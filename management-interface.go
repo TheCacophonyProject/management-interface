@@ -29,8 +29,10 @@ func showDiskSpace(w http.ResponseWriter) error {
 
 	// Run df command to show disk space available on SD card.
 	out, err := exec.Command("sh", "-c", "df -h").Output()
+
 	// On Windows, commands need to be handled like this:
 	//out, err := exec.Command("cmd", "/C", "dir").Output()
+
 	if err != nil {
 		log.Printf(err.Error())
 		fmt.Fprintf(w, err.Error()+"\n")
