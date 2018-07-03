@@ -21,9 +21,14 @@ package main
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os/exec"
+	"strconv"
+	"strings"
 )
+
+const NumPacketsToSend int = 3
 
 func showDiskSpace(w http.ResponseWriter) error {
 
@@ -39,21 +44,82 @@ func showDiskSpace(w http.ResponseWriter) error {
 		fmt.Fprintf(w, "Cannot show disk space at this time.\n")
 		return err
 	}
-	fmt.Fprintf(w, "%s\n", out)
+	fmt.Fprintf(w, "Disk space usage is: \n\n%s\n", out)
 	return nil
 
 }
 
+// Show the available network interfaces on this machine.
+func availableInterfaces(w http.ResponseWriter) error {
+
+	interfaces, err := net.Interfaces()
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(w, "Available network interfaces on this machine:\n\n")
+	for _, i := range interfaces {
+		if i.Name != "lo" {
+
+			fmt.Fprintf(w, "Testing %v...\n", i.Name)
+			fmt.Fprintf(w, "  Sending %v packets\n", NumPacketsToSend)
+
+			// Windows
+			//commandStr := "ping -n " + strconv.Itoa(NumPacketsToSend) + " -w 15 1.1.1.1"
+			//out, _ := exec.Command("cmd", "/C", commandStr).Output()
+			//pos := strings.Index(outStr, "Received =")
+			//if pos != -1 {
+			//	numPacketsReceivedStr := string(outStr[pos+11])
+
+			// Unix
+			commandStr := "ping -I " + i.Name + " -c " + strconv.Itoa(NumPacketsToSend) + " -n -W 15 1.1.1.1"
+			out, _ := exec.Command("sh", "-c", commandStr).Output()
+
+			// Did we get the output we'd expect if the network interface is up?
+			interfaceUp := false
+			outStr := string(out)
+			pos := strings.Index(outStr, "transmitted")
+			if pos != -1 {
+				numPacketsReceivedStr := string(outStr[pos+13])
+				fmt.Fprintf(w, "  Received %v packets\n", numPacketsReceivedStr)
+				numPacketsReceived, _ := strconv.Atoi(numPacketsReceivedStr)
+				if numPacketsReceived > 0 {
+					// I consider this interface to be "up".
+					interfaceUp = true
+				}
+			}
+			if interfaceUp {
+				fmt.Fprintf(w, "\n  %v is UP.\n\n", i.Name)
+			} else {
+				fmt.Fprintf(w, "\n  %v is DOWN.\n\n", i.Name)
+			}
+
+		}
+	}
+	return nil
+}
+
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Fprintf(w, "Disk space usage is: \n\n")
-	showDiskSpace(w)
+	err := showDiskSpace(w)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
+// Show the status of each newtwork interface
+func networkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
+	err := availableInterfaces(w)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func main() {
 
 	http.HandleFunc("/", indexHandler)
+	http.HandleFunc("/net/", networkInterfacesHandler)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 
