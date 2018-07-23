@@ -16,111 +16,119 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-package main
+package managementinterface
 
 import (
-	"fmt"
+	"html/template"
 	"log"
-	"net"
 	"net/http"
 	"os/exec"
-	"strconv"
+	"runtime"
 	"strings"
 )
 
-const NumPacketsToSend int = 3
+// A struct used to wrap data being sent to the HTML templates.
+type dataToBeDisplayed struct {
+	Head  string
+	Body  string
+	Other string
+}
 
-func showDiskSpace(w http.ResponseWriter) error {
+func getDiskSpace() (string, error) {
 
-	// Run df command to show disk space available on SD card.
-	out, err := exec.Command("sh", "-c", "df -h").Output()
-
-	// On Windows, commands need to be handled like this:
-	//out, err := exec.Command("cmd", "/C", "dir").Output()
+	out := make([]byte, 0)
+	err := error(nil)
+	if runtime.GOOS == "windows" {
+		// On Windows, commands need to be handled like this:
+		out, err = exec.Command("cmd", "/C", "dir").Output()
+	} else {
+		// 'Nix.  Run df command to show disk space available on SD card.
+		out, err = exec.Command("sh", "-c", "df -h").Output()
+	}
 
 	if err != nil {
 		log.Printf(err.Error())
-		fmt.Fprintf(w, err.Error()+"\n")
-		fmt.Fprintf(w, "Cannot show disk space at this time.\n")
-		return err
+		//fmt.Fprintf(w, err.Error()+"\n")
+		//fmt.Fprintf(w, "Cannot show disk space at this time.\n")
+		return err.Error(), err
 	}
-	fmt.Fprintf(w, "Disk space usage is: \n\n%s\n", out)
-	return nil
+
+	//fmt.Fprintf(w, "Disk space usage is: \n\n%s\n", out)
+	return string(out), nil
 
 }
 
-// Show the available network interfaces on this machine.
-func availableInterfaces(w http.ResponseWriter) error {
+// Return info on memory e.g. memory used, memory available etc.
+func getMemoryStats() (string, error) {
 
-	interfaces, err := net.Interfaces()
-
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintf(w, "Available network interfaces on this machine:\n\n")
-	for _, i := range interfaces {
-		if i.Name != "lo" {
-
-			fmt.Fprintf(w, "Testing %v...\n", i.Name)
-			fmt.Fprintf(w, "  Sending %v packets\n", NumPacketsToSend)
-
-			// Windows
-			//commandStr := "ping -n " + strconv.Itoa(NumPacketsToSend) + " -w 15 1.1.1.1"
-			//out, _ := exec.Command("cmd", "/C", commandStr).Output()
-			//pos := strings.Index(outStr, "Received =")
-			//if pos != -1 {
-			//	numPacketsReceivedStr := string(outStr[pos+11])
-
-			// Unix
-			commandStr := "ping -I " + i.Name + " -c " + strconv.Itoa(NumPacketsToSend) + " -n -W 15 1.1.1.1"
-			out, _ := exec.Command("sh", "-c", commandStr).Output()
-
-			// Did we get the output we'd expect if the network interface is up?
-			interfaceUp := false
-			outStr := string(out)
-			pos := strings.Index(outStr, "transmitted")
-			if pos != -1 {
-				numPacketsReceivedStr := string(outStr[pos+13])
-				fmt.Fprintf(w, "  Received %v packets\n", numPacketsReceivedStr)
-				numPacketsReceived, _ := strconv.Atoi(numPacketsReceivedStr)
-				if numPacketsReceived > 0 {
-					// I consider this interface to be "up".
-					interfaceUp = true
-				}
-			}
-			if interfaceUp {
-				fmt.Fprintf(w, "\n  %v is UP.\n\n", i.Name)
-			} else {
-				fmt.Fprintf(w, "\n  %v is DOWN.\n\n", i.Name)
-			}
-
-		}
-	}
-	return nil
+	return "Not implemented yet.", nil
 }
 
-func indexHandler(w http.ResponseWriter, r *http.Request) {
+// DiskMemoryHandler shows disk space usage and memory usage
+func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 
-	err := showDiskSpace(w)
+	diskData, err := getDiskSpace()
 	if err != nil {
 		log.Fatal(err)
 	}
+	// Want to separate this into multiple lines so that can display each line on a separate line in HTML
+	temp := strings.Split(diskData, "\n")
+	outputStrings := make([]StringToBeDisplayed, 0)
+	for _, str := range temp {
+		outputStrings = append(outputStrings, StringToBeDisplayed{Text: str})
+	}
+	// Need to put our output string in a struct so we can access it from html
+	outputStruct := MultiLineStringToBeDisplayed{Strings: outputStrings}
+
+	// memoryData, err := getMemoryStats()
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	t, _ := template.ParseFiles("../html/disk-memory.html")
+	t.Execute(w, outputStruct)
+
 }
 
-// Show the status of each newtwork interface
-func networkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
-	err := availableInterfaces(w)
+// IndexHandler is the root handler.
+func IndexHandler(w http.ResponseWriter, r *http.Request) {
+
+	t, _ := template.ParseFiles("../html/index.html")
+	t.Execute(w, "")
+
+}
+
+// NetworkInterfacesHandler - Show the status of each newtwork interface
+func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
+	data, err := AvailableInterfaces()
+	//fmt.Println(data) // remove later
 	if err != nil {
 		log.Fatal(err)
 	}
+	// Need to put our output string in a struct so we can access it from html
+	outputStruct := MultiLineStringToBeDisplayed{Strings: data}
+
+	t, _ := template.ParseFiles("../html/network-interfaces.html")
+	t.Execute(w, outputStruct)
 }
 
-func main() {
+// CameraPositioningHandler will show a frame from the camera to help with positioning
+func CameraPositioningHandler(w http.ResponseWriter, r *http.Request) {
+	t, _ := template.ParseFiles("../html/camera-positioning.html")
+	t.Execute(w, "Some data")
 
-	http.HandleFunc("/", indexHandler)
-	http.HandleFunc("/net/", networkInterfacesHandler)
+}
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+// ThreeGConnectivityHandler - Do we have 3G Connectivity?
+func ThreeGConnectivityHandler(w http.ResponseWriter, r *http.Request) {
+	t, _ := template.ParseFiles("../html/3G-connectivity.html")
+	t.Execute(w, "Some data")
+
+}
+
+// APIServerHandler - API Server stuff
+func APIServerHandler(w http.ResponseWriter, r *http.Request) {
+	t, _ := template.ParseFiles("../html/API-server.html")
+	t.Execute(w, "Some data")
 
 }
