@@ -22,18 +22,23 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/TheCacophonyProject/management-interface"
+	"github.com/gobuffalo/packr"
+
+	managementinterface "github.com/TheCacophonyProject/management-interface"
 )
 
 // Set up and handle page requests.
 func main() {
-
 	http.HandleFunc("/3G-connectivity.html/", managementinterface.ThreeGConnectivityHandler)
 	http.HandleFunc("/API-server.html/", managementinterface.APIServerHandler)
 	http.HandleFunc("/camera-positioning.html/", managementinterface.CameraPositioningHandler)
 	http.HandleFunc("/", managementinterface.IndexHandler)
 	http.HandleFunc("/network-interfaces.html/", managementinterface.NetworkInterfacesHandler)
 	http.HandleFunc("/disk-memory.html/", managementinterface.DiskMemoryHandler)
+
+	// Serve up static content.
+	static := packr.NewBox("../../static")
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(static)))
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 
