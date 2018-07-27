@@ -72,18 +72,21 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 	// Want to separate this into multiple lines so that can display each line on a separate line in HTML
-	temp := strings.Split(diskData, "\n")
 	outputStrings := make([]StringToBeDisplayed, 0)
-	for _, str := range temp {
+	for _, str := range strings.Split(diskData, "\n") {
 		outputStrings = append(outputStrings, StringToBeDisplayed{Text: str})
 	}
-	// Need to put our output string in a struct so we can access it from html
-	outputStruct := MultiLineStringToBeDisplayed{Strings: outputStrings}
 
 	// memoryData, err := getMemoryStats()
 	// if err != nil {
 	// 	log.Fatal(err)
 	// }
+	// for _, str := range strings.Split(memoryData, "\n") {
+	// 	outputStrings = append(outputStrings, StringToBeDisplayed{Text: str})
+	// }
+
+	// Need to put our output string in a struct so we can access it from html
+	outputStruct := MultiLineStringToBeDisplayed{Strings: outputStrings}
 
 	t, _ := template.ParseFiles("../html/disk-memory.html")
 	t.Execute(w, outputStruct)
