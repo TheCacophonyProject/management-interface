@@ -27,7 +27,6 @@ import (
 
 // Set up and handle page requests.
 func main() {
-
 	http.HandleFunc("/3G-connectivity.html/", managementinterface.ThreeGConnectivityHandler)
 	http.HandleFunc("/API-server.html/", managementinterface.APIServerHandler)
 	http.HandleFunc("/camera-positioning.html/", managementinterface.CameraPositioningHandler)

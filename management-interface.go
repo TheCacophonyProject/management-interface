@@ -25,7 +25,16 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"github.com/gobuffalo/packr"
 )
+
+var templateSrc = packr.NewBox("./html")
+
+func parseTemplate(name string) *template.Template {
+	t := template.New(name)
+	return template.Must(t.Parse(templateSrc.String(name)))
+}
 
 // A struct used to wrap data being sent to the HTML templates.
 type dataToBeDisplayed struct {
@@ -35,8 +44,7 @@ type dataToBeDisplayed struct {
 }
 
 func getDiskSpace() (string, error) {
-
-	out := make([]byte, 0)
+	var out []byte
 	err := error(nil)
 	if runtime.GOOS == "windows" {
 		// On Windows, commands need to be handled like this:
@@ -48,12 +56,8 @@ func getDiskSpace() (string, error) {
 
 	if err != nil {
 		log.Printf(err.Error())
-		//fmt.Fprintf(w, err.Error()+"\n")
-		//fmt.Fprintf(w, "Cannot show disk space at this time.\n")
 		return err.Error(), err
 	}
-
-	//fmt.Fprintf(w, "Disk space usage is: \n\n%s\n", out)
 	return string(out), nil
 
 }
@@ -72,8 +76,9 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 	// Want to separate this into multiple lines so that can display each line on a separate line in HTML
-	outputStrings := make([]StringToBeDisplayed, 0)
-	for _, str := range strings.Split(diskData, "\n") {
+	temp := strings.Split(diskData, "\n")
+	var outputStrings []StringToBeDisplayed
+	for _, str := range temp {
 		outputStrings = append(outputStrings, StringToBeDisplayed{Text: str})
 	}
 
@@ -88,15 +93,14 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 	// Need to put our output string in a struct so we can access it from html
 	outputStruct := MultiLineStringToBeDisplayed{Strings: outputStrings}
 
-	t, _ := template.ParseFiles("../html/disk-memory.html")
+	t := parseTemplate("disk-memory.html")
 	t.Execute(w, outputStruct)
 
 }
 
 // IndexHandler is the root handler.
 func IndexHandler(w http.ResponseWriter, r *http.Request) {
-
-	t, _ := template.ParseFiles("../html/index.html")
+	t := parseTemplate("index.html")
 	t.Execute(w, "")
 
 }
@@ -104,34 +108,33 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 // NetworkInterfacesHandler - Show the status of each newtwork interface
 func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := AvailableInterfaces()
-	//fmt.Println(data) // remove later
 	if err != nil {
 		log.Fatal(err)
 	}
 	// Need to put our output string in a struct so we can access it from html
 	outputStruct := MultiLineStringToBeDisplayed{Strings: data}
 
-	t, _ := template.ParseFiles("../html/network-interfaces.html")
+	t := parseTemplate("network-interfaces.html")
 	t.Execute(w, outputStruct)
 }
 
 // CameraPositioningHandler will show a frame from the camera to help with positioning
 func CameraPositioningHandler(w http.ResponseWriter, r *http.Request) {
-	t, _ := template.ParseFiles("../html/camera-positioning.html")
+	t := parseTemplate("camera-positioning.html")
 	t.Execute(w, "Some data")
 
 }
 
 // ThreeGConnectivityHandler - Do we have 3G Connectivity?
 func ThreeGConnectivityHandler(w http.ResponseWriter, r *http.Request) {
-	t, _ := template.ParseFiles("../html/3G-connectivity.html")
+	t := parseTemplate("3G-connectivity.html")
 	t.Execute(w, "Some data")
 
 }
 
 // APIServerHandler - API Server stuff
 func APIServerHandler(w http.ResponseWriter, r *http.Request) {
-	t, _ := template.ParseFiles("../html/API-server.html")
+	t := parseTemplate("API-server.html")
 	t.Execute(w, "Some data")
 
 }
