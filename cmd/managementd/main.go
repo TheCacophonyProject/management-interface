@@ -23,23 +23,24 @@ import (
 	"net/http"
 
 	"github.com/gobuffalo/packr"
+	"github.com/gorilla/mux"
 
 	managementinterface "github.com/TheCacophonyProject/management-interface"
 )
 
 // Set up and handle page requests.
 func main() {
-	http.HandleFunc("/3G-connectivity.html/", managementinterface.ThreeGConnectivityHandler)
-	http.HandleFunc("/API-server.html/", managementinterface.APIServerHandler)
-	http.HandleFunc("/camera-positioning.html/", managementinterface.CameraPositioningHandler)
-	http.HandleFunc("/", managementinterface.IndexHandler)
-	http.HandleFunc("/network-interfaces.html/", managementinterface.NetworkInterfacesHandler)
-	http.HandleFunc("/disk-memory.html/", managementinterface.DiskMemoryHandler)
+	router := mux.NewRouter()
+	router.HandleFunc("/3G-connectivity.html", managementinterface.ThreeGConnectivityHandler).Methods("GET")
+	router.HandleFunc("/API-server.html", managementinterface.APIServerHandler).Methods("GET")
+	router.HandleFunc("/camera-positioning.html", managementinterface.CameraPositioningHandler).Methods("GET")
+	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
+	router.HandleFunc("/network-interfaces.html", managementinterface.NetworkInterfacesHandler).Methods("GET")
+	router.HandleFunc("/disk-memory.html", managementinterface.DiskMemoryHandler).Methods("GET")
 
 	// Serve up static content.
 	static := packr.NewBox("../../static")
-	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(static)))
+	router.Handle("/static/", http.StripPrefix("/static/", http.FileServer(static))).Methods("GET")
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
-
+	log.Fatal(http.ListenAndServe(":8080", router))
 }
