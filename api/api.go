@@ -48,7 +48,7 @@ func GetRecordings(w http.ResponseWriter, r *http.Request) {
 func GetRecording(w http.ResponseWriter, r *http.Request) {
 	recordingName := mux.Vars(r)["id"]
 	log.Printf("get recording '%s'", recordingName)
-	if checkIfCptvFile(recordingName) == false {
+	if !checkIfCptvFile(recordingName) {
 		w.WriteHeader(http.StatusBadRequest)
 		io.WriteString(w, "cptv file not found\n")
 		return
@@ -69,10 +69,9 @@ func GetRecording(w http.ResponseWriter, r *http.Request) {
 
 // DeleteRecording deletes the given cptv file
 func DeleteRecording(w http.ResponseWriter, r *http.Request) {
-	// check that it is a cptv recording that is requested.
 	cptvName := mux.Vars(r)["id"]
 	log.Printf("delete cptv '%s'", cptvName)
-	if checkIfCptvFile(cptvName) == false {
+	if !checkIfCptvFile(cptvName) {
 		w.WriteHeader(http.StatusOK)
 		io.WriteString(w, "cptv file not found\n")
 		return
