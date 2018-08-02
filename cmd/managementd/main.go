@@ -41,7 +41,7 @@ func main() {
 
 	// Serve up static content.
 	static := packr.NewBox("../../static")
-	router.Handle("/static/", http.StripPrefix("/static/", http.FileServer(static))).Methods("GET")
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(static)))
 
 	// API
 	router.HandleFunc("/api/recordings", api.GetRecordings).Methods("GET")
