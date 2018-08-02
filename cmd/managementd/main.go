@@ -26,6 +26,7 @@ import (
 	"github.com/gorilla/mux"
 
 	managementinterface "github.com/TheCacophonyProject/management-interface"
+	api "github.com/TheCacophonyProject/management-interface/api"
 )
 
 // Set up and handle page requests.
@@ -41,6 +42,11 @@ func main() {
 	// Serve up static content.
 	static := packr.NewBox("../../static")
 	router.Handle("/static/", http.StripPrefix("/static/", http.FileServer(static))).Methods("GET")
+
+	// API
+	router.HandleFunc("/api/recordings", api.GetRecordings).Methods("GET")
+	router.HandleFunc("/api/recording/{id}", api.GetRecording).Methods("GET")
+	router.HandleFunc("/api/recording/{id}", api.DeleteRecording).Methods("DELETE")
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
