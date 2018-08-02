@@ -66,12 +66,12 @@ func (api *ManagementAPI) GetRecording(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, recordingName))
 	w.Header().Set("Content-Type", "application/x-cptv")
 	f, err := os.Open(filepath.Join(api.cptvDir, recordingName))
-	defer f.Close()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Println(err)
 		return
 	}
+	defer f.Close()
 	w.WriteHeader(http.StatusOK)
 	io.Copy(w, bufio.NewReader(f))
 }
