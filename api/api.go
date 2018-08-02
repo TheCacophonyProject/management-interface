@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-package managementapi
+package api
 
 import (
 	"bufio"
@@ -32,52 +32,65 @@ import (
 )
 
 const (
-	cptvDir  = "/var/spool/cptv/"
 	cptvGlob = "*.cptv"
 )
 
+type ManagementAPI struct {
+	cptvDir string
+}
+
+func NewAPI(cptvDir string) *ManagementAPI {
+	return &ManagementAPI{
+		cptvDir: cptvDir,
+	}
+}
+
 // GetRecordings returns a list of cptv files in a array.
-func GetRecordings(w http.ResponseWriter, r *http.Request) {
+func (api *ManagementAPI) GetRecordings(w http.ResponseWriter, r *http.Request) {
 	log.Println("get recordings")
-	names := getCptvNames()
+	names := getCptvNames(api.cptvDir)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(names)
 }
 
 // GetRecording downloads a cptv file
-func GetRecording(w http.ResponseWriter, r *http.Request) {
+func (api *ManagementAPI) GetRecording(w http.ResponseWriter, r *http.Request) {
 	recordingName := mux.Vars(r)["id"]
 	log.Printf("get recording '%s'", recordingName)
-	if !checkIfCptvFile(recordingName) {
+	if !checkIfCptvFile(recordingName, api.cptvDir) {
 		w.WriteHeader(http.StatusBadRequest)
 		io.WriteString(w, "cptv file not found\n")
 		return
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", recordingName))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, recordingName))
 	w.Header().Set("Content-Type", "application/x-cptv")
-	f, err := os.Open(filepath.Join(cptvDir, recordingName))
+	f, err := os.Open(filepath.Join(api.cptvDir, recordingName))
+	defer f.Close()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Println(err)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	reader := bufio.NewReader(f)
-	io.Copy(w, reader)
+	io.Copy(w, bufio.NewReader(f))
 }
 
 // DeleteRecording deletes the given cptv file
-func DeleteRecording(w http.ResponseWriter, r *http.Request) {
+func (api *ManagementAPI) DeleteRecording(w http.ResponseWriter, r *http.Request) {
 	cptvName := mux.Vars(r)["id"]
 	log.Printf("delete cptv '%s'", cptvName)
-	if !checkIfCptvFile(cptvName) {
+	if !checkIfCptvFile(cptvName, api.cptvDir) {
 		w.WriteHeader(http.StatusOK)
 		io.WriteString(w, "cptv file not found\n")
 		return
 	}
-	err := os.Remove(filepath.Join(cptvDir, cptvName))
-	if err != nil {
+	err := os.Remove(filepath.Join(api.cptvDir, cptvName))
+	if os.IsNotExist(err) {
+		w.WriteHeader(http.StatusOK)
+		io.WriteString(w, "cptv file not found\n")
+		return
+	} else if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "failed to delete file")
@@ -87,8 +100,8 @@ func DeleteRecording(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "cptv file deleted")
 }
 
-func getCptvNames() []string {
-	matches, _ := filepath.Glob(filepath.Join(cptvDir, cptvGlob))
+func getCptvNames(dir string) []string {
+	matches, _ := filepath.Glob(filepath.Join(dir, cptvGlob))
 	names := make([]string, len(matches))
 	for i, filename := range matches {
 		names[i] = filepath.Base(filename)
@@ -96,8 +109,8 @@ func getCptvNames() []string {
 	return names
 }
 
-func checkIfCptvFile(cptv string) bool {
-	for _, n := range getCptvNames() {
+func checkIfCptvFile(cptv, dir string) bool {
+	for _, n := range getCptvNames(dir) {
 		if n == cptv {
 			return true
 		}

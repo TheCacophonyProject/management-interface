@@ -26,7 +26,11 @@ import (
 	"github.com/gorilla/mux"
 
 	managementinterface "github.com/TheCacophonyProject/management-interface"
-	api "github.com/TheCacophonyProject/management-interface/api"
+	"github.com/TheCacophonyProject/management-interface/api"
+)
+
+const (
+	cptvDir = "/var/spool/cptv/"
 )
 
 // Set up and handle page requests.
@@ -44,9 +48,10 @@ func main() {
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(static)))
 
 	// API
-	router.HandleFunc("/api/recordings", api.GetRecordings).Methods("GET")
-	router.HandleFunc("/api/recording/{id}", api.GetRecording).Methods("GET")
-	router.HandleFunc("/api/recording/{id}", api.DeleteRecording).Methods("DELETE")
+	apiObj := api.NewAPI(cptvDir)
+	router.HandleFunc("/api/recordings", apiObj.GetRecordings).Methods("GET")
+	router.HandleFunc("/api/recording/{id}", apiObj.GetRecording).Methods("GET")
+	router.HandleFunc("/api/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
