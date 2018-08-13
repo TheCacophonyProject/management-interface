@@ -36,12 +36,12 @@ const (
 // Set up and handle page requests.
 func main() {
 	router := mux.NewRouter()
-	router.HandleFunc("/3G-connectivity.html", managementinterface.ThreeGConnectivityHandler).Methods("GET")
-	router.HandleFunc("/API-server.html", managementinterface.APIServerHandler).Methods("GET")
-	router.HandleFunc("/camera-positioning.html", managementinterface.CameraPositioningHandler).Methods("GET")
+	router.HandleFunc("/3G-connectivity", managementinterface.ThreeGConnectivityHandler).Methods("GET")
+	router.HandleFunc("/API-server", managementinterface.APIServerHandler).Methods("GET")
+	router.HandleFunc("/camera-positioning", managementinterface.CameraPositioningHandler).Methods("GET")
 	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
-	router.HandleFunc("/network-interfaces.html", managementinterface.NetworkInterfacesHandler).Methods("GET")
-	router.HandleFunc("/disk-memory.html", managementinterface.DiskMemoryHandler).Methods("GET")
+	router.HandleFunc("/network-interfaces", managementinterface.NetworkInterfacesHandler).Methods("GET")
+	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
 
 	// Serve up static content.
 	static := packr.NewBox("../../static")
