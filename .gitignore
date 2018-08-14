@@ -1,3 +1,5 @@
 debug
 *.exe
 /.vscode/
+/dist/
+/main

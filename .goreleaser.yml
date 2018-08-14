@@ -1,0 +1,36 @@
+project_name: management-interface
+
+release:
+  github:
+    owner: TheCacophonyProject
+    name: management-interface
+  name_template: '{{.Tag}}'
+
+builds:
+- goos:
+  - linux
+  goarch:
+  - arm
+  goarm:
+  - "7"
+  main: cmd/managementd/main.go
+  ldflags: -s -w -X main.version={{.Version}}
+  binary: management-interface
+
+nfpm:
+  vendor: The Cacophony Project
+  homepage: http://cacophony.org.nz/
+  maintainer: Cameron Ryan-Pears <cameron@cacophony.org.nz>
+  description: Management interface for Cacophonators
+  license: GPL v3.0
+  name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}"
+  formats:
+    - deb
+  bindir: /usr/bin
+  files:
+    "_release/cacophonator-management.service": "/etc/avahi/services/cacophonator-management.service"
+
+checksum:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
+
+dist: dist
