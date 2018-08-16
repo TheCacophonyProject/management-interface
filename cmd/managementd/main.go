@@ -33,8 +33,12 @@ const (
 	cptvDir = "/var/spool/cptv/"
 )
 
+var version = "<not set>"
+
 // Set up and handle page requests.
 func main() {
+	log.SetFlags(0) // Removes default timestamp flag
+	log.Printf("running version: %s", version)
 	router := mux.NewRouter()
 	router.HandleFunc("/3G-connectivity", managementinterface.ThreeGConnectivityHandler).Methods("GET")
 	router.HandleFunc("/API-server", managementinterface.APIServerHandler).Methods("GET")
