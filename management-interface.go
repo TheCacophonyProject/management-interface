@@ -65,7 +65,21 @@ func getDiskSpace() (string, error) {
 // Return info on memory e.g. memory used, memory available etc.
 func getMemoryStats() (string, error) {
 
-	return "Not implemented yet.", nil
+	var out []byte
+	err := error(nil)
+	if runtime.GOOS == "windows" {
+		// Will show more than just memory stuff.
+		out, err = exec.Command("cmd", "/C", "systeminfo").Output()
+	} else {
+		// 'Nix.  Run vmstat command to show memory stats.
+		out, err = exec.Command("sh", "-c", "vmstat -s").Output()
+	}
+
+	if err != nil {
+		log.Printf(err.Error())
+		return err.Error(), err
+	}
+	return string(out), nil
 }
 
 // DiskMemoryHandler shows disk space usage and memory usage
@@ -76,19 +90,18 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 	// Want to separate this into multiple lines so that can display each line on a separate line in HTML
-	temp := strings.Split(diskData, "\n")
 	var outputStrings []StringToBeDisplayed
-	for _, str := range temp {
+	for _, str := range strings.Split(diskData, "\n") {
 		outputStrings = append(outputStrings, StringToBeDisplayed{Text: str})
 	}
 
-	// memoryData, err := getMemoryStats()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// for _, str := range strings.Split(memoryData, "\n") {
-	// 	outputStrings = append(outputStrings, StringToBeDisplayed{Text: str})
-	// }
+	memoryData, err := getMemoryStats()
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, str := range strings.Split(memoryData, "\n") {
+		outputStrings = append(outputStrings, StringToBeDisplayed{Text: str})
+	}
 
 	// Need to put our output string in a struct so we can access it from html
 	outputStruct := MultiLineStringToBeDisplayed{Strings: outputStrings}
