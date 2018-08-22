@@ -25,15 +25,14 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
-
-	"github.com/gobuffalo/packr"
 )
 
-var templateSrc = packr.NewBox("./html")
+// tmpl is our pointer to our parsed templates.
+var tmpl *template.Template
 
-func parseTemplate(name string) *template.Template {
-	t := template.New(name)
-	return template.Must(t.Parse(templateSrc.String(name)))
+// ParseTemplates parses our html templates upfront.
+func ParseTemplates() {
+	tmpl = template.Must(template.ParseGlob("../../html/*"))
 }
 
 // A struct used to wrap data being sent to the HTML templates.
@@ -106,16 +105,12 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 	// Need to put our output string in a struct so we can access it from html
 	outputStruct := MultiLineStringToBeDisplayed{Strings: outputStrings}
 
-	t := parseTemplate("disk-memory.html")
-	t.Execute(w, outputStruct)
-
+	tmpl.ExecuteTemplate(w, "disk-memory.html", outputStruct)
 }
 
 // IndexHandler is the root handler.
 func IndexHandler(w http.ResponseWriter, r *http.Request) {
-	t := parseTemplate("index.html")
-	t.Execute(w, "")
-
+	tmpl.ExecuteTemplate(w, "index.html", nil)
 }
 
 // NetworkInterfacesHandler - Show the status of each newtwork interface
@@ -127,27 +122,20 @@ func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 	// Need to put our output string in a struct so we can access it from html
 	outputStruct := MultiLineStringToBeDisplayed{Strings: data}
 
-	t := parseTemplate("network-interfaces.html")
-	t.Execute(w, outputStruct)
+	tmpl.ExecuteTemplate(w, "network-interfaces.html", outputStruct)
 }
 
 // CameraPositioningHandler will show a frame from the camera to help with positioning
 func CameraPositioningHandler(w http.ResponseWriter, r *http.Request) {
-	t := parseTemplate("camera-positioning.html")
-	t.Execute(w, "Some data")
-
+	tmpl.ExecuteTemplate(w, "camera-positioning.html", nil)
 }
 
 // ThreeGConnectivityHandler - Do we have 3G Connectivity?
 func ThreeGConnectivityHandler(w http.ResponseWriter, r *http.Request) {
-	t := parseTemplate("3G-connectivity.html")
-	t.Execute(w, "Some data")
-
+	tmpl.ExecuteTemplate(w, "3G-connectivity.html", nil)
 }
 
 // APIServerHandler - API Server stuff
 func APIServerHandler(w http.ResponseWriter, r *http.Request) {
-	t := parseTemplate("API-server.html")
-	t.Execute(w, "Some data")
-
+	tmpl.ExecuteTemplate(w, "API-server.html", nil)
 }

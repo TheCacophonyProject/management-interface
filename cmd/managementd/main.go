@@ -39,6 +39,7 @@ var version = "<not set>"
 func main() {
 	log.SetFlags(0) // Removes default timestamp flag
 	log.Printf("running version: %s", version)
+	managementinterface.ParseTemplates()
 	router := mux.NewRouter()
 	router.HandleFunc("/3G-connectivity", managementinterface.ThreeGConnectivityHandler).Methods("GET")
 	router.HandleFunc("/API-server", managementinterface.APIServerHandler).Methods("GET")
