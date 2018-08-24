@@ -39,7 +39,6 @@ var version = "<not set>"
 func main() {
 	log.SetFlags(0) // Removes default timestamp flag
 	log.Printf("running version: %s", version)
-	managementinterface.ParseTemplates()
 	router := mux.NewRouter()
 	router.HandleFunc("/3G-connectivity", managementinterface.ThreeGConnectivityHandler).Methods("GET")
 	router.HandleFunc("/API-server", managementinterface.APIServerHandler).Methods("GET")
@@ -51,6 +50,9 @@ func main() {
 	// Serve up static content.
 	static := packr.NewBox("../../static")
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(static)))
+
+	// Parse html templates.
+	//managementinterface.ParseTemplates()
 
 	// API
 	apiObj := api.NewAPI(cptvDir)

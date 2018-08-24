@@ -25,14 +25,24 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"github.com/gobuffalo/packr"
 )
+
+// Using a packr box means the html files are bundled up in the binary application.
+var templateBox = packr.NewBox("./html")
 
 // tmpl is our pointer to our parsed templates.
 var tmpl *template.Template
 
-// ParseTemplates parses our html templates upfront.
-func ParseTemplates() {
-	tmpl = template.Must(template.ParseGlob("../../html/*"))
+// This parses our html templates up front.
+func init() {
+	tmpl = template.New("")
+
+	for _, name := range templateBox.List() {
+		t := tmpl.New(name)
+		template.Must(t.Parse(templateBox.String(name)))
+	}
 }
 
 // A struct used to wrap data being sent to the HTML templates.
