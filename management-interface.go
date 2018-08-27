@@ -29,11 +29,20 @@ import (
 	"github.com/gobuffalo/packr"
 )
 
-var templateSrc = packr.NewBox("./html")
+// Using a packr box means the html files are bundled up in the binary application.
+var templateBox = packr.NewBox("./html")
 
-func parseTemplate(name string) *template.Template {
-	t := template.New(name)
-	return template.Must(t.Parse(templateSrc.String(name)))
+// tmpl is our pointer to our parsed templates.
+var tmpl *template.Template
+
+// This parses our html templates up front.
+func init() {
+	tmpl = template.New("")
+
+	for _, name := range templateBox.List() {
+		t := tmpl.New(name)
+		template.Must(t.Parse(templateBox.String(name)))
+	}
 }
 
 // A struct used to wrap data being sent to the HTML templates.
@@ -106,16 +115,12 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 	// Need to put our output string in a struct so we can access it from html
 	outputStruct := MultiLineStringToBeDisplayed{Strings: outputStrings}
 
-	t := parseTemplate("disk-memory.html")
-	t.Execute(w, outputStruct)
-
+	tmpl.ExecuteTemplate(w, "disk-memory.html", outputStruct)
 }
 
 // IndexHandler is the root handler.
 func IndexHandler(w http.ResponseWriter, r *http.Request) {
-	t := parseTemplate("index.html")
-	t.Execute(w, "")
-
+	tmpl.ExecuteTemplate(w, "index.html", nil)
 }
 
 // NetworkInterfacesHandler - Show the status of each newtwork interface
@@ -127,27 +132,20 @@ func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 	// Need to put our output string in a struct so we can access it from html
 	outputStruct := MultiLineStringToBeDisplayed{Strings: data}
 
-	t := parseTemplate("network-interfaces.html")
-	t.Execute(w, outputStruct)
+	tmpl.ExecuteTemplate(w, "network-interfaces.html", outputStruct)
 }
 
 // CameraPositioningHandler will show a frame from the camera to help with positioning
 func CameraPositioningHandler(w http.ResponseWriter, r *http.Request) {
-	t := parseTemplate("camera-positioning.html")
-	t.Execute(w, "Some data")
-
+	tmpl.ExecuteTemplate(w, "camera-positioning.html", nil)
 }
 
 // ThreeGConnectivityHandler - Do we have 3G Connectivity?
 func ThreeGConnectivityHandler(w http.ResponseWriter, r *http.Request) {
-	t := parseTemplate("3G-connectivity.html")
-	t.Execute(w, "Some data")
-
+	tmpl.ExecuteTemplate(w, "3G-connectivity.html", nil)
 }
 
 // APIServerHandler - API Server stuff
 func APIServerHandler(w http.ResponseWriter, r *http.Request) {
-	t := parseTemplate("API-server.html")
-	t.Execute(w, "Some data")
-
+	tmpl.ExecuteTemplate(w, "API-server.html", nil)
 }

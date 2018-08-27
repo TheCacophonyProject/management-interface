@@ -51,6 +51,9 @@ func main() {
 	static := packr.NewBox("../../static")
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(static)))
 
+	// Parse html templates.
+	//managementinterface.ParseTemplates()
+
 	// API
 	apiObj := api.NewAPI(cptvDir)
 	router.HandleFunc("/api/recordings", apiObj.GetRecordings).Methods("GET")
