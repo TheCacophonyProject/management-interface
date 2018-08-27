@@ -19,6 +19,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -30,29 +31,30 @@ import (
 )
 
 const (
-	cptvDir = "/var/spool/cptv/"
+	cptvDir    = "/var/spool/cptv/"
+	listenPort = 8080
 )
 
 var version = "<not set>"
 
 // Set up and handle page requests.
 func main() {
-	log.SetFlags(0) // Removes default timestamp flag
+	log.SetFlags(0) // Removes timestamp output
 	log.Printf("running version: %s", version)
+
 	router := mux.NewRouter()
-	router.HandleFunc("/3G-connectivity", managementinterface.ThreeGConnectivityHandler).Methods("GET")
-	router.HandleFunc("/API-server", managementinterface.APIServerHandler).Methods("GET")
-	router.HandleFunc("/camera-positioning", managementinterface.CameraPositioningHandler).Methods("GET")
-	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
-	router.HandleFunc("/network-interfaces", managementinterface.NetworkInterfacesHandler).Methods("GET")
-	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
 
 	// Serve up static content.
 	static := packr.NewBox("../../static")
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(static)))
 
-	// Parse html templates.
-	//managementinterface.ParseTemplates()
+	// UI handlers.
+	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
+	router.HandleFunc("/3G-connectivity", managementinterface.ThreeGConnectivityHandler).Methods("GET")
+	router.HandleFunc("/API-server", managementinterface.APIServerHandler).Methods("GET")
+	router.HandleFunc("/camera-positioning", managementinterface.CameraPositioningHandler).Methods("GET")
+	router.HandleFunc("/network-interfaces", managementinterface.NetworkInterfacesHandler).Methods("GET")
+	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
 
 	// API
 	apiObj := api.NewAPI(cptvDir)
@@ -60,5 +62,7 @@ func main() {
 	router.HandleFunc("/api/recording/{id}", apiObj.GetRecording).Methods("GET")
 	router.HandleFunc("/api/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
 
-	log.Fatal(http.ListenAndServe(":8080", router))
+	listenAddr := fmt.Sprintf(":%d", listenPort)
+	log.Printf("listening on %s", listenAddr)
+	log.Fatal(http.ListenAndServe(listenAddr, router))
 }
