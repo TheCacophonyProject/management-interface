@@ -104,7 +104,7 @@ func (api *ManagementAPI) DeleteRecording(w http.ResponseWriter, r *http.Request
 func (api *ManagementAPI) TakeSnapshot(w http.ResponseWriter, r *http.Request) {
 	_, err := exec.Command("sh", "-c", "dbus-send --system --type=method_call --print-reply --dest=org.cacophony.thermalrecorder /org/cacophony/thermalrecorder org.cacophony.thermalrecorder.TakeSnapshot").Output()
 	if err != nil {
-		log.Println("error taking snapshot")
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }

@@ -18,6 +18,11 @@
 
     <div class="container">
       <h2>Camera Positioning</h2>
+      <div id="timeout-message" style="display: none;">
+        <p> Timeout for camera viewing.</p>
+        <button type="button" onclick="restartCameraViewing()">Continue viewing camera</button>
+      </div>
+
       <img id="snapshot-image" src="/snapshot-image" style="width:100%;max-width:800px;">
     </div>
 
