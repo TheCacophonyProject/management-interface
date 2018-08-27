@@ -151,3 +151,8 @@ func APIServerHandler(w http.ResponseWriter, r *http.Request) {
 	t.Execute(w, "Some data")
 
 }
+
+// GetSnapshot - Still image from Lepton camera
+func GetSnapshot(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "/var/spool/cptv/still.png")
+}

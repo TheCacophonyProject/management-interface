@@ -26,6 +26,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/gorilla/mux"
@@ -98,6 +99,14 @@ func (api *ManagementAPI) DeleteRecording(w http.ResponseWriter, r *http.Request
 	}
 	w.WriteHeader(http.StatusOK)
 	io.WriteString(w, "cptv file deleted")
+}
+
+func (api *ManagementAPI) TakeSnapshot(w http.ResponseWriter, r *http.Request) {
+	_, err := exec.Command("sh", "-c", "dbus-send --system --type=method_call --print-reply --dest=org.cacophony.thermalrecorder /org/cacophony/thermalrecorder org.cacophony.thermalrecorder.TakeSnapshot").Output()
+	if err != nil {
+		log.Println("error taking snapshot")
+		return
+	}
 }
 
 func getCptvNames(dir string) []string {

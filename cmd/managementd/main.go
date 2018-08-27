@@ -46,6 +46,7 @@ func main() {
 	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
 	router.HandleFunc("/network-interfaces", managementinterface.NetworkInterfacesHandler).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
+	router.HandleFunc("/snapshot-image", managementinterface.GetSnapshot).Methods("GET")
 
 	// Serve up static content.
 	static := packr.NewBox("../../static")
@@ -56,6 +57,7 @@ func main() {
 	router.HandleFunc("/api/recordings", apiObj.GetRecordings).Methods("GET")
 	router.HandleFunc("/api/recording/{id}", apiObj.GetRecording).Methods("GET")
 	router.HandleFunc("/api/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
+	router.HandleFunc("/api/take-snapshot", apiObj.TakeSnapshot).Methods("GET")
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
