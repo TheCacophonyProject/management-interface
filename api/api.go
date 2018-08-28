@@ -26,9 +26,9 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 
+	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
 )
 
@@ -101,8 +101,11 @@ func (api *ManagementAPI) DeleteRecording(w http.ResponseWriter, r *http.Request
 	io.WriteString(w, "cptv file deleted")
 }
 
+// TakeSnapshot will request a new snapshot to be taken by thermal-recorder
 func (api *ManagementAPI) TakeSnapshot(w http.ResponseWriter, r *http.Request) {
-	_, err := exec.Command("sh", "-c", "dbus-send --system --type=method_call --print-reply --dest=org.cacophony.thermalrecorder /org/cacophony/thermalrecorder org.cacophony.thermalrecorder.TakeSnapshot").Output()
+	conn, err := dbus.SystemBus()
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
+	err = recorder.Call("org.cacophony.thermalrecorder.TakeSnapshot", 0).Err
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
