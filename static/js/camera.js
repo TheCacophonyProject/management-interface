@@ -14,8 +14,8 @@ function restartCameraViewing() {
 async function updateSnapshotLoop() {
   var xmlHttp = new XMLHttpRequest();
   xmlHttp.open("PUT", "/api/camera/snapshot", true);
-  xmlHttp.onreadystatechange = async function() {
-    if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
+  xmlHttp.onload = async function() {
+    if (xmlHttp.status == 200) {
       let snapshot = document.getElementById("snapshot-image")
       snapshot.src = "/camera/snapshot?"+ new Date().getTime();
       await sleep(500);
@@ -25,9 +25,15 @@ async function updateSnapshotLoop() {
       } else {
         stopSnapshots('Timeout for camera viewing.');
       }
-    } else if (xmlHttp.readyState == 4 && xmlHttp.status != 200) {
+    } else {
+      console.log("status:", xmlHttp.status);
+      console.log("response:", xmlHttp.response);
       stopSnapshots('Error getting new snapshot.')
     }
+  }
+  xmlHttp.onerror = function(err) {
+    console.log('error:', err);
+    stopSnapshots('Error getting new snapshot');
   }
   xmlHttp.send( null );
 }
