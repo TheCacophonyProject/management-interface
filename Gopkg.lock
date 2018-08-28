@@ -8,6 +8,12 @@
   version = "v1.12.0"
 
 [[projects]]
+  name = "github.com/godbus/dbus"
+  packages = ["."]
+  revision = "a389bdde4dd695d414e47b755e95e72b7826432c"
+  version = "v4.1.0"
+
+[[projects]]
   name = "github.com/gorilla/context"
   packages = ["."]
   revision = "08b5f424b9271eedf6f9f0ce86cb9396ed337a42"
@@ -28,6 +34,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b7811e2584637bdaeea7d62b951ed8e8c5507f46b2b8788bf76aa166d7c0841d"
+  inputs-digest = "203abbe8619ccaaf0643e1a889c8715525720ea61b0426eff59e99ba5ba9cdd5"
   solver-name = "gps-cdcl"
   solver-version = 1
