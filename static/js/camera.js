@@ -13,11 +13,11 @@ function restartCameraViewing() {
 
 async function updateSnapshotLoop() {
   var xmlHttp = new XMLHttpRequest();
-  xmlHttp.open("GET", "/api/take-snapshot", true);
+  xmlHttp.open("PUT", "/api/camera/snapshot", true);
   xmlHttp.onreadystatechange = async function() {
     if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
       let snapshot = document.getElementById("snapshot-image")
-      snapshot.src = "/snapshot-image?"+ new Date().getTime();
+      snapshot.src = "/camera/snapshot?"+ new Date().getTime();
       await sleep(500);
       snapshotCount++;
       if (snapshotCount < 200) {

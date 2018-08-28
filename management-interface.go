@@ -135,11 +135,6 @@ func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "network-interfaces.html", outputStruct)
 }
 
-// CameraPositioningHandler will show a frame from the camera to help with positioning
-func CameraPositioningHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl.ExecuteTemplate(w, "camera-positioning.html", nil)
-}
-
 // ThreeGConnectivityHandler - Do we have 3G Connectivity?
 func ThreeGConnectivityHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "3G-connectivity.html", nil)
@@ -150,7 +145,12 @@ func APIServerHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "API-server.html", nil)
 }
 
-// GetSnapshot - Still image from Lepton camera
-func GetSnapshot(w http.ResponseWriter, r *http.Request) {
+// CameraHandler will show a frame from the camera to help with positioning
+func CameraHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl.ExecuteTemplate(w, "camera.html", nil)
+}
+
+// CameraSnapshot - Still image from Lepton camera
+func CameraSnapshot(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "/var/spool/cptv/still.png")
 }
