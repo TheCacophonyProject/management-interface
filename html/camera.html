@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Camera</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+  </head>
+
+  <body>
+      {{template "navbar"}}
+
+    <div class="container">
+      <h2>Camera</h2>
+      <div id="snapshot-stopped" style="display: none;">
+        <p id="snapshot-stopped-message"></p>
+        <button type="button" onclick="restartCameraViewing()">Continue viewing camera</button>
+      </div>
+
+      <img id="snapshot-image" src="/camera/snapshot" style="width:100%;max-width:800px;">
+    </div>
+
+  </body>
+  <script type="text/javascript" src="/static/js/jquery-3.3.1.slim.min.js"></script>
+  <script type="text/javascript" src="/static/js/camera.js"></script>
+</html>

@@ -52,15 +52,17 @@ func main() {
 	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
 	router.HandleFunc("/3G-connectivity", managementinterface.ThreeGConnectivityHandler).Methods("GET")
 	router.HandleFunc("/API-server", managementinterface.APIServerHandler).Methods("GET")
-	router.HandleFunc("/camera-positioning", managementinterface.CameraPositioningHandler).Methods("GET")
 	router.HandleFunc("/network-interfaces", managementinterface.NetworkInterfacesHandler).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
+	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
+	router.HandleFunc("/camera/snapshot", managementinterface.CameraSnapshot).Methods("GET")
 
 	// API
 	apiObj := api.NewAPI(cptvDir)
 	router.HandleFunc("/api/recordings", apiObj.GetRecordings).Methods("GET")
 	router.HandleFunc("/api/recording/{id}", apiObj.GetRecording).Methods("GET")
 	router.HandleFunc("/api/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
+	router.HandleFunc("/api/camera/snapshot", apiObj.TakeSnapshot).Methods("PUT")
 
 	listenAddr := fmt.Sprintf(":%d", listenPort)
 	log.Printf("listening on %s", listenAddr)
