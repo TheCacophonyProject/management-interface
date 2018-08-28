@@ -5,7 +5,7 @@ window.onload = function() {
 var snapshotCount = 0;
 
 function restartCameraViewing() {
-  document.getElementById("timeout-message").style.display = 'none';
+  document.getElementById("snapshot-stopped").style.display = 'none';
   document.getElementById("snapshot-image").style.display = '';
   snapshotCount = 0;
   updateSnapshotLoop();
@@ -23,16 +23,19 @@ async function updateSnapshotLoop() {
       if (snapshotCount < 200) {
         updateSnapshotLoop();
       } else {
-        snapshot.style.display = 'none';
-        document.getElementById("timeout-message").style.display = '';
+        stopSnapshots('Timeout for camera viewing.');
       }
     } else if (xmlHttp.readyState == 4 && xmlHttp.status != 200) {
-      console.log("failed to update image");
-      await sleep(100);
-      updateSnapshotLoop();
+      stopSnapshots('Error getting new snapshot.')
     }
   }
   xmlHttp.send( null );
+}
+
+function stopSnapshots(message) {
+  document.getElementById("snapshot-stopped-message").innerText = message;
+  document.getElementById("snapshot-stopped").style.display = '';
+  document.getElementById("snapshot-image").style.display = 'none';
 }
 
 function sleep(ms) {
