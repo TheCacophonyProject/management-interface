@@ -13,9 +13,12 @@ builds:
   - arm
   goarm:
   - "7"
-  main: cmd/managementd/main.go
+  main: ./cmd/managementd
   ldflags: -s -w -X main.version={{.Version}}
-  binary: management-interface
+  binary: managementd
+  hooks:
+    pre: packr
+    post: packr clean
 
 nfpm:
   vendor: The Cacophony Project
