@@ -3,3 +3,4 @@
 # Except
 !.gitignore
 !main.go
+!config.go

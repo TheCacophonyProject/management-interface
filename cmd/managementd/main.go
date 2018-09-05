@@ -31,8 +31,7 @@ import (
 )
 
 const (
-	cptvDir    = "/var/spool/cptv/"
-	listenPort = 8080
+	configFile = "/etc/cacophony/management-interface.yaml"
 )
 
 var version = "<not set>"
@@ -41,6 +40,13 @@ var version = "<not set>"
 func main() {
 	log.SetFlags(0) // Removes timestamp output
 	log.Printf("running version: %s", version)
+
+	config, err := ParseConfigFile(configFile)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	log.Printf("config: %v", config)
 
 	router := mux.NewRouter()
 
@@ -58,13 +64,13 @@ func main() {
 	router.HandleFunc("/camera/snapshot", managementinterface.CameraSnapshot).Methods("GET")
 
 	// API
-	apiObj := api.NewAPI(cptvDir)
+	apiObj := api.NewAPI(config.CPTVDir)
 	router.HandleFunc("/api/recordings", apiObj.GetRecordings).Methods("GET")
 	router.HandleFunc("/api/recording/{id}", apiObj.GetRecording).Methods("GET")
 	router.HandleFunc("/api/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
 	router.HandleFunc("/api/camera/snapshot", apiObj.TakeSnapshot).Methods("PUT")
 
-	listenAddr := fmt.Sprintf(":%d", listenPort)
+	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, router))
 }
