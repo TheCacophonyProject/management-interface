@@ -33,6 +33,7 @@ nfpm:
   files:
     "_release/cacophonator-management-avahi.service": "/etc/avahi/services/cacophonator-management.service"
     "_release/cacophonator-management-systemd.service": "/etc/systemd/system/cacophonator-management.service"
+  config_files:
     "_release/management-interface.yaml": "/etc/cacophony/management-interface.yaml"
 
 checksum:
