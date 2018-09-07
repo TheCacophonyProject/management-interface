@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	configFile = "/etc/cacophony/management-interface.yaml"
+	configFile = "/etc/cacophony/managementd.yaml"
 )
 
 var version = "<not set>"
