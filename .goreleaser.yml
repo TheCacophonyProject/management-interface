@@ -31,7 +31,10 @@ nfpm:
     - deb
   bindir: /usr/bin
   files:
-    "_release/cacophonator-management.service": "/etc/avahi/services/cacophonator-management.service"
+    "_release/cacophonator-management-avahi.service": "/etc/avahi/services/cacophonator-management.service"
+    "_release/cacophonator-management-systemd.service": "/etc/systemd/system/cacophonator-management.service"
+  config_files:
+    "_release/managementd.yaml": "/etc/cacophony/managementd.yaml"
 
 checksum:
   name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'

@@ -1,0 +1,11 @@
+[Unit]
+Description=Cacophonator management interface
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/managementd
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
