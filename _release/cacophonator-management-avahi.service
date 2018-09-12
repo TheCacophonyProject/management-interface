@@ -2,6 +2,6 @@
   <name>cacophony</name>
   <service protocol="ipv4">
     <type>_cacophonator-management._tcp</type>
-    <port>8080</port>
+    <port>80</port>
   </service>
 </service-group>
