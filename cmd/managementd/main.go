@@ -47,6 +47,9 @@ func main() {
 		return
 	}
 	log.Printf("config: %v", config)
+	if config.Port != 80 {
+		log.Printf("warning: avahi service is advertised on port 80 but port %v is being used", config.Port)
+	}
 
 	router := mux.NewRouter()
 
