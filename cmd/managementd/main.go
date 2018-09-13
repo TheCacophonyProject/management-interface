@@ -68,12 +68,24 @@ func main() {
 
 	// API
 	apiObj := api.NewAPI(config.CPTVDir)
-	router.HandleFunc("/api/recordings", apiObj.GetRecordings).Methods("GET")
-	router.HandleFunc("/api/recording/{id}", apiObj.GetRecording).Methods("GET")
-	router.HandleFunc("/api/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
-	router.HandleFunc("/api/camera/snapshot", apiObj.TakeSnapshot).Methods("PUT")
+	apiRouter := router.PathPrefix("/api").Subrouter()
+	apiRouter.HandleFunc("/recordings", apiObj.GetRecordings).Methods("GET")
+	apiRouter.HandleFunc("/recording/{id}", apiObj.GetRecording).Methods("GET")
+	apiRouter.HandleFunc("/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
+	apiRouter.HandleFunc("/camera/snapshot", apiObj.TakeSnapshot).Methods("PUT")
+	apiRouter.Use(simpleAuth)
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, router))
+}
+
+func simpleAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "feathers" {
+			next.ServeHTTP(w, r)
+		} else {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+		}
+	})
 }
