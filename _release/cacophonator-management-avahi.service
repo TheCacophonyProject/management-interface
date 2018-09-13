@@ -1,6 +1,6 @@
 <service-group>
-  <name>cacophony</name>
-  <service protocol="ipv4">
+  <name replace-wildcards="yes">%h</name>
+  <service>
     <type>_cacophonator-management._tcp</type>
     <port>80</port>
   </service>
