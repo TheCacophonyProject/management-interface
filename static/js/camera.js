@@ -14,7 +14,7 @@ function restartCameraViewing() {
 async function updateSnapshotLoop() {
   var xmlHttp = new XMLHttpRequest();
   xmlHttp.open("PUT", "/api/camera/snapshot", true);
-  xmlHttp.setRequestHeader("Authorization", "feathers")
+  xmlHttp.setRequestHeader("Authorization", "Basic "+btoa("admin:feathers"))
   xmlHttp.onload = async function() {
     if (xmlHttp.status == 200) {
       let snapshot = document.getElementById("snapshot-image")

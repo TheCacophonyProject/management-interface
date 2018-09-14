@@ -73,16 +73,17 @@ func main() {
 	apiRouter.HandleFunc("/recording/{id}", apiObj.GetRecording).Methods("GET")
 	apiRouter.HandleFunc("/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
 	apiRouter.HandleFunc("/camera/snapshot", apiObj.TakeSnapshot).Methods("PUT")
-	apiRouter.Use(simpleAuth)
+	apiRouter.Use(basicAuth)
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, router))
 }
 
-func simpleAuth(next http.Handler) http.Handler {
+func basicAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") == "feathers" {
+		userPassEncoded := "YWRtaW46ZmVhdGhlcnM=" // admin:feathers base64 encoded.
+		if r.Header.Get("Authorization") == "Basic "+userPassEncoded {
 			next.ServeHTTP(w, r)
 		} else {
 			http.Error(w, "Forbidden", http.StatusForbidden)
