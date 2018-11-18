@@ -40,5 +40,5 @@ For either case the resulting executable is `managementd`.
 * Build for ARM (run `make`)
 * Copy to the Pi: `scp managementd pi@[host]`
 * SSH to Pi: `ssh pi@[host]`
-* Stop the running management server: `sudo systemctl stop cacophononator-management`
+* Stop the running management server: `sudo systemctl stop cacophonator-management`
 * Run the development version: `sudo ./managementd`
