@@ -98,24 +98,41 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// Want to separate this into multiple lines so that can display each line on a separate line in HTML
-	var outputStrings []StringToBeDisplayed
-	for _, str := range strings.Split(diskData, "\n") {
-		outputStrings = append(outputStrings, StringToBeDisplayed{Text: str})
+
+	// Want to separate this into separate fields so that can display in a table in HTML
+	outputStrings := [][]string{}
+	rows := strings.Split(diskData, "\n")
+	for _, row := range rows[1:] {
+		words := strings.Fields(row)
+		outputStrings = append(outputStrings, words)
 	}
 
 	memoryData, err := getMemoryStats()
 	if err != nil {
 		log.Fatal(err)
 	}
-	for _, str := range strings.Split(memoryData, "\n") {
-		outputStrings = append(outputStrings, StringToBeDisplayed{Text: str})
+	// Want to separate this into separate fields so that can display in a table in HTML
+	outputStrings2 := [][]string{}
+	rows = strings.Split(memoryData, "\n")
+	for _, row := range rows[1:] {
+		cleanRow := strings.Trim(row, " \t")
+		words := strings.SplitN(cleanRow, " ", 2)
+		outputStrings2 = append(outputStrings2, words)
 	}
 
-	// Need to put our output string in a struct so we can access it from html
-	outputStruct := MultiLineStringToBeDisplayed{Strings: outputStrings}
+	// Put it all in a struct so we can access it from HTML
+	type table struct {
+		NumDiskRows    int
+		DiskDataRows   [][]string
+		NumMemoryRows  int
+		MemoryDataRows [][]string
+	}
+	outputStruct := table{NumDiskRows: len(outputStrings), DiskDataRows: outputStrings,
+		NumMemoryRows: len(outputStrings2), MemoryDataRows: outputStrings2}
 
+	// Execute the actual template.
 	tmpl.ExecuteTemplate(w, "disk-memory.html", outputStruct)
+
 }
 
 // IndexHandler is the root handler.
