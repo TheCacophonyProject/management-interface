@@ -7,26 +7,71 @@
   <link rel="stylesheet" href="/static/css/bootstrap.min.css">
 </head>
 
-<body>
-    {{template "navbar"}}
+    <body>
+        {{template "navbar"}}
 
-    <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
-    <script src="/static/js/bootstrap.min.js"></script>
-
-    <div class="container">
-        <h2>Disk And Memory Statistics:<br></h2>
-    </div>
-    <h3>Disk:</h3>
-    <div class="well">
-        {{range .Strings}}
-            <h4>{{.Text}}<h4>
-        {{end}}
-    </div>
-    <h3>Memory:</h3>
-    <div class="well">
-    <h4>Nothing here yet</h4>
-    </div>
-
+        <div class="container">
+            <div class="container p-5">
+                <h2>Disk And Memory Statistics:<br></h2>
+            </div>
+        
+            <div class="container p-5">
+                    <h3>Disk:</h3>
+            </div>
+    
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Filesystem</th> 
+                            <th>Size</th> 
+                            <th>Used</th> 
+                            <th>Avail</th> 
+                            <th>Use %</th> 
+                            <th>Mounted on</th> 
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .DiskDataRows}}
+                            <tr>
+                                {{range .}}<td>{{.}}</td>{{end}}                
+                            </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+    
+    
+            <div class="container p-5">
+                <h3>Memory:</h3>
+            </div>
+    
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th class="w-25" class="text-right">Memory Amount</th> 
+                            <th>Memory Type</th> 
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .MemoryDataRows}}
+                            <tr>
+                                {{range .}}<td>{{.}}</td>{{end}}                
+                            </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+    
+    
+        </div>
+    
+    
+        <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+        <script src="/static/js/bootstrap.min.js"></script>
+    
+    
 
     </body>
 </html>
