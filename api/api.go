@@ -33,7 +33,8 @@ import (
 )
 
 const (
-	cptvGlob = "*.cptv"
+	cptvGlob            = "*.cptv"
+	failedUploadsFolder = "failed-uploads"
 )
 
 type ManagementAPI struct {
@@ -116,7 +117,7 @@ func (api *ManagementAPI) TakeSnapshot(w http.ResponseWriter, r *http.Request) {
 
 func getCptvNames(dir string) []string {
 	matches, _ := filepath.Glob(filepath.Join(dir, cptvGlob))
-	failedUploadMatches, _ := filepath.Glob(filepath.Join(dir, "failed-uploads", cptvGlob))
+	failedUploadMatches, _ := filepath.Glob(filepath.Join(dir, failedUploadsFolder, cptvGlob))
 	matches = append(matches, failedUploadMatches...)
 	names := make([]string, len(matches))
 	for i, filename := range matches {
@@ -128,7 +129,7 @@ func getCptvNames(dir string) []string {
 func getRecordingPath(cptv, dir string) string {
 	paths := []string{
 		filepath.Join(dir, cptv),
-		filepath.Join(dir, "failed-uploads", cptv),
+		filepath.Join(dir, failedUploadsFolder, cptv),
 	}
 	for _, path := range paths {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
