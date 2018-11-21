@@ -127,6 +127,17 @@ func getCptvNames(dir string) []string {
 }
 
 func getRecordingPath(cptv, dir string) string {
+	// Check that given file is a cptv file on the device.
+	isCptvFile := false
+	for _, name := range getCptvNames(dir) {
+		if name == cptv {
+			isCptvFile = true
+			break
+		}
+	}
+	if !isCptvFile {
+		return ""
+	}
 	paths := []string{
 		filepath.Join(dir, cptv),
 		filepath.Join(dir, failedUploadsFolder, cptv),
