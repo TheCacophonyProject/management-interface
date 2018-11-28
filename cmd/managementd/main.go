@@ -32,6 +32,7 @@ import (
 
 const (
 	configFile = "/etc/cacophony/managementd.yaml"
+	// configFile = "../../_release/managementd.yaml"
 )
 
 var version = "<not set>"

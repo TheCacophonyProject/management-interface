@@ -1,30 +1,113 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <title>Network Interfaces</title>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/static/css/bootstrap.min.css">
-</head>
+    <head>
+        <title>Network Interfaces</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    </head>
 
-<body>
-    {{template "navbar"}}
-
-    <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
-    <script src="/static/js/bootstrap.min.js"></script>
+    <body>
+        {{template "navbar"}}
 
 
-    <div class="container">
-        <h2>Network Interfaces<br></h2>
-    </div>
-    <h3>Available network interfaces on this machine:</h3>
-    <div class="well">
-        {{range .Strings}}
-            <h4>{{.Text}}<h4>
-        {{end}}
-    </div>
+        <div class="container">
+            <div class="container pt-5 pl-0">
+                <h2>Network Interfaces<br></h2>
+            </div>
+            <hr>
+
+            <!-- <div class="container pt-3 pb-2 pl-0">
+                <h3>Available network interfaces on this machine:</h3>
+            </div> -->
+
+            <div class="row">
+                <div class="col-md-3" >
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Lan</h5>
+                            <a href="#" class="btn btn-primary">Test</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Status</h5>
+                            <p>Icon</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Output</h5>
+                            <p>Some placeholder text</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Wifi</h5>
+                            <a href="#" class="btn btn-primary">Test</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Status</h5>
+                            <p>Icon</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Output</h5>
+                            <p>Some placeholder text</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">3G</h5>
+                            <a href="#" class="btn btn-primary">Test</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Status</h5>
+                            <p>Icon</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Output</h5>
+                            <p>Some placeholder text</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
 
+        </div>
 
-</body>
+
+        <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+        <script src="/static/js/bootstrap.min.js"></script>
+
+    </body>
 </html>

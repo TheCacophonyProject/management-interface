@@ -117,6 +117,10 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows[1:] {
 		cleanRow := strings.Trim(row, " \t")
 		words := strings.SplitN(cleanRow, " ", 2)
+		if len(words) > 1 && strings.HasPrefix(words[1], "K ") {
+			words[0] = words[0] + " K"
+			words[1] = words[1][2:]
+		}
 		outputStrings2 = append(outputStrings2, words)
 	}
 
@@ -142,14 +146,15 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 
 // NetworkInterfacesHandler - Show the status of each newtwork interface
 func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
-	data, err := AvailableInterfaces()
-	if err != nil {
-		log.Fatal(err)
-	}
-	// Need to put our output string in a struct so we can access it from html
-	outputStruct := MultiLineStringToBeDisplayed{Strings: data}
 
-	tmpl.ExecuteTemplate(w, "network-interfaces.html", outputStruct)
+	// data, err := AvailableInterfaces()
+	// if err != nil {
+	// 	log.Output(1, err.Error())
+	// }
+
+	// Need to respond to individual requests to test if a network status is up or down.
+
+	tmpl.ExecuteTemplate(w, "network-interfaces.html", "DummyData")
 }
 
 // ThreeGConnectivityHandler - Do we have 3G Connectivity?
