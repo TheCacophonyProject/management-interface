@@ -19,14 +19,18 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package managementinterface
 
 import (
+	"encoding/json"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/gobuffalo/packr"
+	"github.com/gorilla/mux"
 )
 
 // Using a packr box means the html files are bundled up in the binary application.
@@ -146,15 +150,51 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 
 // NetworkInterfacesHandler - Show the status of each newtwork interface
 func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
-
-	// data, err := AvailableInterfaces()
-	// if err != nil {
-	// 	log.Output(1, err.Error())
-	// }
+	ifaces, err := net.Interfaces()
+	interfaces := []net.Interface{}
+	if err != nil {
+		log.Output(1, err.Error())
+	} else {
+		// Filter out loopback interfaces
+		for _, iface := range ifaces {
+			if iface.Flags&net.FlagLoopback == 0 {
+				// Not a loopback interface
+				interfaces = append(interfaces, iface)
+			}
+		}
+	}
 
 	// Need to respond to individual requests to test if a network status is up or down.
 
-	tmpl.ExecuteTemplate(w, "network-interfaces.html", "DummyData")
+	tmpl.ExecuteTemplate(w, "network-interfaces.html", interfaces)
+}
+
+func CheckInterfaceHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	response := make(map[string]string)
+	// Extract interface id
+	interfaceVar := mux.Vars(r)["id"]
+	interfaceId, _ := strconv.Atoi(interfaceVar)
+	// Lookup interface by id
+	iface, err := net.InterfaceByIndex(interfaceId)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		response["status"] = "unknown"
+		response["result"] = "Unable to find interface with id " + interfaceVar
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+	args := []string{"-I", iface.Name, "-c", "3", "-n", "-W", "15", "1.1.1.1"}
+	output, err := exec.Command("ping", args...).Output()
+	w.WriteHeader(http.StatusOK)
+	response["result"] = string(output)
+	if err != nil {
+		// Ping was not successful
+		response["status"] = "down"
+	} else {
+		response["status"] = "up"
+	}
+	json.NewEncoder(w).Encode(response)
 }
 
 // ThreeGConnectivityHandler - Do we have 3G Connectivity?
