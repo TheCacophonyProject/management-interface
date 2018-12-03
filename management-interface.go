@@ -26,7 +26,6 @@ import (
 	"net/http"
 	"os/exec"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/gobuffalo/packr"
@@ -49,13 +48,7 @@ func init() {
 	}
 }
 
-// A struct used to wrap data being sent to the HTML templates.
-type dataToBeDisplayed struct {
-	Head  string
-	Body  string
-	Other string
-}
-
+// Return info on the disk space available, disk space used etc.
 func getDiskSpace() (string, error) {
 	var out []byte
 	err := error(nil)
@@ -153,7 +146,7 @@ func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 	ifaces, err := net.Interfaces()
 	interfaces := []net.Interface{}
 	if err != nil {
-		log.Output(1, err.Error())
+		log.Print(err.Error())
 	} else {
 		// Filter out loopback interfaces
 		for _, iface := range ifaces {
@@ -169,18 +162,19 @@ func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "network-interfaces.html", interfaces)
 }
 
+// Checks an interface to see if it is up or down.  To do this the ping command is used
+// to send data to Cloudfare at 1.1.1.1
 func CheckInterfaceHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	response := make(map[string]string)
-	// Extract interface id
-	interfaceVar := mux.Vars(r)["id"]
-	interfaceId, _ := strconv.Atoi(interfaceVar)
-	// Lookup interface by id
-	iface, err := net.InterfaceByIndex(interfaceId)
+	// Extract interface name
+	interfaceName := mux.Vars(r)["name"]
+	// Lookup interface by name
+	iface, err := net.InterfaceByName(interfaceName)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		response["status"] = "unknown"
-		response["result"] = "Unable to find interface with id " + interfaceVar
+		response["result"] = "Unable to find interface with name " + interfaceName
 		json.NewEncoder(w).Encode(response)
 		return
 	}

@@ -17,17 +17,13 @@
             </div>
             <hr>
 
-            <!-- <div class="container pt-3 pb-2 pl-0">
-                <h3>Available network interfaces on this machine:</h3>
-            </div> -->
-
             {{range .}}
             <div class="row">
                 <div class="col-md-3" >
                     <div class="card mb-3">
                         <div class="card-body">
                             <h5 class="card-title">{{.Name}}</h5>
-                            <button id="interface-{{.Index}}-test" type="button" onclick="checkInterface({{.Index}})" class="btn btn-primary">Test</button>
+                            <button id="interface-{{.Name}}-test" type="button" onclick="checkInterface({{.Name}})" class="btn btn-primary">Test</button>
                         </div>
                     </div>
                 </div>
@@ -35,7 +31,7 @@
                     <div class="card mb-3">
                         <div class="card-body">
                             <h5 class="card-title">Status</h5>
-                            <h4 id="interface-{{.Index}}-indicator">&#x003F;</h4>
+                            <h4 id="interface-{{.Name}}-indicator">&#x003F;</h4>
                         </div>
                     </div>
                 </div>
@@ -43,7 +39,7 @@
                     <div class="card mb-3">
                         <div class="card-body">
                             <h5 class="card-title">Output</h5>
-                            <p style="white-space: pre-wrap;" id="interface-{{.Index}}-statustext"></p>
+                            <p style="white-space: pre-wrap;" id="interface-{{.Name}}-statustext"></p>
                         </div>
                     </div>
                 </div>
@@ -55,19 +51,20 @@
         <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
         <script src="/static/js/bootstrap.min.js"></script>
         <script>
-          function checkInterface(interfaceIndex) {
+          function checkInterface(interfaceName) {
             // Set status indicator
-            var statusIndicator = document.getElementById("interface-" + interfaceIndex + "-indicator");
+            var statusIndicator = document.getElementById("interface-" + interfaceName + "-indicator");
             statusIndicator.textContent = "...";
             // Clear output text
-            var status = document.getElementById("interface-" + interfaceIndex + "-statustext");
+            var status = document.getElementById("interface-" + interfaceName + "-statustext");
             status.textContent = "";
             // Disable test button while waiting for response
-            var button = document.getElementById("interface-" + interfaceIndex + "-test");
+            var button = document.getElementById("interface-" + interfaceName + "-test");
             button.disabled = true;
+            console.log("/interface-status/" + interfaceName)
             fetch(
-              "/interface-status/" + interfaceIndex,
-              {method: "POST"}
+              "/interface-status/" + interfaceName,
+              {method: "GET"}
             ).then(function(response) {
               return response.json();
             }).then(function(json) {
