@@ -1,30 +1,89 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <title>Network Interfaces</title>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/static/css/bootstrap.min.css">
-</head>
+    <head>
+        <title>Network Interfaces</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    </head>
 
-<body>
-    {{template "navbar"}}
-
-    <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
-    <script src="/static/js/bootstrap.min.js"></script>
+    <body>
+        {{template "navbar"}}
 
 
-    <div class="container">
-        <h2>Network Interfaces<br></h2>
-    </div>
-    <h3>Available network interfaces on this machine:</h3>
-    <div class="well">
-        {{range .Strings}}
-            <h4>{{.Text}}<h4>
-        {{end}}
-    </div>
+        <div class="container">
+            <div class="container pt-5 pl-0">
+                <h2>Network Interfaces<br></h2>
+            </div>
+            <hr>
+
+            {{range .}}
+            <div class="row">
+                <div class="col-md-3" >
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">{{.Name}}</h5>
+                            <button id="interface-{{.Name}}-test" type="button" onclick="checkInterface({{.Name}})" class="btn btn-primary">Test</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Status</h5>
+                            <h4 id="interface-{{.Name}}-indicator">&#x003F;</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">Output</h5>
+                            <p style="white-space: pre-wrap;" id="interface-{{.Name}}-statustext"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+        </div>
 
 
+        <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+        <script src="/static/js/bootstrap.min.js"></script>
+        <script>
+          function checkInterface(interfaceName) {
+            // Set status indicator
+            var statusIndicator = document.getElementById("interface-" + interfaceName + "-indicator");
+            statusIndicator.textContent = "...";
+            // Clear output text
+            var status = document.getElementById("interface-" + interfaceName + "-statustext");
+            status.textContent = "";
+            // Disable test button while waiting for response
+            var button = document.getElementById("interface-" + interfaceName + "-test");
+            button.disabled = true;
+            console.log("/interface-status/" + interfaceName)
+            fetch(
+              "/interface-status/" + interfaceName,
+              {method: "GET"}
+            ).then(function(response) {
+              return response.json();
+            }).then(function(json) {
+              status.textContent = json["result"];
+              button.disabled = false;
+              var state = json["status"];
+              if (state === "down") {
+                // Cross mark
+                statusIndicator.innerHTML = "&#x2717;";
+              } else if (state === "up") {
+                // Check mark
+                statusIndicator.innerHTML = "&#x2714;";
+              } else {
+                // Question mark
+                statusIndicator.innerHTML = "&#x003F;";
+              }
+            });
+          }
+        </script>
 
-</body>
+    </body>
 </html>

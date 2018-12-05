@@ -62,6 +62,7 @@ func main() {
 	router.HandleFunc("/3G-connectivity", managementinterface.ThreeGConnectivityHandler).Methods("GET")
 	router.HandleFunc("/API-server", managementinterface.APIServerHandler).Methods("GET")
 	router.HandleFunc("/network-interfaces", managementinterface.NetworkInterfacesHandler).Methods("GET")
+	router.HandleFunc("/interface-status/{name:[a-zA-Z0-9-* ]+}", managementinterface.CheckInterfaceHandler).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
 	router.HandleFunc("/camera/snapshot", managementinterface.CameraSnapshot).Methods("GET")

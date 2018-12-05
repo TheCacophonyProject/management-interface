@@ -19,14 +19,17 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package managementinterface
 
 import (
+	"encoding/json"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
 	"os/exec"
 	"runtime"
 	"strings"
 
 	"github.com/gobuffalo/packr"
+	"github.com/gorilla/mux"
 )
 
 // Using a packr box means the html files are bundled up in the binary application.
@@ -45,13 +48,7 @@ func init() {
 	}
 }
 
-// A struct used to wrap data being sent to the HTML templates.
-type dataToBeDisplayed struct {
-	Head  string
-	Body  string
-	Other string
-}
-
+// Return info on the disk space available, disk space used etc.
 func getDiskSpace() (string, error) {
 	var out []byte
 	err := error(nil)
@@ -117,6 +114,10 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows[1:] {
 		cleanRow := strings.Trim(row, " \t")
 		words := strings.SplitN(cleanRow, " ", 2)
+		if len(words) > 1 && strings.HasPrefix(words[1], "K ") {
+			words[0] = words[0] + " K"
+			words[1] = words[1][2:]
+		}
 		outputStrings2 = append(outputStrings2, words)
 	}
 
@@ -142,14 +143,52 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 
 // NetworkInterfacesHandler - Show the status of each newtwork interface
 func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
-	data, err := AvailableInterfaces()
+	ifaces, err := net.Interfaces()
+	interfaces := []net.Interface{}
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err.Error())
+	} else {
+		// Filter out loopback interfaces
+		for _, iface := range ifaces {
+			if iface.Flags&net.FlagLoopback == 0 {
+				// Not a loopback interface
+				interfaces = append(interfaces, iface)
+			}
+		}
 	}
-	// Need to put our output string in a struct so we can access it from html
-	outputStruct := MultiLineStringToBeDisplayed{Strings: data}
 
-	tmpl.ExecuteTemplate(w, "network-interfaces.html", outputStruct)
+	// Need to respond to individual requests to test if a network status is up or down.
+
+	tmpl.ExecuteTemplate(w, "network-interfaces.html", interfaces)
+}
+
+// Checks an interface to see if it is up or down.  To do this the ping command is used
+// to send data to Cloudfare at 1.1.1.1
+func CheckInterfaceHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	response := make(map[string]string)
+	// Extract interface name
+	interfaceName := mux.Vars(r)["name"]
+	// Lookup interface by name
+	iface, err := net.InterfaceByName(interfaceName)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		response["status"] = "unknown"
+		response["result"] = "Unable to find interface with name " + interfaceName
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+	args := []string{"-I", iface.Name, "-c", "3", "-n", "-W", "15", "1.1.1.1"}
+	output, err := exec.Command("ping", args...).Output()
+	w.WriteHeader(http.StatusOK)
+	response["result"] = string(output)
+	if err != nil {
+		// Ping was not successful
+		response["status"] = "down"
+	} else {
+		response["status"] = "up"
+	}
+	json.NewEncoder(w).Encode(response)
 }
 
 // ThreeGConnectivityHandler - Do we have 3G Connectivity?
