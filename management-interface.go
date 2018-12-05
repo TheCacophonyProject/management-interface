@@ -158,12 +158,11 @@ func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Need to respond to individual requests to test if a network status is up or down.
-
 	tmpl.ExecuteTemplate(w, "network-interfaces.html", interfaces)
 }
 
-// Checks an interface to see if it is up or down.  To do this the ping command is used
-// to send data to Cloudfare at 1.1.1.1
+// CheckInterfaceHandler checks an interface to see if it is up or down.
+// To do this the ping command is used to send data to Cloudfare at 1.1.1.1
 func CheckInterfaceHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	response := make(map[string]string)
@@ -189,16 +188,6 @@ func CheckInterfaceHandler(w http.ResponseWriter, r *http.Request) {
 		response["status"] = "up"
 	}
 	json.NewEncoder(w).Encode(response)
-}
-
-// ThreeGConnectivityHandler - Do we have 3G Connectivity?
-func ThreeGConnectivityHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl.ExecuteTemplate(w, "3G-connectivity.html", nil)
-}
-
-// APIServerHandler - API Server stuff
-func APIServerHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl.ExecuteTemplate(w, "API-server.html", nil)
 }
 
 // CameraHandler will show a frame from the camera to help with positioning
