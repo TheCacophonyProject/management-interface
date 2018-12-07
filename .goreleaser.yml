@@ -19,6 +19,15 @@ builds:
   hooks:
     pre: packr
     post: packr clean
+- goos:
+  - linux
+  goarch:
+  - arm
+  goarm:
+  - "7"
+  main: ./cmd/signal-strenght
+  ldflags: -s -w
+  binary: signal-strength
 
 nfpm:
   vendor: The Cacophony Project
