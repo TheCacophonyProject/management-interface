@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	homePath   = "http://192.168.8.1"
-	statusPath = "/api/monitoring/status"
+	modemAddress = "http://192.168.8.1"
+	statusPath   = "/api/monitoring/status"
 )
 
 type responseHolder struct {
@@ -46,11 +46,11 @@ func Run() (int, error) {
 	var client = &http.Client{
 		Jar: cookieJar,
 	}
-	_, err = client.Get(homePath)
+	_, err = client.Get(modemAddress) // Goto homepage first to get cookie for API request
 	if err != nil {
 		return 0, err
 	}
-	resp, err := client.Get(homePath + statusPath)
+	resp, err := client.Get(modemAddress + statusPath)
 	if err != nil {
 		return 0, err
 	}
