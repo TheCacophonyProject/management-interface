@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	modemAddress = "http://192.168.8.1"
-	statusPath   = "/api/monitoring/status"
+	modemURL  = "http://192.168.8.1"
+	statusURL = modemURL + "/api/monitoring/status"
 )
 
 type responseHolder struct {
@@ -43,14 +43,14 @@ func Run() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	var client = &http.Client{
+	client := &http.Client{
 		Jar: cookieJar,
 	}
-	_, err = client.Get(modemAddress) // Goto homepage first to get cookie for API request
+	_, err = client.Get(modemURL) // Goto homepage first to get cookie for API request
 	if err != nil {
 		return 0, err
 	}
-	resp, err := client.Get(modemAddress + statusPath)
+	resp, err := client.Get(statusURL)
 	if err != nil {
 		return 0, err
 	}
@@ -58,7 +58,7 @@ func Run() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	r := responseHolder{}
+	var r responseHolder
 	err = xml.Unmarshal(bodyBytes, &r)
 	if err != nil {
 		return 0, err

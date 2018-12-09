@@ -25,7 +25,7 @@ builds:
   - arm
   goarm:
   - "7"
-  main: ./cmd/signal-strenght
+  main: ./cmd/signal-strength
   ldflags: -s -w
   binary: signal-strength
 
