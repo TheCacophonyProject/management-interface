@@ -27,7 +27,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 
+	signalstrength "github.com/TheCacophonyProject/management-interface/signal-strength"
 	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
 )
@@ -53,6 +55,16 @@ func (api *ManagementAPI) GetRecordings(w http.ResponseWriter, r *http.Request) 
 	names := getCptvNames(api.cptvDir)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(names)
+}
+
+func (api *ManagementAPI) GetSignalStrength(w http.ResponseWriter, r *http.Request) {
+	sig, err := signalstrength.Run()
+	w.WriteHeader(http.StatusOK)
+	if err != nil {
+		io.WriteString(w, "failed to connect to modem\n")
+		return
+	}
+	io.WriteString(w, strconv.Itoa(sig))
 }
 
 // GetRecording downloads a cptv file
