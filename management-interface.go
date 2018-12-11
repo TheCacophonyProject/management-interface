@@ -141,6 +141,65 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "index.html", nil)
 }
 
+// Type used in serving interface information.
+type interfaceDetails struct {
+	Name       string
+	Netmask    string
+	IPAdresses []string
+}
+
+// Get the netmask for a given interface.  I used the ifconfig command for this.
+func getNetmask(interfaceName string) string {
+
+	netmaskStr := ""
+	args := []string{interfaceName}
+	output, err := exec.Command("ifconfig", args...).Output()
+	if err != nil {
+		// Don't fail, just return empty string
+		return netmaskStr
+	} else {
+		rows := strings.Split(string(output), "\n")
+		netmaskPos := strings.Index(rows[1], "netmask")
+		broadcastPos := strings.Index(rows[1], "broadcast")
+		if netmaskPos != -1 && broadcastPos != -1 {
+			netmaskStr = rows[1][netmaskPos+8 : broadcastPos]
+		}
+	}
+	return netmaskStr
+}
+
+// Get the IP address for a given interface.  There can be 0, 1 or 2 (e.g. IPv4 and IPv6)
+func getIPAddresses(iface net.Interface) []string {
+
+	var IPAdresses []string
+
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return IPAdresses
+	}
+
+	for _, addr := range addrs {
+		IPAdresses = append(IPAdresses, "  "+addr.String())
+	}
+	return IPAdresses
+}
+
+// Get the IP address and net mask for each interface.
+func getInterfaceProperties(interfaces []net.Interface) []interfaceDetails {
+
+	var ifacesDetails []interfaceDetails
+
+	for _, iface := range interfaces {
+		netmask := getNetmask(iface.Name)
+		addresses := getIPAddresses(iface)
+
+		ifaceDetails := interfaceDetails{Name: iface.Name, Netmask: netmask, IPAdresses: addresses}
+		ifacesDetails = append(ifacesDetails, ifaceDetails)
+	}
+
+	return ifacesDetails
+}
+
 // NetworkInterfacesHandler - Show the status of each newtwork interface
 func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 	ifaces, err := net.Interfaces()
@@ -157,8 +216,11 @@ func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Get the IP address and net mask for each interface.
+	ifacesDetails := getInterfaceProperties(interfaces)
+
 	// Need to respond to individual requests to test if a network status is up or down.
-	tmpl.ExecuteTemplate(w, "network-interfaces.html", interfaces)
+	tmpl.ExecuteTemplate(w, "network-interfaces.html", ifacesDetails)
 }
 
 // CheckInterfaceHandler checks an interface to see if it is up or down.
