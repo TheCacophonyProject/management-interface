@@ -141,10 +141,32 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "index.html", nil)
 }
 
+// Type used in serving interface information.
+type interfaceProperties struct {
+	Name        string
+	IPAddresses []string
+}
+
+// Get the IP address for a given interface.  There can be 0, 1 or 2 (e.g. IPv4 and IPv6)
+func getIPAddresses(iface net.Interface) []string {
+
+	var IPAdresses []string
+
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return IPAdresses // Blank entry.
+	}
+
+	for _, addr := range addrs {
+		IPAdresses = append(IPAdresses, "  "+addr.String())
+	}
+	return IPAdresses
+}
+
 // NetworkInterfacesHandler - Show the status of each newtwork interface
 func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 	ifaces, err := net.Interfaces()
-	interfaces := []net.Interface{}
+	interfaces := []interfaceProperties{}
 	if err != nil {
 		log.Print(err.Error())
 	} else {
@@ -152,7 +174,9 @@ func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 		for _, iface := range ifaces {
 			if iface.Flags&net.FlagLoopback == 0 {
 				// Not a loopback interface
-				interfaces = append(interfaces, iface)
+				addresses := getIPAddresses(iface)
+				ifaceProperties := interfaceProperties{Name: iface.Name, IPAddresses: addresses}
+				interfaces = append(interfaces, ifaceProperties)
 			}
 		}
 	}
