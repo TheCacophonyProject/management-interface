@@ -141,12 +141,6 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "index.html", nil)
 }
 
-// Type used in serving interface information.
-type interfaceProperties struct {
-	Name        string
-	IPAddresses []string
-}
-
 // Get the IP address for a given interface.  There can be 0, 1 or 2 (e.g. IPv4 and IPv6)
 func getIPAddresses(iface net.Interface) []string {
 
@@ -165,6 +159,13 @@ func getIPAddresses(iface net.Interface) []string {
 
 // NetworkInterfacesHandler - Show the status of each newtwork interface
 func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
+
+	// Type used in serving interface information.
+	type interfaceProperties struct {
+		Name        string
+		IPAddresses []string
+	}
+
 	ifaces, err := net.Interfaces()
 	interfaces := []interfaceProperties{}
 	if err != nil {
