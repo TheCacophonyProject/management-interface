@@ -23,7 +23,7 @@
                     <div class="card mb-3">
                         <div class="card-body">
                             <h5 class="card-title"><strong>{{.Name}}</strong></h5>
-                            <h6>IP Address(s):</h6>
+                            <h6>IP Address(es):</h6>
                             {{ $addrs := .IPAddresses }}
                             {{ range $addr := $addrs }}
                                 <h6 class="ml-2">{{$addr}}</h6>

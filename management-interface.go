@@ -144,20 +144,20 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 // Get the IP address for a given interface.  There can be 0, 1 or 2 (e.g. IPv4 and IPv6)
 func getIPAddresses(iface net.Interface) []string {
 
-	var IPAdresses []string
+	var IPAddresses []string
 
 	addrs, err := iface.Addrs()
 	if err != nil {
-		return IPAdresses // Blank entry.
+		return IPAddresses // Blank entry.
 	}
 
 	for _, addr := range addrs {
-		IPAdresses = append(IPAdresses, "  "+addr.String())
+		IPAddresses = append(IPAddresses, "  "+addr.String())
 	}
-	return IPAdresses
+	return IPAddresses
 }
 
-// NetworkInterfacesHandler - Show the status of each newtwork interface
+// NetworkInterfacesHandler - Show the status of each network interface
 func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Type used in serving interface information.
