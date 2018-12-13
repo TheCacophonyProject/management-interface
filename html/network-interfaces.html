@@ -19,26 +19,31 @@
 
             {{range .}}
             <div class="row">
-                <div class="col-md-3" >
+                <div class="col-md-5" >
                     <div class="card mb-3">
                         <div class="card-body">
-                            <h5 class="card-title">{{.Name}}</h5>
-                            <button id="interface-{{.Name}}-test" type="button" onclick="checkInterface({{.Name}})" class="btn btn-primary">Test</button>
+                            <h5 class="card-title"><strong>{{.Name}}</strong></h5>
+                            <h6>IP Address(es):</h6>
+                            {{ $addrs := .IPAddresses }}
+                            {{ range $addr := $addrs }}
+                                <h6 class="ml-2">{{$addr}}</h6>
+                            {{ end }}
                         </div>
                     </div>
                 </div>
                 <div class="col-md-2">
                     <div class="card mb-3">
                         <div class="card-body">
-                            <h5 class="card-title">Status</h5>
+                            <h5 class="card-title"><strong>Status</strong></h5>
+                            <button id="interface-{{.Name}}-test" type="button" onclick="checkInterface({{.Name}})" class="btn btn-primary mb-4">Test</button>
                             <h4 id="interface-{{.Name}}-indicator">&#x003F;</h4>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-7">
+                <div class="col-md-5">
                     <div class="card mb-3">
                         <div class="card-body">
-                            <h5 class="card-title">Output</h5>
+                            <h5 class="card-title"><strong>Output</strong></h5>
                             <p style="white-space: pre-wrap;" id="interface-{{.Name}}-statustext"></p>
                         </div>
                     </div>
