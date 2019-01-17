@@ -35,6 +35,9 @@ import (
 // Using a packr box means the html files are bundled up in the binary application.
 var templateBox = packr.NewBox("./html")
 
+// Using a packr box means the sound files are bundled up in the binary application.
+var soundsBox = packr.NewBox("./sounds")
+
 // tmpl is our pointer to our parsed templates.
 var tmpl *template.Template
 
@@ -211,6 +214,33 @@ func CheckInterfaceHandler(w http.ResponseWriter, r *http.Request) {
 		response["status"] = "down"
 	} else {
 		response["status"] = "up"
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+// SpeakerTestHandler will show a frame from the camera to help with positioning
+func SpeakerTestHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl.ExecuteTemplate(w, "speaker-test.html", nil)
+}
+
+// SpeakerStatusHandler attempts to play a sound on connected speaker(s).
+func SpeakerStatusHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	response := make(map[string]string)
+
+	// fileName := soundsBox.String("IEEE_float_mono_32kHz.wav")
+	fileName := "./sounds/IEEE_float_mono_32kHz.wav"
+	//args := []string{"-v80", "./static/sounds/IEEE_float_mono_32kHz.wav"}
+	args := []string{"-v50", "-q", fileName}
+	output, err := exec.Command("play", args...).CombinedOutput()
+	w.WriteHeader(http.StatusOK)
+	response["result"] = string(output)
+	if err != nil {
+		// Play command was not successful
+		response["status"] = "fail"
+		log.Printf(err.Error())
+	} else {
+		response["status"] = "success"
 	}
 	json.NewEncoder(w).Encode(response)
 }
