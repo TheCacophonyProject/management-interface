@@ -18,13 +18,6 @@
             <hr>
 
             <div class="row">
-                <!-- <div class="col-md-5" >
-                    <div class="card mb-3">
-                        <div class="card-body">
-                            <h5 class="card-title"><strong>Speaker</strong></h5>
-                        </div>
-                    </div>
-                </div> -->
                 <div class="col-md-4">
                     <div class="card mb-3">
                         <div class="card-body">
@@ -62,9 +55,8 @@
             // Disable test button while waiting for response
             var button = document.getElementById("speaker-test-button");
             button.disabled = true;
-            console.log("/speaker-status/")
             fetch(
-              "/speaker-status",
+              "/speaker/status",
               {method: "GET"}
             ).then(function(response) {
               return response.json();

@@ -24,7 +24,9 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -34,9 +36,6 @@ import (
 
 // Using a packr box means the html files are bundled up in the binary application.
 var templateBox = packr.NewBox("./html")
-
-// Using a packr box means the sound files are bundled up in the binary application.
-var soundsBox = packr.NewBox("./sounds")
 
 // tmpl is our pointer to our parsed templates.
 var tmpl *template.Template
@@ -223,25 +222,77 @@ func SpeakerTestHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "speaker-test.html", nil)
 }
 
+// exists returns whether the given file or directory exists
+func exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return true, err
+}
+
 // SpeakerStatusHandler attempts to play a sound on connected speaker(s).
 func SpeakerStatusHandler(w http.ResponseWriter, r *http.Request) {
+
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	response := make(map[string]string)
 
-	// fileName := soundsBox.String("IEEE_float_mono_32kHz.wav")
-	fileName := "./sounds/IEEE_float_mono_32kHz.wav"
-	//args := []string{"-v80", "./static/sounds/IEEE_float_mono_32kHz.wav"}
-	args := []string{"-v50", "-q", fileName}
-	output, err := exec.Command("play", args...).CombinedOutput()
-	w.WriteHeader(http.StatusOK)
-	response["result"] = string(output)
+	fileName := "/IEEE_float_mono_32kHz.wav"         // Default sound file name.
+	secondaryPath := "/usr/lib/management-interface" // Check here if the file is not found in the executable directory.
+
+	// Get the path to where the executable was started.
+	ex, err := os.Executable()
 	if err != nil {
-		// Play command was not successful
-		response["status"] = "fail"
 		log.Printf(err.Error())
-	} else {
-		response["status"] = "success"
 	}
+	exPath := filepath.Dir(ex)
+
+	// We need to check if the file exists
+	pathToUse := ""
+	fileFound := false
+	ret, err := exists(exPath + fileName)
+	if ret {
+		fileFound = true
+		pathToUse = exPath
+	} else {
+		if err != nil {
+			log.Printf(err.Error())
+		}
+		ret, err = exists(secondaryPath + fileName)
+		if ret {
+			fileFound = true
+			pathToUse = secondaryPath
+		} else {
+			if err != nil {
+				log.Printf(err.Error())
+			}
+			log.Printf("File " + fileName + " NOT found")
+		}
+	}
+
+	if fileFound {
+		// Play the sound file
+		args := []string{"-v50", "-q", pathToUse + fileName}
+		output, err := exec.Command("play", args...).CombinedOutput()
+		w.WriteHeader(http.StatusOK)
+		response["result"] = string(output)
+		if err != nil {
+			// Play command was not successful
+			response["status"] = "fail"
+			log.Printf(err.Error())
+		} else {
+			response["status"] = "success"
+		}
+	} else {
+		// Report that the file was not found.
+		response["status"] = "fail"
+		response["result"] = "File " + fileName + " not found."
+	}
+
+	// Encode data to be sent back to html.
 	json.NewEncoder(w).Encode(response)
 }
 
