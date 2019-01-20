@@ -34,13 +34,17 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// The file system location of this execuable.
+var executablePath = ""
+
 // Using a packr box means the html files are bundled up in the binary application.
 var templateBox = packr.NewBox("./html")
 
 // tmpl is our pointer to our parsed templates.
 var tmpl *template.Template
 
-// This parses our html templates up front.
+// This does some initialisation.  It parses our html templates up front and
+// finds the location where this executable was started.
 func init() {
 	tmpl = template.New("")
 
@@ -48,6 +52,19 @@ func init() {
 		t := tmpl.New(name)
 		template.Must(t.Parse(templateBox.String(name)))
 	}
+
+	executablePath = getExecutablePath()
+
+}
+
+// Get the directory of where this executable was started.
+func getExecutablePath() string {
+	ex, err := os.Executable()
+	if err != nil {
+		log.Printf(err.Error())
+		return ""
+	}
+	return filepath.Dir(ex)
 }
 
 // Return info on the disk space available, disk space used etc.
@@ -222,16 +239,34 @@ func SpeakerTestHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "speaker-test.html", nil)
 }
 
-// exists returns whether the given file or directory exists
-func exists(path string) (bool, error) {
+// fileExists returns whether the given file or directory exists
+func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	if err == nil {
-		return true, nil
+		return true
+	} else {
+		return false
 	}
-	if os.IsNotExist(err) {
-		return false, nil
+}
+
+// findAudioFile locates our test audio file.  It returns true and the location of the file
+// if the file is found. And false and empty string otherwise.
+func findAudioFile(fileName string, secondaryPath string) (bool, string) {
+
+	// Check if the file is in the executable directory
+	if executablePath != "" && fileExists(executablePath+fileName) {
+		return true, executablePath
 	}
-	return true, err
+
+	// In our default, second location?
+	if fileExists(secondaryPath + fileName) {
+		return true, secondaryPath
+	}
+
+	// Test sound not available
+	log.Printf("File " + fileName + " NOT found")
+	return false, ""
+
 }
 
 // SpeakerStatusHandler attempts to play a sound on connected speaker(s).
@@ -243,39 +278,10 @@ func SpeakerStatusHandler(w http.ResponseWriter, r *http.Request) {
 	fileName := "/IEEE_float_mono_32kHz.wav"         // Default sound file name.
 	secondaryPath := "/usr/lib/management-interface" // Check here if the file is not found in the executable directory.
 
-	// Get the path to where the executable was started.
-	ex, err := os.Executable()
-	if err != nil {
-		log.Printf(err.Error())
-	}
-	exPath := filepath.Dir(ex)
-
-	// We need to check if the file exists
-	pathToUse := ""
-	fileFound := false
-	ret, err := exists(exPath + fileName)
-	if ret {
-		fileFound = true
-		pathToUse = exPath
-	} else {
-		if err != nil {
-			log.Printf(err.Error())
-		}
-		ret, err = exists(secondaryPath + fileName)
-		if ret {
-			fileFound = true
-			pathToUse = secondaryPath
-		} else {
-			if err != nil {
-				log.Printf(err.Error())
-			}
-			log.Printf("File " + fileName + " NOT found")
-		}
-	}
-
-	if fileFound {
+	result, testAudioPath := findAudioFile(fileName, secondaryPath)
+	if result {
 		// Play the sound file
-		args := []string{"-v50", "-q", pathToUse + fileName}
+		args := []string{"-v50", "-q", testAudioPath + fileName}
 		output, err := exec.Command("play", args...).CombinedOutput()
 		w.WriteHeader(http.StatusOK)
 		response["result"] = string(output)
