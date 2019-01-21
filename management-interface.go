@@ -24,7 +24,9 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -32,13 +34,20 @@ import (
 	"github.com/gorilla/mux"
 )
 
+const fileName = "IEEE_float_mono_32kHz.wav"          // Default sound file name.
+const secondaryPath = "/usr/lib/management-interface" // Check here if the file is not found in the executable directory.
+
+// The file system location of this execuable.
+var executablePath = ""
+
 // Using a packr box means the html files are bundled up in the binary application.
 var templateBox = packr.NewBox("./html")
 
 // tmpl is our pointer to our parsed templates.
 var tmpl *template.Template
 
-// This parses our html templates up front.
+// This does some initialisation.  It parses our html templates up front and
+// finds the location where this executable was started.
 func init() {
 	tmpl = template.New("")
 
@@ -46,6 +55,19 @@ func init() {
 		t := tmpl.New(name)
 		template.Must(t.Parse(templateBox.String(name)))
 	}
+
+	executablePath = getExecutablePath()
+
+}
+
+// Get the directory of where this executable was started.
+func getExecutablePath() string {
+	ex, err := os.Executable()
+	if err != nil {
+		log.Printf(err.Error())
+		return ""
+	}
+	return filepath.Dir(ex)
 }
 
 // Return info on the disk space available, disk space used etc.
@@ -212,6 +234,71 @@ func CheckInterfaceHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		response["status"] = "up"
 	}
+	json.NewEncoder(w).Encode(response)
+}
+
+// SpeakerTestHandler will show a frame from the camera to help with positioning
+func SpeakerTestHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl.ExecuteTemplate(w, "speaker-test.html", nil)
+}
+
+// fileExists returns whether the given file or directory exists
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	} else {
+		return false
+	}
+}
+
+// findAudioFile locates our test audio file.  It returns true and the location of the file
+// if the file is found. And false and empty string otherwise.
+func findAudioFile() (bool, string) {
+
+	// Check if the file is in the executable directory
+	if fileExists(filepath.Join(executablePath, fileName)) {
+		return true, filepath.Join(executablePath, fileName)
+	}
+
+	// In our default, second location?
+	if fileExists(filepath.Join(secondaryPath, fileName)) {
+		log.Printf("Secondary file path is: %s", filepath.Join(secondaryPath, fileName))
+		return true, filepath.Join(secondaryPath, fileName)
+	}
+
+	// Test sound not available
+	return false, ""
+
+}
+
+// SpeakerStatusHandler attempts to play a sound on connected speaker(s).
+func SpeakerStatusHandler(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	response := make(map[string]string)
+
+	result, testAudioFileLocation := findAudioFile()
+	if result {
+		// Play the sound file
+		args := []string{"-v10", "-q", testAudioFileLocation}
+		output, err := exec.Command("play", args...).CombinedOutput()
+		response["result"] = string(output)
+		if err != nil {
+			// Play command was not successful
+			w.WriteHeader(http.StatusInternalServerError)
+			log.Printf(err.Error())
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+	} else {
+		// Report that the file was not found.
+		w.WriteHeader(http.StatusInternalServerError)
+		response["result"] = "File " + fileName + " not found."
+		log.Printf("File " + fileName + " not found")
+	}
+
+	// Encode data to be sent back to html.
 	json.NewEncoder(w).Encode(response)
 }
 

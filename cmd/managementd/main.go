@@ -61,6 +61,8 @@ func main() {
 	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
 	router.HandleFunc("/network-interfaces", managementinterface.NetworkInterfacesHandler).Methods("GET")
 	router.HandleFunc("/interface-status/{name:[a-zA-Z0-9-* ]+}", managementinterface.CheckInterfaceHandler).Methods("GET")
+	router.HandleFunc("/speaker", managementinterface.SpeakerTestHandler).Methods("GET")
+	router.HandleFunc("/speaker/status", managementinterface.SpeakerStatusHandler).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
 	router.HandleFunc("/camera/snapshot", managementinterface.CameraSnapshot).Methods("GET")
