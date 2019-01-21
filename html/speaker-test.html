@@ -59,22 +59,19 @@
               "/speaker/status",
               {method: "GET"}
             ).then(function(response) {
-              return response.json();
+                statusText.textContent = "";
+                button.disabled = false;
+                if (response.ok) {
+                    // Check mark
+                    statusIndicator.innerHTML = "&#x2714;";
+                }
+                else {
+                    // Cross mark
+                    statusIndicator.innerHTML = "&#x2717;";
+                }
+                return response.json();
             }).then(function(json) {
               outputText.textContent = json["result"];
-              statusText.textContent = "";
-              button.disabled = false;
-              var state = json["status"];
-              if (state === "fail") {
-                // Cross mark
-                statusIndicator.innerHTML = "&#x2717;";
-              } else if (state === "success") {
-                // Check mark
-                statusIndicator.innerHTML = "&#x2714;";
-              } else {
-                // Question mark
-                statusIndicator.innerHTML = "&#x003F;";
-              }
             });
           }
         </script>

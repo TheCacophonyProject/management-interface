@@ -34,6 +34,9 @@ import (
 	"github.com/gorilla/mux"
 )
 
+const fileName = "IEEE_float_mono_32kHz.wav"          // Default sound file name.
+const secondaryPath = "/usr/lib/management-interface" // Check here if the file is not found in the executable directory.
+
 // The file system location of this execuable.
 var executablePath = ""
 
@@ -251,20 +254,20 @@ func fileExists(path string) bool {
 
 // findAudioFile locates our test audio file.  It returns true and the location of the file
 // if the file is found. And false and empty string otherwise.
-func findAudioFile(fileName string, secondaryPath string) (bool, string) {
+func findAudioFile() (bool, string) {
 
 	// Check if the file is in the executable directory
-	if executablePath != "" && fileExists(executablePath+fileName) {
-		return true, executablePath
+	if fileExists(filepath.Join(executablePath, fileName)) {
+		return true, filepath.Join(executablePath, fileName)
 	}
 
 	// In our default, second location?
-	if fileExists(secondaryPath + fileName) {
-		return true, secondaryPath
+	if fileExists(filepath.Join(secondaryPath, fileName)) {
+		log.Printf("Secondary file path is: %s", filepath.Join(secondaryPath, fileName))
+		return true, filepath.Join(secondaryPath, fileName)
 	}
 
 	// Test sound not available
-	log.Printf("File " + fileName + " NOT found")
 	return false, ""
 
 }
@@ -275,27 +278,24 @@ func SpeakerStatusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	response := make(map[string]string)
 
-	fileName := "/IEEE_float_mono_32kHz.wav"         // Default sound file name.
-	secondaryPath := "/usr/lib/management-interface" // Check here if the file is not found in the executable directory.
-
-	result, testAudioPath := findAudioFile(fileName, secondaryPath)
+	result, testAudioFileLocation := findAudioFile()
 	if result {
 		// Play the sound file
-		args := []string{"-v50", "-q", testAudioPath + fileName}
+		args := []string{"-v10", "-q", testAudioFileLocation}
 		output, err := exec.Command("play", args...).CombinedOutput()
-		w.WriteHeader(http.StatusOK)
 		response["result"] = string(output)
 		if err != nil {
 			// Play command was not successful
-			response["status"] = "fail"
+			w.WriteHeader(http.StatusInternalServerError)
 			log.Printf(err.Error())
 		} else {
-			response["status"] = "success"
+			w.WriteHeader(http.StatusOK)
 		}
 	} else {
 		// Report that the file was not found.
-		response["status"] = "fail"
+		w.WriteHeader(http.StatusInternalServerError)
 		response["result"] = "File " + fileName + " not found."
+		log.Printf("File " + fileName + " not found")
 	}
 
 	// Encode data to be sent back to html.
