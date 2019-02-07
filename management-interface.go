@@ -19,7 +19,10 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package managementinterface
 
 import (
+	"bufio"
 	"encoding/json"
+	"github.com/gobuffalo/packr"
+	"github.com/gorilla/mux"
 	"html/template"
 	"log"
 	"net"
@@ -28,10 +31,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
-
-	"github.com/gobuffalo/packr"
-	"github.com/gorilla/mux"
 )
 
 const fileName = "IEEE_float_mono_32kHz.wav"          // Default sound file name.
@@ -206,6 +207,105 @@ func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Need to respond to individual requests to test if a network status is up or down.
 	tmpl.ExecuteTemplate(w, "network-interfaces.html", interfaces)
+}
+
+// WifiNetworkHandler - Show the wireless netowrks the pi can see
+func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
+
+	//wirelessNetworks :=
+	//ifaces, err := net.Interfaces()
+	networks := parseWPASupplicantConfig("/home/zaza/go/src/github.com/TheCacophonyProject/management-interface/sup_test.conf")
+	/*if err != nil {
+		log.Print(err.Error())
+	} else {
+		// Filter out loopback interfaces
+		for _, iface := range ifaces {
+			if iface.Flags&net.FlagLoopback == 0 {
+				// Not a loopback interface
+				addresses := getIPAddresses(iface)
+				ifaceProperties := interfaceProperties{Name: iface.Name, IPAddresses: addresses}
+				interfaces = append(interfaces, ifaceProperties)
+			}
+		}
+	}*/
+
+	// Need to respond to individual requests to test if a network status is up or down.
+	tmpl.ExecuteTemplate(w, "wifi-networks.html", networks)
+}
+
+func dequote(input string) string {
+	if strings.HasPrefix(input, "\"") && strings.HasSuffix(input, "\"") {
+		input = input[1 : len(input)-1]
+	}
+	return input
+}
+
+type wifiNetwork struct {
+	Ssid    string
+	PassKey string
+}
+
+func parseWPASupplicantConfig(configFile string) []wifiNetwork {
+	file, err := os.Open(configFile)
+	if err != nil {
+		log.Print(err.Error())
+	}
+	defer file.Close()
+
+	networks := []wifiNetwork{}
+
+	//networks := map[string]map[string]string{}
+	var networkMap map[string]string
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		line = strings.TrimSpace(line)
+		if line == "}" {
+			ssid := networkMap["ssid"]
+			if ssid == "" {
+				log.Print("Empty SSID")
+			} else {
+				wNetwork := wifiNetwork{Ssid: networkMap["ssid"], PassKey: networkMap["psk"]}
+				networks = append(networks, wNetwork)
+			}
+			networkMap = nil
+		} else if line != "" {
+			parts := strings.Split(line, "=")
+			if len(parts) != 2 {
+				log.Print("Line incorrectly formated")
+				//SOME kind of error
+				break
+			}
+			key := parts[0]
+			value := parts[1]
+			if value == "{" {
+				if key != "network" {
+					log.Print("Line unsupported section")
+					//  raise ParseError('unsupported section: "{}"'.format(left))
+				} else if networkMap != nil {
+					log.Print("Can't nest networks")
+					//raise ParseError("can't nest networks")
+				} else {
+					networkMap = map[string]string{}
+				}
+			} else {
+				networkMap[key] = dequote(value)
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	sort.Slice(networks, func(i, j int) bool { return networks[i].Ssid < networks[j].Ssid })
+
+	log.Print(networks)
+	return networks
 }
 
 // CheckInterfaceHandler checks an interface to see if it is up or down.
