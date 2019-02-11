@@ -40,6 +40,9 @@ const secondaryPath = "/usr/lib/management-interface" // Check here if the file 
 // The file system location of this execuable.
 var executablePath = ""
 
+// The name of the device we are running this executable on..
+var deviceName = ""
+
 // Using a packr box means the html files are bundled up in the binary application.
 var templateBox = packr.NewBox("./html")
 
@@ -49,15 +52,34 @@ var tmpl *template.Template
 // This does some initialisation.  It parses our html templates up front and
 // finds the location where this executable was started.
 func init() {
+
+	deviceName = getDeviceName()
+
 	tmpl = template.New("")
 
 	for _, name := range templateBox.List() {
 		t := tmpl.New(name)
-		template.Must(t.Parse(templateBox.String(name)))
+		if name == "navbar.html" {
+			stringToParse := templateBox.String(name)
+			stringToParse = strings.Replace(stringToParse, "Cacophonator Management", deviceName, 1)
+			template.Must(t.Parse(stringToParse))
+		} else {
+			template.Must(t.Parse(templateBox.String(name)))
+		}
 	}
 
 	executablePath = getExecutablePath()
 
+}
+
+// Get the host name (device name) this executable was started on.
+func getDeviceName() string {
+	name, err := os.Hostname()
+	if err != nil {
+		log.Printf(err.Error())
+		return ""
+	}
+	return name
 }
 
 // Get the directory of where this executable was started.
@@ -179,8 +201,8 @@ func getIPAddresses(iface net.Interface) []string {
 	return IPAddresses
 }
 
-// NetworkInterfacesHandler - Show the status of each network interface
-func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
+// NetworkHandler - Show the status of each network interface
+func NetworkHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Type used in serving interface information.
 	type interfaceProperties struct {
@@ -205,7 +227,7 @@ func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Need to respond to individual requests to test if a network status is up or down.
-	tmpl.ExecuteTemplate(w, "network-interfaces.html", interfaces)
+	tmpl.ExecuteTemplate(w, "network.html", interfaces)
 }
 
 // CheckInterfaceHandler checks an interface to see if it is up or down.
@@ -247,9 +269,8 @@ func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	if err == nil {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 // findAudioFile locates our test audio file.  It returns true and the location of the file
