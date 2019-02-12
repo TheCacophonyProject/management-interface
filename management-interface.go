@@ -40,7 +40,7 @@ const secondaryPath = "/usr/lib/management-interface" // Check here if the file 
 // The file system location of this execuable.
 var executablePath = ""
 
-// The name of the device we are running this executable on..
+// The name of the device we are running this executable on.
 var deviceName = ""
 
 // Using a packr box means the html files are bundled up in the binary application.
@@ -53,33 +53,42 @@ var tmpl *template.Template
 // finds the location where this executable was started.
 func init() {
 
-	deviceName = getDeviceName()
+	setDeviceName()
 
 	tmpl = template.New("")
+	tmpl.Funcs(template.FuncMap{"DeviceName": getDeviceName})
 
 	for _, name := range templateBox.List() {
 		t := tmpl.New(name)
-		if name == "navbar.html" {
-			stringToParse := templateBox.String(name)
-			stringToParse = strings.Replace(stringToParse, "Cacophonator Management", deviceName, 1)
-			template.Must(t.Parse(stringToParse))
-		} else {
-			template.Must(t.Parse(templateBox.String(name)))
-		}
+		template.Must(t.Parse(templateBox.String(name)))
 	}
 
 	executablePath = getExecutablePath()
 
 }
 
-// Get the host name (device name) this executable was started on.
+// All this function does is return the deviceName variable.
+// It is called when templates are executed.
 func getDeviceName() string {
+	return deviceName
+}
+
+// Get the host name (device name) this executable was started on.
+// Store it in a module level variable. It is inserted into the html templates at run time.
+func setDeviceName() {
 	name, err := os.Hostname()
 	if err != nil {
 		log.Printf(err.Error())
-		return ""
+		deviceName = "Unknown Device."
+	} else {
+		deviceName = name
+		// Check for the case when name could be something like: 'host.corp.com'
+		// If it is, just use the part before the first dot.
+		pos := strings.Index(name, ".")
+		if pos != -1 {
+			deviceName = name[:pos]
+		}
 	}
-	return name
 }
 
 // Get the directory of where this executable was started.
@@ -267,10 +276,7 @@ func SpeakerTestHandler(w http.ResponseWriter, r *http.Request) {
 // fileExists returns whether the given file or directory exists
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
-	if err == nil {
-		return true
-	}
-	return false
+	return err == nil
 }
 
 // findAudioFile locates our test audio file.  It returns true and the location of the file
