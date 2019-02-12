@@ -40,9 +40,6 @@ const secondaryPath = "/usr/lib/management-interface" // Check here if the file 
 // The file system location of this execuable.
 var executablePath = ""
 
-// The name of the device we are running this executable on.
-var deviceName = ""
-
 // Using a packr box means the html files are bundled up in the binary application.
 var templateBox = packr.NewBox("./html")
 
@@ -53,10 +50,10 @@ var tmpl *template.Template
 // finds the location where this executable was started.
 func init() {
 
-	setDeviceName()
-
+	// The name of the device we are running this executable on.
+	deviceName := getDeviceName()
 	tmpl = template.New("")
-	tmpl.Funcs(template.FuncMap{"DeviceName": getDeviceName})
+	tmpl.Funcs(template.FuncMap{"DeviceName": func() string { return deviceName }})
 
 	for _, name := range templateBox.List() {
 		t := tmpl.New(name)
@@ -67,28 +64,17 @@ func init() {
 
 }
 
-// All this function does is return the deviceName variable.
-// It is called when templates are executed.
-func getDeviceName() string {
-	return deviceName
-}
-
 // Get the host name (device name) this executable was started on.
 // Store it in a module level variable. It is inserted into the html templates at run time.
-func setDeviceName() {
+func getDeviceName() string {
 	name, err := os.Hostname()
 	if err != nil {
 		log.Printf(err.Error())
-		deviceName = "Unknown Device."
-	} else {
-		deviceName = name
-		// Check for the case when name could be something like: 'host.corp.com'
-		// If it is, just use the part before the first dot.
-		pos := strings.Index(name, ".")
-		if pos != -1 {
-			deviceName = name[:pos]
-		}
+		return "Unknown Device."
 	}
+	// Make sure we handle the case when name could be something like: 'host.corp.com'
+	// If it is, just use the part before the first dot.
+	return strings.SplitN(name, ".", 2)[0]
 }
 
 // Get the directory of where this executable was started.
