@@ -49,7 +49,11 @@ var tmpl *template.Template
 // This does some initialisation.  It parses our html templates up front and
 // finds the location where this executable was started.
 func init() {
+
+	// The name of the device we are running this executable on.
+	deviceName := getDeviceName()
 	tmpl = template.New("")
+	tmpl.Funcs(template.FuncMap{"DeviceName": func() string { return deviceName }})
 
 	for _, name := range templateBox.List() {
 		t := tmpl.New(name)
@@ -58,6 +62,19 @@ func init() {
 
 	executablePath = getExecutablePath()
 
+}
+
+// Get the host name (device name) this executable was started on.
+// Store it in a module level variable. It is inserted into the html templates at run time.
+func getDeviceName() string {
+	name, err := os.Hostname()
+	if err != nil {
+		log.Printf(err.Error())
+		return "Unknown"
+	}
+	// Make sure we handle the case when name could be something like: 'host.corp.com'
+	// If it is, just use the part before the first dot.
+	return strings.SplitN(name, ".", 2)[0]
 }
 
 // Get the directory of where this executable was started.
@@ -179,8 +196,8 @@ func getIPAddresses(iface net.Interface) []string {
 	return IPAddresses
 }
 
-// NetworkInterfacesHandler - Show the status of each network interface
-func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
+// NetworkHandler - Show the status of each network interface
+func NetworkHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Type used in serving interface information.
 	type interfaceProperties struct {
@@ -205,7 +222,7 @@ func NetworkInterfacesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Need to respond to individual requests to test if a network status is up or down.
-	tmpl.ExecuteTemplate(w, "network-interfaces.html", interfaces)
+	tmpl.ExecuteTemplate(w, "network.html", interfaces)
 }
 
 // CheckInterfaceHandler checks an interface to see if it is up or down.
@@ -245,11 +262,7 @@ func SpeakerTestHandler(w http.ResponseWriter, r *http.Request) {
 // fileExists returns whether the given file or directory exists
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
-	if err == nil {
-		return true
-	} else {
-		return false
-	}
+	return err == nil
 }
 
 // findAudioFile locates our test audio file.  It returns true and the location of the file
