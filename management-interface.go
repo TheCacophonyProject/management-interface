@@ -70,7 +70,7 @@ func getDeviceName() string {
 	name, err := os.Hostname()
 	if err != nil {
 		log.Printf(err.Error())
-		return "Unknown Device."
+		return "Unknown"
 	}
 	// Make sure we handle the case when name could be something like: 'host.corp.com'
 	// If it is, just use the part before the first dot.
