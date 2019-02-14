@@ -39,11 +39,11 @@
             <h2>Current Networks<br></h2>
             <div class="row">
                  {{range .}}
-                <div class="col-md-5" >
+                <div class="col-md-5 wifi-item" >
                     <div class="card mb-3">
                         <div class="card-body">
                             <h5 class="card-title"><strong>{{.Ssid}}</strong></h5>
-                                <a onclick="removeNetwork('{{.Ssid}}')" class="btn btn-info btn-lg">
+                                <a onclick="removeNetwork(this,{{.NetworkID}})" class="btn btn-info btn-lg">
                                     <span class="glyphicon glyphicon-trash"></span>Remove 
                                 </a>
                         </div>
@@ -58,16 +58,18 @@
         <script src="/static/js/bootstrap.min.js"></script>
         <script>
 
-            function removeNetwork(ssid){
+            function removeNetwork(domLink, id){
                 fetch(
-                    "/wifi-networks/" + ssid,
+                    "/wifi-networks/" + id,
                     {method: "DELETE"}
                 ).then(function(response) {
-                  return response.json();
-                }).then(function(json) {
-                  
-                });  
-
+                    if(response.status == 200){
+                        console.log($(domLink).closest(".wifi-item"));
+                       $($(domLink).closest(".wifi-item")).remove()
+                    }
+                    console.log(response.status);
+                //  return response.json();
+                })
             }
 
         </script>

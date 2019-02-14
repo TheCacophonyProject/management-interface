@@ -21,6 +21,7 @@ package managementinterface
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
 	"html/template"
@@ -33,6 +34,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -215,18 +217,18 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 
 	//wirelessNetworks :=
 	//ifaces, err := net.Interfaces()
-	configFile :="/home/zaza/go/src/github.com/TheCacophonyProject/management-interface/sup_test.conf"
-	if r.Method ==http.MethodPost{
-  		 if err := r.ParseForm(); err != nil {
-            log.Print(err.Error())
-            return
-        }
+	configFile := "/home/zaza/go/src/github.com/TheCacophonyProject/management-interface/sup_test.conf"
+	if r.Method == http.MethodPost {
+		if err := r.ParseForm(); err != nil {
+			log.Print(err.Error())
+			return
+		}
 
-        ssid := r.FormValue("ssid")
-        password := r.FormValue("password")
-        addWpaNetwork(configFile, ssid, password)
-        log.Print("Ssid: " + ssid + " password: " + password);
-        //Add new network
+		ssid := r.FormValue("ssid")
+		password := r.FormValue("password")
+		addWpaNetwork(configFile, ssid, password)
+		log.Print("Ssid: " + ssid + " password: " + password)
+		//Add new network
 
 	}
 	networks := parseWpaSupplicantConfig(configFile)
@@ -235,9 +237,23 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 
 // WifiNetworkHandler - Show the wireless netowrks the pi can see
 func DeleteNetworkHandler(w http.ResponseWriter, r *http.Request) {
-	ssidName := mux.Vars(r)["id"]
-	out, err  = exec.Command("wpa_cli ", "remove_network " + id).Output()
-	out, err  = exec.Command("wpa_cli ", "save config ").Output()
+	id := mux.Vars(r)["id"]
+
+	log.Print("Delete network handler" + id)
+	var out []byte
+	err := error(nil)
+	out, err = exec.Command("wpa_cli", "remove_network", id).Output()
+	log.Print(string(out))
+	if err != nil {
+		log.Print("removing " + err.Error())
+	}
+	_, err = exec.Command("wpa_cli", "save", "config").Output()
+	if err != nil {
+		log.Print("saving " + err.Error())
+	}
+
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, "network deleted")
 }
 
 func dequote(input string) string {
@@ -248,51 +264,71 @@ func dequote(input string) string {
 }
 
 type wifiNetwork struct {
-	Ssid    string
-	NetworkId int
+	Ssid      string
+	NetworkID int
 }
 
 func addWpaNetwork(configFile string, ssid string, password string) {
-	out, err  = exec.Command("wpa_cli ", "add_network").Output()
+	var out []byte
+	err := error(nil)
+	out, err = exec.Command("wpa_cli", "add_network").Output()
+	if err != nil {
+		log.Print(err)
+	}
 	stdOut := string(out)
-	networkId int;
+	var networkId int = 0
+
+	scanner := bufio.NewScanner(strings.NewReader(stdOut))
+	log.Print("read output")
 	for scanner.Scan() {
-		string.HasPrefix
 		line := scanner.Text()
-		if _, err := strconv.Atoi(v); err == nil {
-			networkId = v;
-		}	
+		networkId, err = strconv.Atoi(line)
+
 	}
 	cmd := exec.Command("wpa_cli")
 	stdin, err := cmd.StdinPipe()
 	defer stdin.Close()
-	io.WriteString(stdin, "set_network " + networkId + " ssid " + ssid + "\n")
-	io.WriteString(stdin, "set_network " + networkId + " psk " + password + "\n")
-	io.WriteString(stdin, "enable_network " + networkId + "\n")
+
+	inputS := fmt.Sprintf("set_network %d ssid \"%s\"\n", networkId, ssid)
+	inputS = inputS + fmt.Sprintf("set_network %d psk \"%s\"\n", networkId, password)
+	inputS = inputS + fmt.Sprintf("enable_network %d\n", networkId) + "save config\n" + "quit\n"
+	log.Print(inputS)
+	io.WriteString(stdin, inputS)
+	/*log.Print()
+	io.WriteString(stdin, fmt.Sprintf("set_network %d ssid \"%s\"\n", networkId, ssid))
+	io.WriteString(stdin, fmt.Sprintf("set_network %d psk %s\n", networkId, password))
+	io.WriteString(stdin, fmt.Sprintf("enable_network %d\n", networkId))
 	io.WriteString(stdin, "save config\n")
-	io.WriteString(stdin, "quit\n")
+	io.WriteString(stdin, "quit\n")*/
+	err = cmd.Run()
+	if err != nil {
+		log.Print(err)
+	}
 }
 
 func parseWpaSupplicantConfig(configFile string) []wifiNetwork {
-	out, err  = exec.Command("wpa_cli ", "-list_networks").Output()
+	var out []byte
+	err := error(nil)
+	out, err = exec.Command("wpa_cli", "list_networks").Output()
 
 	if err != nil {
-		log.Printf(err.Error())
-		return err.Error(), err
+		log.Printf("error parsing wpa config" + err.Error())
+		//	return err.Error(), err
 	}
 	networkList := string(out)
 	networks := []wifiNetwork{}
-
+	var id int
 	scanner := bufio.NewScanner(strings.NewReader(networkList))
 	for scanner.Scan() {
-		string.HasPrefix
 		line := scanner.Text()
-		parts := strings.Split(line, " ")
-		if len(parts)>2 {
-			if _, err := strconv.Atoi(v); err == nil {
-				if(parts[1] !="bushnet"){
-					wNetwork := wifiNetwork{Ssid: parts[1], NetworkId: parts[2]}
-					networks = append(networks, wNetwork);
+		log.Print(line)
+		parts := strings.Split(line, "\t")
+		log.Print(len(parts))
+		if len(parts) > 2 {
+			if id, err = strconv.Atoi(parts[0]); err == nil {
+				if parts[1] != "bushnet" {
+					wNetwork := wifiNetwork{Ssid: parts[1], NetworkID: id}
+					networks = append(networks, wNetwork)
 				}
 			}
 		}
@@ -303,66 +339,66 @@ func parseWpaSupplicantConfig(configFile string) []wifiNetwork {
 
 	/*
 
-	, nil
+		, nil
 
-	file, err := os.Open(configFile)
-	if err != nil {
-		log.Print(err.Error())
-	}
-	defer file.Close()
-
-	networks := []wifiNetwork{}
-
-	//networks := map[string]map[string]string{}
-	var networkMap map[string]string
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "#") {
-			continue
+		file, err := os.Open(configFile)
+		if err != nil {
+			log.Print(err.Error())
 		}
-		line = strings.TrimSpace(line)
-		if line == "}" {
-			ssid := networkMap["ssid"]
-			if ssid == "" {
-				log.Print("Empty SSID")
-			} else if ssid != "bushnet"{
-				wNetwork := wifiNetwork{Ssid: networkMap["ssid"], PassKey: networkMap["psk"]}
-				networks = append(networks, wNetwork)
+		defer file.Close()
+
+		networks := []wifiNetwork{}
+
+		//networks := map[string]map[string]string{}
+		var networkMap map[string]string
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, "#") {
+				continue
 			}
-			networkMap = nil
-		} else if line != "" {
-			parts := strings.Split(line, "=")
-			if len(parts) != 2 {
-				log.Print("Line incorrectly formated")
-				//SOME kind of error
-				break
-			}
-			key := parts[0]
-			value := parts[1]
-			if value == "{" {
-				if key != "network" {
-					log.Print("Line unsupported section")
-					//  raise ParseError('unsupported section: "{}"'.format(left))
-				} else if networkMap != nil {
-					log.Print("Can't nest networks")
-					//raise ParseError("can't nest networks")
-				} else {
-					networkMap = map[string]string{}
+			line = strings.TrimSpace(line)
+			if line == "}" {
+				ssid := networkMap["ssid"]
+				if ssid == "" {
+					log.Print("Empty SSID")
+				} else if ssid != "bushnet"{
+					wNetwork := wifiNetwork{Ssid: networkMap["ssid"], PassKey: networkMap["psk"]}
+					networks = append(networks, wNetwork)
 				}
-			} else {
-				networkMap[key] = dequote(value)
+				networkMap = nil
+			} else if line != "" {
+				parts := strings.Split(line, "=")
+				if len(parts) != 2 {
+					log.Print("Line incorrectly formated")
+					//SOME kind of error
+					break
+				}
+				key := parts[0]
+				value := parts[1]
+				if value == "{" {
+					if key != "network" {
+						log.Print("Line unsupported section")
+						//  raise ParseError('unsupported section: "{}"'.format(left))
+					} else if networkMap != nil {
+						log.Print("Can't nest networks")
+						//raise ParseError("can't nest networks")
+					} else {
+						networkMap = map[string]string{}
+					}
+				} else {
+					networkMap[key] = dequote(value)
+				}
 			}
 		}
-	}
 
-	if err := scanner.Err(); err != nil {
-		log.Fatal(err)
-	}
+		if err := scanner.Err(); err != nil {
+			log.Fatal(err)
+		}
 
-	sort.Slice(networks, func(i, j int) bool { return networks[i].Ssid < networks[j].Ssid })
-	return networks*/
+		sort.Slice(networks, func(i, j int) bool { return networks[i].Ssid < networks[j].Ssid })
+		return networks*/
 }
 
 // CheckInterfaceHandler checks an interface to see if it is up or down.
