@@ -60,7 +60,7 @@ func main() {
 	// UI handlers.
 	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
 	router.HandleFunc("/network-interfaces", managementinterface.NetworkInterfacesHandler).Methods("GET")
-	router.HandleFunc("/wifi-networks", managementinterface.WifiNetworkHandler).Methods("GET")
+	router.HandleFunc("/wifi-networks", managementinterface.WifiNetworkHandler).Methods("GET","POST")
 
 	router.HandleFunc("/wifi-networks/{ssid}", managementinterface.DeleteNetworkHandler).Methods("DELETE")
 

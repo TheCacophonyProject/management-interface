@@ -15,8 +15,28 @@
             <div class="container pt-5 pl-0">
                 <h2>WIfi Networks<br></h2>
             </div>
-            <hr>
+            <form method="POST">
+               <div class="col-md-12" >
+                    <h5 class="card-title"><strong>Add a Network</strong></h5>
+                    <div class="form-group">
+                        <label for="text-ssid">Network Name (SSID)</label>
+                        <div class="input-group">
+                          <input type="text" class="form-control" id="text-ssid" name="ssid" value="">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="text-password">Password</label>
+                        <div class="input-group">
+                          <input type="password" class="form-control" id="text-password" name="password"  value="">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add</button>
+                </div>
+            </form>
 
+            <br>
+
+            <h2>Current Networks<br></h2>
             <div class="row">
                  {{range .}}
                 <div class="col-md-5" >

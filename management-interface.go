@@ -24,6 +24,7 @@ import (
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
 	"html/template"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -214,17 +215,29 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 
 	//wirelessNetworks :=
 	//ifaces, err := net.Interfaces()
-	networks := parseWPASupplicantConfig("/home/zaza/go/src/github.com/TheCacophonyProject/management-interface/sup_test.conf")
+	configFile :="/home/zaza/go/src/github.com/TheCacophonyProject/management-interface/sup_test.conf"
+	if r.Method ==http.MethodPost{
+  		 if err := r.ParseForm(); err != nil {
+            log.Print(err.Error())
+            return
+        }
+
+        ssid := r.FormValue("ssid")
+        password := r.FormValue("password")
+        addWpaNetwork(configFile, ssid, password)
+        log.Print("Ssid: " + ssid + " password: " + password);
+        //Add new network
+
+	}
+	networks := parseWpaSupplicantConfig(configFile)
 	tmpl.ExecuteTemplate(w, "wifi-networks.html", networks)
 }
 
 // WifiNetworkHandler - Show the wireless netowrks the pi can see
 func DeleteNetworkHandler(w http.ResponseWriter, r *http.Request) {
-	log.Print("Delete network")
-	log.Print(r)
-	//wirelessNetworks :=
-	//ifaces, err := net.Interfaces()
-	//	tmpl.ExecuteTemplate(w, "wifi-networks.html", networks)
+	ssidName := mux.Vars(r)["id"]
+	out, err  = exec.Command("wpa_cli ", "remove_network " + id).Output()
+	out, err  = exec.Command("wpa_cli ", "save config ").Output()
 }
 
 func dequote(input string) string {
@@ -236,10 +249,62 @@ func dequote(input string) string {
 
 type wifiNetwork struct {
 	Ssid    string
-	PassKey string
+	NetworkId int
 }
 
-func parseWPASupplicantConfig(configFile string) []wifiNetwork {
+func addWpaNetwork(configFile string, ssid string, password string) {
+	out, err  = exec.Command("wpa_cli ", "add_network").Output()
+	stdOut := string(out)
+	networkId int;
+	for scanner.Scan() {
+		string.HasPrefix
+		line := scanner.Text()
+		if _, err := strconv.Atoi(v); err == nil {
+			networkId = v;
+		}	
+	}
+	cmd := exec.Command("wpa_cli")
+	stdin, err := cmd.StdinPipe()
+	defer stdin.Close()
+	io.WriteString(stdin, "set_network " + networkId + " ssid " + ssid + "\n")
+	io.WriteString(stdin, "set_network " + networkId + " psk " + password + "\n")
+	io.WriteString(stdin, "enable_network " + networkId + "\n")
+	io.WriteString(stdin, "save config\n")
+	io.WriteString(stdin, "quit\n")
+}
+
+func parseWpaSupplicantConfig(configFile string) []wifiNetwork {
+	out, err  = exec.Command("wpa_cli ", "-list_networks").Output()
+
+	if err != nil {
+		log.Printf(err.Error())
+		return err.Error(), err
+	}
+	networkList := string(out)
+	networks := []wifiNetwork{}
+
+	scanner := bufio.NewScanner(strings.NewReader(networkList))
+	for scanner.Scan() {
+		string.HasPrefix
+		line := scanner.Text()
+		parts := strings.Split(line, " ")
+		if len(parts)>2 {
+			if _, err := strconv.Atoi(v); err == nil {
+				if(parts[1] !="bushnet"){
+					wNetwork := wifiNetwork{Ssid: parts[1], NetworkId: parts[2]}
+					networks = append(networks, wNetwork);
+				}
+			}
+		}
+	}
+
+	sort.Slice(networks, func(i, j int) bool { return networks[i].Ssid < networks[j].Ssid })
+	return networks
+
+	/*
+
+	, nil
+
 	file, err := os.Open(configFile)
 	if err != nil {
 		log.Print(err.Error())
@@ -262,7 +327,7 @@ func parseWPASupplicantConfig(configFile string) []wifiNetwork {
 			ssid := networkMap["ssid"]
 			if ssid == "" {
 				log.Print("Empty SSID")
-			} else {
+			} else if ssid != "bushnet"{
 				wNetwork := wifiNetwork{Ssid: networkMap["ssid"], PassKey: networkMap["psk"]}
 				networks = append(networks, wNetwork)
 			}
@@ -297,7 +362,7 @@ func parseWPASupplicantConfig(configFile string) []wifiNetwork {
 	}
 
 	sort.Slice(networks, func(i, j int) bool { return networks[i].Ssid < networks[j].Ssid })
-	return networks
+	return networks*/
 }
 
 // CheckInterfaceHandler checks an interface to see if it is up or down.
