@@ -17,56 +17,39 @@
             </div>
             <hr>
 
-            {{range .}}
             <div class="row">
+                 {{range .}}
                 <div class="col-md-5" >
                     <div class="card mb-3">
                         <div class="card-body">
                             <h5 class="card-title"><strong>{{.Ssid}}</strong></h5>
-                            <h6>{{.PassKey}}</h6>
+                                <a onclick="removeNetwork('{{.Ssid}}')" class="btn btn-info btn-lg">
+                                    <span class="glyphicon glyphicon-trash"></span>Remove 
+                                </a>
                         </div>
                     </div>
                 </div>
+                {{end}}         
             </div>
-            {{end}}
         </div>
 
 
         <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
         <script src="/static/js/bootstrap.min.js"></script>
         <script>
-          function checkInterface(interfaceName) {
-            // Set status indicator
-            var statusIndicator = document.getElementById("interface-" + interfaceName + "-indicator");
-            statusIndicator.textContent = "...";
-            // Clear output text
-            var status = document.getElementById("interface-" + interfaceName + "-statustext");
-            status.textContent = "";
-            // Disable test button while waiting for response
-            var button = document.getElementById("interface-" + interfaceName + "-test");
-            button.disabled = true;
-            console.log("/interface-status/" + interfaceName)
-            fetch(
-              "/interface-status/" + interfaceName,
-              {method: "GET"}
-            ).then(function(response) {
-              return response.json();
-            }).then(function(json) {
-              status.textContent = json["result"];
-              button.disabled = false;
-              var state = json["status"];
-              if (state === "down") {
-                // Cross mark
-                statusIndicator.innerHTML = "&#x2717;";
-              } else if (state === "up") {
-                // Check mark
-                statusIndicator.innerHTML = "&#x2714;";
-              } else {
-                // Question mark
-                statusIndicator.innerHTML = "&#x003F;";
-              }
-            });
-          }
+
+            function removeNetwork(ssid){
+                fetch(
+                    "/wifi-networks/" + ssid,
+                    {method: "DELETE"}
+                ).then(function(response) {
+                  return response.json();
+                }).then(function(json) {
+                  
+                });  
+
+            }
+
         </script>
 
     </body>

@@ -62,6 +62,8 @@ func main() {
 	router.HandleFunc("/network-interfaces", managementinterface.NetworkInterfacesHandler).Methods("GET")
 	router.HandleFunc("/wifi-networks", managementinterface.WifiNetworkHandler).Methods("GET")
 
+	router.HandleFunc("/wifi-networks/{ssid}", managementinterface.DeleteNetworkHandler).Methods("DELETE")
+
 	router.HandleFunc("/interface-status/{name:[a-zA-Z0-9-* ]+}", managementinterface.CheckInterfaceHandler).Methods("GET")
 	router.HandleFunc("/speaker", managementinterface.SpeakerTestHandler).Methods("GET")
 	router.HandleFunc("/speaker/status", managementinterface.SpeakerStatusHandler).Methods("GET")

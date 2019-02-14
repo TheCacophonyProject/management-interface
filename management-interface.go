@@ -215,22 +215,16 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 	//wirelessNetworks :=
 	//ifaces, err := net.Interfaces()
 	networks := parseWPASupplicantConfig("/home/zaza/go/src/github.com/TheCacophonyProject/management-interface/sup_test.conf")
-	/*if err != nil {
-		log.Print(err.Error())
-	} else {
-		// Filter out loopback interfaces
-		for _, iface := range ifaces {
-			if iface.Flags&net.FlagLoopback == 0 {
-				// Not a loopback interface
-				addresses := getIPAddresses(iface)
-				ifaceProperties := interfaceProperties{Name: iface.Name, IPAddresses: addresses}
-				interfaces = append(interfaces, ifaceProperties)
-			}
-		}
-	}*/
-
-	// Need to respond to individual requests to test if a network status is up or down.
 	tmpl.ExecuteTemplate(w, "wifi-networks.html", networks)
+}
+
+// WifiNetworkHandler - Show the wireless netowrks the pi can see
+func DeleteNetworkHandler(w http.ResponseWriter, r *http.Request) {
+	log.Print("Delete network")
+	log.Print(r)
+	//wirelessNetworks :=
+	//ifaces, err := net.Interfaces()
+	//	tmpl.ExecuteTemplate(w, "wifi-networks.html", networks)
 }
 
 func dequote(input string) string {
@@ -303,8 +297,6 @@ func parseWPASupplicantConfig(configFile string) []wifiNetwork {
 	}
 
 	sort.Slice(networks, func(i, j int) bool { return networks[i].Ssid < networks[j].Ssid })
-
-	log.Print(networks)
 	return networks
 }
 
