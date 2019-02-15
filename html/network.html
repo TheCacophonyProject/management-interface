@@ -10,13 +10,19 @@
     <body>
         {{template "navbar"}}
 
+        {{ $enabled := .Config.Online }}
         <div class="container">
-            <div class="container pt-5 pl-0">
-                <h2>Network<br></h2>
+            <div class="container pt-5 pl-0" style="display: flex; align-items: baseline;">
+                <h2 style="flex-grow: 1;">Network</h2>
+                <div class="form-group form-check">
+                    <input type="checkbox" class="form-check-input" id="onlineCheck" disabled {{if $enabled}} checked {{else}} unchecked {{end}}>
+                    <label class="form-check-label" for="onlineCheck">Enabled</label>
+                </div>
             </div>
             <hr>
 
-            {{range .}}
+
+            {{range .Interfaces}}
             <div class="row">
                 <div class="col-md-5" >
                     <div class="card mb-3">
@@ -34,7 +40,7 @@
                     <div class="card mb-3">
                         <div class="card-body">
                             <h5 class="card-title"><strong>Status</strong></h5>
-                            <button id="interface-{{.Name}}-test" type="button" onclick="checkInterface({{.Name}})" class="btn btn-primary mb-4">Test</button>
+                            <button id="interface-{{.Name}}-test" type="button" onclick="checkInterface({{.Name}})" {{if not $enabled}}disabled{{end}} class="btn btn-primary mb-4">Test</button>
                             <h4 id="interface-{{.Name}}-indicator">&#x003F;</h4>
                         </div>
                     </div>

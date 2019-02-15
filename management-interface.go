@@ -21,6 +21,7 @@ package managementinterface
 import (
 	"encoding/json"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -32,10 +33,13 @@ import (
 
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
+	yaml "gopkg.in/yaml.v2"
 )
 
 const fileName = "IEEE_float_mono_32kHz.wav"          // Default sound file name.
 const secondaryPath = "/usr/lib/management-interface" // Check here if the file is not found in the executable directory.
+
+const networkConfigFile = "/etc/cacophony/network.yaml"
 
 // The file system location of this execuable.
 var executablePath = ""
@@ -62,6 +66,32 @@ func init() {
 
 	executablePath = getExecutablePath()
 
+}
+
+type NetworkConfig struct {
+	Online bool `yaml:"online"`
+}
+
+func ParseNetworkConfig(filepath string) NetworkConfig {
+
+	// Create a default config
+	config := NetworkConfig{
+		Online: true,
+	}
+
+	inBuf, err := ioutil.ReadFile(filepath)
+	if err != nil {
+		// Create config file
+		outBuf, _ := yaml.Marshal(config)
+		ioutil.WriteFile(filepath, outBuf, 0640)
+
+		return config
+	}
+
+	// If an error occurs, will fall back to default config
+	yaml.Unmarshal(inBuf, &config)
+
+	return config
 }
 
 // Get the host name (device name) this executable was started on.
@@ -205,6 +235,11 @@ func NetworkHandler(w http.ResponseWriter, r *http.Request) {
 		IPAddresses []string
 	}
 
+	type networkState struct {
+		Interfaces []interfaceProperties
+		Config     NetworkConfig
+	}
+
 	ifaces, err := net.Interfaces()
 	interfaces := []interfaceProperties{}
 	if err != nil {
@@ -221,8 +256,16 @@ func NetworkHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Read online/offline status from 'network.yaml'
+	config := ParseNetworkConfig(networkConfigFile)
+
+	state := networkState{
+		Interfaces: interfaces,
+		Config:     config,
+	}
+
 	// Need to respond to individual requests to test if a network status is up or down.
-	tmpl.ExecuteTemplate(w, "network.html", interfaces)
+	tmpl.ExecuteTemplate(w, "network.html", state)
 }
 
 // CheckInterfaceHandler checks an interface to see if it is up or down.
