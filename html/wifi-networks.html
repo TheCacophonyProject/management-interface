@@ -43,9 +43,11 @@
                     <div class="card mb-3">
                         <div class="card-body">
                             <h5 class="card-title"><strong>{{.Ssid}}</strong></h5>
+                                {{if ne .Ssid "bushnet"}}
                                 <a onclick="removeNetwork(this,{{.NetworkID}})" class="btn btn-info btn-lg">
                                     <span class="glyphicon glyphicon-trash"></span>Remove 
                                 </a>
+                                {{end}}
                         </div>
                     </div>
                 </div>
@@ -63,13 +65,14 @@
                     "/wifi-networks/" + id,
                     {method: "DELETE"}
                 ).then(function(response) {
-                    if(response.status == 200){
+                    return response.text();
+                }).then(function(result) {
+                    console.log(result);
+                    if(result == 1){
                         console.log($(domLink).closest(".wifi-item"));
-                       $($(domLink).closest(".wifi-item")).remove()
+                        $($(domLink).closest(".wifi-item")).remove()
                     }
-                    console.log(response.status);
-                //  return response.json();
-                })
+                });
             }
 
         </script>
