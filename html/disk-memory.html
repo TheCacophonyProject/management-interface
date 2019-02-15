@@ -5,47 +5,74 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="/static/css/bootstrap.min.css">
-  <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
-  <script src="/static/js/bootstrap.min.js"></script>
 </head>
-<body>
 
-    <nav class="navbar navbar-inverse">
-        <div class="container-fluid">
-            <div class="navbar-header">
-            <a class="navbar-brand" href="#">Cacophonator Setup</a>
+    <body>
+        {{template "navbar"}}
+
+        <div class="container">
+            <div class="container pt-5 pl-0">
+                <h2>Disk And Memory Statistics<br></h2>
             </div>
-            <ul class="nav navbar-nav">
-            <li class="active"><a href="/">Home</a></li>
-            <li class="dropdown">
-                <a class="dropdown-toggle" data-toggle="dropdown" href="#">Config
-                <span class="caret"></span></a>
-                <ul class="dropdown-menu">
-                <li><a href="/3G-connectivity">3G Connectivity</a></li>
-                <li><a href="/API-server">API Server</a></li>
-                <li><a href="/camera-positioning">Camera Positioning</a></li>
-                <li><a href="/disk-memory">Disk and Memory</a></li>
-                <li><a href="/network-interfaces">Network Interfaces</a></li>
-                </ul>
-            </li>
-            </ul>
+            <hr>
+        
+            <div class="container p-5">
+                    <h3>Disk:</h3>
+            </div>
+    
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Filesystem</th> 
+                            <th>Size</th> 
+                            <th>Used</th> 
+                            <th>Avail</th> 
+                            <th>Use %</th> 
+                            <th>Mounted on</th> 
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .DiskDataRows}}
+                            <tr>
+                                {{range .}}<td>{{.}}</td>{{end}}                
+                            </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+    
+    
+            <div class="container p-5">
+                <h3>Memory:</h3>
+            </div>
+    
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th class="w-25" class="text-right">Memory Amount</th> 
+                            <th>Memory Type</th> 
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .MemoryDataRows}}
+                            <tr>
+                                {{range .}}<td>{{.}}</td>{{end}}                
+                            </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+    
+    
         </div>
-    </nav>
-                    
-<div class="container">
-    <h2>Disk And Memory Statistics:<br></h2>
-</div>
-<h3>Disk:</h3>
-<div class="well">
-    {{range .Strings}}
-        <h4>{{.Text}}<h4>
-    {{end}}
-</div>
-<h3>Memory:</h3>
-<div class="well">
-  <h4>Nothing here yet</h4>
-</div>
+    
+    
+        <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+        <script src="/static/js/bootstrap.min.js"></script>
+    
+    
 
-
-</body>
+    </body>
 </html>
