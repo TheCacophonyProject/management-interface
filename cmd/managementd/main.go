@@ -61,6 +61,7 @@ func main() {
 	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
 	router.HandleFunc("/network", managementinterface.NetworkHandler).Methods("GET")
 	router.HandleFunc("/interface-status/{name:[a-zA-Z0-9-* ]+}", managementinterface.CheckInterfaceHandler).Methods("GET")
+	router.HandleFunc("/online-state", managementinterface.ToggleOnlineState).Methods("POST")
 	router.HandleFunc("/speaker", managementinterface.SpeakerTestHandler).Methods("GET")
 	router.HandleFunc("/speaker/status", managementinterface.SpeakerStatusHandler).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
