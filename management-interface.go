@@ -72,6 +72,11 @@ type NetworkConfig struct {
 	Online bool `yaml:"online"`
 }
 
+func WriteNetworkConfig(filepath string, config NetworkConfig) error {
+	outBuf, _ := yaml.Marshal(config)
+	return ioutil.WriteFile(filepath, outBuf, 0640)
+}
+
 func ParseNetworkConfig(filepath string) NetworkConfig {
 
 	// Create a default config
@@ -295,6 +300,50 @@ func CheckInterfaceHandler(w http.ResponseWriter, r *http.Request) {
 		response["status"] = "up"
 	}
 	json.NewEncoder(w).Encode(response)
+}
+
+func ToggleOnlineState(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
+	config := ParseNetworkConfig(networkConfigFile)
+
+	decoder := json.NewDecoder(r.Body)
+
+	type OnlineState struct {
+		Online bool
+	}
+
+	type Resp struct {
+		Result string `json:"result"`
+		State  bool   `json:"state"`
+	}
+
+	stateMap := OnlineState{}
+	resp := Resp{Result: "", State: config.Online}
+
+	err := decoder.Decode(&stateMap)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		resp.Result = "Failed to understand request"
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	config.Online = stateMap.Online
+	err = WriteNetworkConfig(networkConfigFile, config)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		resp.Result = "Failed to update network config"
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	resp.Result = "Successfully set online state"
+	resp.State = stateMap.Online
+	json.NewEncoder(w).Encode(resp)
+
 }
 
 // SpeakerTestHandler will show a frame from the camera to help with positioning

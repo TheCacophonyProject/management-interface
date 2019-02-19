@@ -10,17 +10,16 @@
     <body>
         {{template "navbar"}}
 
-        {{ $enabled := .Config.Online }}
         <div class="container">
+            <div id="resultMessage" class="alert alert-danger" style="display: none;"></div>
             <div class="container pt-5 pl-0" style="display: flex; align-items: baseline;">
                 <h2 style="flex-grow: 1;">Network</h2>
                 <div class="form-group form-check">
-                    <input type="checkbox" class="form-check-input" id="onlineCheck" disabled {{if $enabled}} checked {{else}} unchecked {{end}}>
+                    <input type="checkbox" class="form-check-input" id="onlineCheck" {{if .Config.Online}} checked {{else}} unchecked {{end}} onclick="handleEnableChange(event)">
                     <label class="form-check-label" for="onlineCheck">Enabled</label>
                 </div>
             </div>
             <hr>
-
 
             {{range .Interfaces}}
             <div class="row">
@@ -40,7 +39,7 @@
                     <div class="card mb-3">
                         <div class="card-body">
                             <h5 class="card-title"><strong>Status</strong></h5>
-                            <button id="interface-{{.Name}}-test" type="button" onclick="checkInterface({{.Name}})" {{if not $enabled}}disabled{{end}} class="btn btn-primary mb-4">Test</button>
+                            <button id="interface-{{.Name}}-test" type="button" onclick="checkInterface({{.Name}})" class="btn btn-primary mb-4">Test</button>
                             <h4 id="interface-{{.Name}}-indicator">&#x003F;</h4>
                         </div>
                     </div>
@@ -61,6 +60,34 @@
         <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
         <script src="/static/js/bootstrap.min.js"></script>
         <script>
+          function handleEnableChange(event) {
+            event.preventDefault();
+            var checkBox = event.target;
+            var value = checkBox.checked;
+            fetch("/online-state", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({online: value})
+            })
+              .then(function(response) {
+                response.json().then(function(json) {
+                  checkBox.checked = json["state"];
+                  var message = document.getElementById("resultMessage")
+                  if (!response.ok) {
+                    // Display message
+                    message.innerText = json["result"];
+                    message.style.display = "block";
+                  } else {
+                    // Ensure any old messages are hidden
+                    message.innerText = "";
+                    message.style.display = "none";
+                  }
+                });
+              });
+          }
+
           function checkInterface(interfaceName) {
             // Set status indicator
             var statusIndicator = document.getElementById("interface-" + interfaceName + "-indicator");
