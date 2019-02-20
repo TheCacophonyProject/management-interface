@@ -21,6 +21,7 @@ package managementinterface
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
@@ -262,7 +263,7 @@ func deleteNetwork(id string) error {
 	scanner.Scan() //skip 1stline
 	scanner.Scan()
 	ssid := scanner.Text()
-	if ssid == "\"bushnet\"" {
+	if strings.ToLower(ssid) == "\"bushnet\"" {
 		log.Printf("error bushnet cannot be deleted")
 		return err
 	}
@@ -287,10 +288,33 @@ func deleteNetwork(id string) error {
 	return err
 }
 
+func doesWpaNetworkExist(ssid string) bool {
+	exists := false
+	networks, _ := parseWpaSupplicantConfig()
+	for _, v := range networks {
+		if strings.ToLower(v.Ssid) == strings.ToLower(ssid) {
+			exists = true
+		}
+	}
+	return exists
+}
+
 func addWpaNetwork(ssid string, password string) error {
-	//check for existing network
-	var out []byte
 	err := error(nil)
+	if ssid == "" {
+		err = errors.New("SSID must have a value")
+		log.Printf("Ssid must have a value")
+		return err
+	}
+
+	exists := doesWpaNetworkExist(ssid)
+	if exists {
+		err = errors.New("SSID already exists " + ssid)
+		log.Printf("Ssid %s already exits", ssid)
+		return err
+	}
+	var out []byte
+
 	out, err = exec.Command("wpa_cli", "add_network").Output()
 	if err != nil {
 		log.Printf("error executing wpa_cli add_network - error %s output %s", err.Error(), out)
