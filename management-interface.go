@@ -72,11 +72,16 @@ type NetworkConfig struct {
 	Online bool `yaml:"online"`
 }
 
+// WriteNetworkConfig writes the config value(s) to the network config file.
 func WriteNetworkConfig(filepath string, config NetworkConfig) error {
-	outBuf, _ := yaml.Marshal(config)
+	outBuf, err := yaml.Marshal(config)
+	if err != nil {
+		return err
+	}
 	return ioutil.WriteFile(filepath, outBuf, 0640)
 }
 
+// ParseNetworkConfig retrieves a value(s) from the network config file.
 func ParseNetworkConfig(filepath string) NetworkConfig {
 
 	// Create a default config
