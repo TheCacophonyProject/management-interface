@@ -68,12 +68,14 @@ func init() {
 
 }
 
+// NetworkConfig is a struct to store our network configuration values in.
 type NetworkConfig struct {
 	Online bool `yaml:"online"`
 }
 
 // WriteNetworkConfig writes the config value(s) to the network config file.
-func WriteNetworkConfig(filepath string, config NetworkConfig) error {
+// If it doesn't exist, it is created.
+func WriteNetworkConfig(filepath string, config *NetworkConfig) error {
 	outBuf, err := yaml.Marshal(config)
 	if err != nil {
 		return err
@@ -82,26 +84,24 @@ func WriteNetworkConfig(filepath string, config NetworkConfig) error {
 }
 
 // ParseNetworkConfig retrieves a value(s) from the network config file.
-func ParseNetworkConfig(filepath string) NetworkConfig {
+func ParseNetworkConfig(filepath string) (*NetworkConfig, error) {
 
 	// Create a default config
-	config := NetworkConfig{
+	config := &NetworkConfig{
 		Online: true,
 	}
 
 	inBuf, err := ioutil.ReadFile(filepath)
-	if err != nil {
-		// Create config file
-		outBuf, _ := yaml.Marshal(config)
-		ioutil.WriteFile(filepath, outBuf, 0640)
-
-		return config
+	if os.IsNotExist(err) {
+		return config, nil
+	} else if err != nil {
+		return nil, err
 	}
 
-	// If an error occurs, will fall back to default config
-	yaml.Unmarshal(inBuf, &config)
-
-	return config
+	if err := yaml.Unmarshal(inBuf, config); err != nil {
+		return nil, err
+	}
+	return config, nil
 }
 
 // Get the host name (device name) this executable was started on.
@@ -267,11 +267,17 @@ func NetworkHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Read online/offline status from 'network.yaml'
-	config := ParseNetworkConfig(networkConfigFile)
+	config, err := ParseNetworkConfig(networkConfigFile)
+	if err != nil {
+		// Create a default config
+		config = &NetworkConfig{
+			Online: true,
+		}
+	}
 
 	state := networkState{
 		Interfaces: interfaces,
-		Config:     config,
+		Config:     *config,
 	}
 
 	// Need to respond to individual requests to test if a network status is up or down.
@@ -307,12 +313,9 @@ func CheckInterfaceHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// ToggleOnlineState attempts to toggle the 'online' value in the network config file.
 func ToggleOnlineState(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-
-	config := ParseNetworkConfig(networkConfigFile)
-
-	decoder := json.NewDecoder(r.Body)
 
 	type OnlineState struct {
 		Online bool
@@ -323,10 +326,21 @@ func ToggleOnlineState(w http.ResponseWriter, r *http.Request) {
 		State  bool   `json:"state"`
 	}
 
-	stateMap := OnlineState{}
+	// Get any value(s) from the config file.
+	config, err := ParseNetworkConfig(networkConfigFile)
+	if err != nil {
+		// Create a default config struct. The 'online' value defaults to true.
+		config = &NetworkConfig{
+			Online: true,
+		}
+	}
+	// Set our response to contain our config 'online' value.  If we encounter an error below, we will return this value.
 	resp := Resp{Result: "", State: config.Online}
 
-	err := decoder.Decode(&stateMap)
+	// Get the desired value of 'online' from the request body.
+	stateMap := OnlineState{}
+	decoder := json.NewDecoder(r.Body)
+	err = decoder.Decode(&stateMap)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		resp.Result = "Failed to understand request"
@@ -334,9 +348,9 @@ func ToggleOnlineState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// We got the desired 'online' value from the request body, so now write this to our config file.
 	config.Online = stateMap.Online
 	err = WriteNetworkConfig(networkConfigFile, config)
-
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		resp.Result = "Failed to update network config"
@@ -344,6 +358,7 @@ func ToggleOnlineState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// We were able to retrieve the 'online' value from the request body and write it to the config file, so all good.
 	w.WriteHeader(http.StatusOK)
 	resp.Result = "Successfully set online state"
 	resp.State = stateMap.Online
