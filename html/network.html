@@ -11,7 +11,9 @@
         {{template "navbar"}}
 
         <div class="container">
-            <div id="resultMessage" class="alert alert-danger" style="display: none;"></div>
+            <div 
+              id="resultMessage" class="alert alert-danger" {{if .ErrorEncountered}} style="display: block;" {{else}} style="display: none;" {{end}}> {{.ErrorMessage}}
+            </div>
             <div class="container pt-5 pl-0" style="display: flex; align-items: baseline;">
                 <h2 style="flex-grow: 1;">Network</h2>
                 <div class="form-group form-check">
@@ -77,12 +79,12 @@
                   var message = $('#resultMessage');
                   if (!response.ok) {
                     // Display message
-                    message.innerText = json["result"];
-                    message.style.display = "block";
+                    $("#resultMessage").text(json["result"]);
+                    $('#resultMessage').show();
                   } else {
                     // Ensure any old messages are hidden
-                    message.innerText = "";
-                    message.style.display = "none";
+                    $("#resultMessage").text("");
+                    $('#resultMessage').hide();
                   }
                 });
               });

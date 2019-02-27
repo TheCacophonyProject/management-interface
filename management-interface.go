@@ -246,14 +246,17 @@ func NetworkHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type networkState struct {
-		Interfaces []interfaceProperties
-		Config     NetworkConfig
+		Interfaces       []interfaceProperties
+		Config           NetworkConfig
+		ErrorEncountered bool
+		ErrorMessage     string
 	}
 
+	errorMessage := ""
 	ifaces, err := net.Interfaces()
 	interfaces := []interfaceProperties{}
 	if err != nil {
-		log.Print(err.Error())
+		errorMessage = err.Error()
 	} else {
 		// Filter out loopback interfaces
 		for _, iface := range ifaces {
@@ -269,16 +272,18 @@ func NetworkHandler(w http.ResponseWriter, r *http.Request) {
 	// Read online/offline status from 'network.yaml'
 	config, err := ParseNetworkConfig(networkConfigFile)
 	if err != nil {
-		// Create a default config
+		errorMessage += "Failed to read network config file. " + err.Error()
+		// Create a default config so that the page will still load.
 		config = &NetworkConfig{
 			Online: true,
 		}
 	}
 
 	state := networkState{
-		Interfaces: interfaces,
-		Config:     *config,
-	}
+		Interfaces:       interfaces,
+		Config:           *config,
+		ErrorEncountered: err != nil,
+		ErrorMessage:     errorMessage}
 
 	// Need to respond to individual requests to test if a network status is up or down.
 	tmpl.ExecuteTemplate(w, "network.html", state)
@@ -325,17 +330,18 @@ func ToggleOnlineState(w http.ResponseWriter, r *http.Request) {
 		Result string `json:"result"`
 		State  bool   `json:"state"`
 	}
+	resp := Resp{Result: "", State: true} // Default response.
 
 	// Get any value(s) from the config file.
 	config, err := ParseNetworkConfig(networkConfigFile)
 	if err != nil {
-		// Create a default config struct. The 'online' value defaults to true.
-		config = &NetworkConfig{
-			Online: true,
-		}
+		w.WriteHeader(http.StatusInternalServerError)
+		resp.Result = "Failed to read network config file. " + err.Error()
+		json.NewEncoder(w).Encode(resp)
+		return
 	}
 	// Set our response to contain our config 'online' value.  If we encounter an error below, we will return this value.
-	resp := Resp{Result: "", State: config.Online}
+	resp.State = config.Online
 
 	// Get the desired value of 'online' from the request body.
 	stateMap := OnlineState{}
@@ -343,7 +349,7 @@ func ToggleOnlineState(w http.ResponseWriter, r *http.Request) {
 	err = decoder.Decode(&stateMap)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		resp.Result = "Failed to understand request"
+		resp.Result = "Failed to understand request. " + err.Error()
 		json.NewEncoder(w).Encode(resp)
 		return
 	}
@@ -353,7 +359,7 @@ func ToggleOnlineState(w http.ResponseWriter, r *http.Request) {
 	err = WriteNetworkConfig(networkConfigFile, config)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		resp.Result = "Failed to update network config"
+		resp.Result = "Failed to update network config. " + err.Error()
 		json.NewEncoder(w).Encode(resp)
 		return
 	}
