@@ -21,6 +21,7 @@ package managementinterface
 import (
 	"encoding/json"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -32,10 +33,13 @@ import (
 
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
+	yaml "gopkg.in/yaml.v2"
 )
 
 const fileName = "IEEE_float_mono_32kHz.wav"          // Default sound file name.
 const secondaryPath = "/usr/lib/management-interface" // Check here if the file is not found in the executable directory.
+
+const networkConfigFile = "/etc/cacophony/network.yaml"
 
 // The file system location of this execuable.
 var executablePath = ""
@@ -62,6 +66,42 @@ func init() {
 
 	executablePath = getExecutablePath()
 
+}
+
+// NetworkConfig is a struct to store our network configuration values in.
+type NetworkConfig struct {
+	Online bool `yaml:"online"`
+}
+
+// WriteNetworkConfig writes the config value(s) to the network config file.
+// If it doesn't exist, it is created.
+func WriteNetworkConfig(filepath string, config *NetworkConfig) error {
+	outBuf, err := yaml.Marshal(config)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(filepath, outBuf, 0640)
+}
+
+// ParseNetworkConfig retrieves a value(s) from the network config file.
+func ParseNetworkConfig(filepath string) (*NetworkConfig, error) {
+
+	// Create a default config
+	config := &NetworkConfig{
+		Online: true,
+	}
+
+	inBuf, err := ioutil.ReadFile(filepath)
+	if os.IsNotExist(err) {
+		return config, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	if err := yaml.Unmarshal(inBuf, config); err != nil {
+		return nil, err
+	}
+	return config, nil
 }
 
 // Get the host name (device name) this executable was started on.
@@ -205,10 +245,18 @@ func NetworkHandler(w http.ResponseWriter, r *http.Request) {
 		IPAddresses []string
 	}
 
+	type networkState struct {
+		Interfaces       []interfaceProperties
+		Config           NetworkConfig
+		ErrorEncountered bool
+		ErrorMessage     string
+	}
+
+	errorMessage := ""
 	ifaces, err := net.Interfaces()
 	interfaces := []interfaceProperties{}
 	if err != nil {
-		log.Print(err.Error())
+		errorMessage = err.Error()
 	} else {
 		// Filter out loopback interfaces
 		for _, iface := range ifaces {
@@ -221,8 +269,24 @@ func NetworkHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Read online/offline status from 'network.yaml'
+	config, err := ParseNetworkConfig(networkConfigFile)
+	if err != nil {
+		errorMessage += "Failed to read network config file. " + err.Error()
+		// Create a default config so that the page will still load.
+		config = &NetworkConfig{
+			Online: true,
+		}
+	}
+
+	state := networkState{
+		Interfaces:       interfaces,
+		Config:           *config,
+		ErrorEncountered: err != nil,
+		ErrorMessage:     errorMessage}
+
 	// Need to respond to individual requests to test if a network status is up or down.
-	tmpl.ExecuteTemplate(w, "network.html", interfaces)
+	tmpl.ExecuteTemplate(w, "network.html", state)
 }
 
 // CheckInterfaceHandler checks an interface to see if it is up or down.
@@ -252,6 +316,60 @@ func CheckInterfaceHandler(w http.ResponseWriter, r *http.Request) {
 		response["status"] = "up"
 	}
 	json.NewEncoder(w).Encode(response)
+}
+
+// ToggleOnlineState attempts to toggle the 'online' value in the network config file.
+func ToggleOnlineState(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
+	type OnlineState struct {
+		Online bool
+	}
+
+	type Resp struct {
+		Result string `json:"result"`
+		State  bool   `json:"state"`
+	}
+	resp := Resp{Result: "", State: true} // Default response.
+
+	// Get any value(s) from the config file.
+	config, err := ParseNetworkConfig(networkConfigFile)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		resp.Result = "Failed to read network config file. " + err.Error()
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+	// Set our response to contain our config 'online' value.  If we encounter an error below, we will return this value.
+	resp.State = config.Online
+
+	// Get the desired value of 'online' from the request body.
+	stateMap := OnlineState{}
+	decoder := json.NewDecoder(r.Body)
+	err = decoder.Decode(&stateMap)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		resp.Result = "Failed to understand request. " + err.Error()
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	// We got the desired 'online' value from the request body, so now write this to our config file.
+	config.Online = stateMap.Online
+	err = WriteNetworkConfig(networkConfigFile, config)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		resp.Result = "Failed to update network config. " + err.Error()
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	// We were able to retrieve the 'online' value from the request body and write it to the config file, so all good.
+	w.WriteHeader(http.StatusOK)
+	resp.Result = "Successfully set online state"
+	resp.State = stateMap.Online
+	json.NewEncoder(w).Encode(resp)
+
 }
 
 // SpeakerTestHandler will show a frame from the camera to help with positioning
