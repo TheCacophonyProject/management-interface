@@ -300,7 +300,7 @@ func getNetworkSsid(networkID string) (string, error) {
 	//get network
 	out, err = exec.Command("wpa_cli", "get_network", networkID, "ssid").Output()
 	if err != nil {
-		log.Printf("error executing wpa_cli get_network %d - error %s output %s", networkID, err.Error(), out)
+		log.Printf("error executing wpa_cli get_network %s - error %s output %s", networkID, err.Error(), out)
 		return "", err
 	}
 
