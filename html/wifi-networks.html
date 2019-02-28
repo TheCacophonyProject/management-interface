@@ -11,8 +11,18 @@
         {{template "navbar"}}
 
 
+
         <div class="container">
-            <div class="container pt-5 pl-0">
+
+            {{if eq .Error ""}}
+            <div id="errorAlert" class="alert alert-warning alert-dismissible" style="visibility: hidden">
+            {{else}}
+            <div id="errorAlert" class="alert alert-warning alert-dismissible" style="">
+            {{end}}
+              <a href="#" onclick="closeAlert()"  class="close"  aria-label="close">&times;</a>
+              <strong><span id="errorSpan">{{.Error}}</span></strong> 
+            </div>
+            <div class="container pl-0">
                 <h2>WIfi Networks<br></h2>
             </div>
             <form method="POST">
@@ -30,7 +40,7 @@
                           <input type="password" class="form-control" id="text-password" name="password"  value="">
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">Add</button>
+                    <button type="submit" class="btn btn-primary">Add Network</button>
                 </div>
             </form>
 
@@ -38,16 +48,18 @@
 
             <h2>Current Networks<br></h2>
             <div class="row">
-                 {{range .}}
+                 {{range .Networks}}
                 <div class="col-md-5 wifi-item" >
                     <div class="card mb-3">
                         <div class="card-body">
                             <h5 class="card-title"><strong>{{.Ssid}}</strong></h5>
-                                {{if ne .Ssid "bushnet"}}
-                                <a onclick="removeNetwork(this,{{.NetworkID}})" class="btn btn-info btn-lg">
-                                    <span class="glyphicon glyphicon-trash"></span>Remove 
-                                </a>
-                                {{end}}
+                            {{if ne .Ssid "bushnet"}}
+                                <div class="text-right">
+                                    <a onclick="removeNetwork(this,{{.NetworkID}})" class="btn btn-info btn-md">
+                                      Remove 
+                                    </a>
+                                </div>
+                            {{end}}
                         </div>
                     </div>
                 </div>
@@ -59,18 +71,21 @@
         <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
         <script src="/static/js/bootstrap.min.js"></script>
         <script>
-
+            function closeAlert(){
+                $("#errorAlert").css("visibility","hidden");
+            }
             function removeNetwork(domLink, id){
                 fetch(
                     "/wifi-networks/" + id,
                     {method: "DELETE"}
                 ).then(function(response) {
-                    return response.text();
+                   return response.json();
                 }).then(function(result) {
-                    console.log(result);
-                    if(result == 1){
-                        console.log($(domLink).closest(".wifi-item"));
+                    if(result.length==0){
                         $($(domLink).closest(".wifi-item")).remove()
+                    }else{
+                        $("#errorSpan").text(result);
+                        $("#errorAlert").css("visibility","visible");
                     }
                 });
             }
