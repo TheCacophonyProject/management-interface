@@ -63,7 +63,6 @@ func init() {
 	deviceName := getDeviceName()
 	tmpl = template.New("")
 	tmpl.Funcs(template.FuncMap{"DeviceName": func() string { return deviceName }})
-
 	for _, name := range templateBox.List() {
 		t := tmpl.New(name)
 		template.Must(t.Parse(templateBox.String(name)))
