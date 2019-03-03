@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Cacophonator Setup</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+</head>
+
+<body>
+    {{template "navbar"}}
+
+    <div class="container">
+        <div 
+            id="resultMessage" class="alert alert-danger" 
+            {{if .ErrorEncountered}} 
+                style="display: block;" 
+            {{else}} 
+                style="display: none;" 
+            {{end}}> {{.ErrorMessage}}
+        </div>
+
+        <div class="container pt-5 pl-0">
+            <h2>Device Location<br></h2>
+        </div>
+        <hr>
+
+
+        <form action="/location" method="POST"> 
+
+            <div class="row">
+                <div class="form-group col-md-4"> 
+                    <label for="latitude">Latitude</label>
+                    <input type="text" class="form-control" id="lat" name="latitude"
+                    {{if eq .Location.Latitude 0.0}} 
+                        placeholder="Enter latitude"
+                    {{else}}
+                        value="{{.Location.Latitude}}"
+                    {{end}}>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="form-group col-md-4">
+                    <label for="longitude">Longitude</label>
+                    <input type="text" class="form-control" id="long" name="longitude"
+                    {{if eq .Location.Longitude 0.0}} 
+                        placeholder="Enter longitude"
+                    {{else}}
+                        value="{{.Location.Longitude}}"
+                    {{end}}>
+                </div>
+            </div>
+
+        <button type="submit" class="btn btn-primary">Submit</button> 
+
+        </form>  
+
+    </div>
+
+
+    <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+</body>
+
+</html>
