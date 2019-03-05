@@ -27,7 +27,7 @@
         <hr>
 
 
-        <form action="/location" method="POST"> 
+        <form id="locationForm" action="/location" method="POST">
 
             <div class="row">
                 <div class="form-group col-md-4"> 
@@ -53,7 +53,7 @@
                 </div>
             </div>
 
-        <button type="submit" class="btn btn-primary">Submit</button> 
+        <button type="submit" class="btn btn-primary" onclick="handleLocationChange(event)" >Submit</button>
 
         </form>  
 
@@ -62,6 +62,44 @@
 
     <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
     <script src="/static/js/bootstrap.min.js"></script>
+    <script>
+      function showMessage(message, state) {
+        var messageBox = $("#resultMessage");
+        messageBox.text(message);
+        if (state === "success") {
+          messageBox.addClass("alert-success");
+          messageBox.removeClass("alert-danger");
+        } else if (state === "error") {
+          messageBox.removeClass("alert-success");
+          messageBox.addClass("alert-danger");
+        }
+        messageBox.show();
+      }
+
+      function handleLocationChange(event) {
+        event.preventDefault();
+
+        var form = document.getElementById("locationForm");
+        var formURL = form.action;
+        var formMethod = form.method;
+        var formData = new FormData(form);
+
+        var lat = document.getElementById("lat").value;
+        var long = document.getElementById("long").value;
+
+        fetch(formURL, {
+          method: formMethod ,
+          body: formData
+        }).then(function(response) {
+          if(response.ok) {
+            showMessage("Successfully set location", "success");
+          } else {
+            showMessage("Failed to set location", "error");
+          }
+        });
+
+      }
+    </script>
 </body>
 
 </html>
