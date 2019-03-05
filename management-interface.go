@@ -124,7 +124,7 @@ func WriteLocationData(filepath string, location LocationData) error {
 func ParseLocationFile(filepath string) (*LocationData, error) {
 
 	// Create a default config
-	location := &LocationData{Latitude: 0.0, Longitude: 0.0}
+	location := &LocationData{}
 
 	inBuf, err := ioutil.ReadFile(filepath)
 	if os.IsNotExist(err) {
@@ -493,7 +493,7 @@ func SetLocationHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errorMessage += "Failed to read location data file. " + err.Error()
 		// Create a default location struct so that the page will still load.
-		location = &LocationData{Latitude: 0.0, Longitude: 0.0}
+		location = &LocationData{}
 	}
 
 	resp := locationResponse{
