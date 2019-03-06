@@ -478,34 +478,8 @@ func CameraSnapshot(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "/var/spool/cptv/still.png")
 }
 
-// SetLocationHandler shows the location of the device.  The location can be viewed and/or set manually.
-func SetLocationHandler(w http.ResponseWriter, r *http.Request) {
-
-	type locationResponse struct {
-		Location         LocationData
-		ErrorEncountered bool
-		ErrorMessage     string
-	}
-
-	errorMessage := ""
-	// Read the location of this device from 'location.yaml'
-	location, err := ParseLocationFile(deviceLocationFile)
-	if err != nil {
-		errorMessage += "Failed to read location data file. " + err.Error()
-		// Create a default location struct so that the page will still load.
-		location = &LocationData{}
-	}
-
-	resp := locationResponse{
-		Location:         *location,
-		ErrorEncountered: err != nil,
-		ErrorMessage:     errorMessage}
-
-	tmpl.ExecuteTemplate(w, "location.html", resp)
-}
-
-// LocationHandler writes the location of the device to the deviceLocationFile
-func LocationHandler(w http.ResponseWriter, r *http.Request) {
+// handleLocationPostRequest handles a POST request to set the location coordinates of a device.
+func handleLocationPostRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Get the latitude and longitude values from the request.
 	location := LocationData{}
@@ -533,5 +507,54 @@ func LocationHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Everything is fine in the world :)
 	w.WriteHeader(http.StatusOK)
-	return
+}
+
+// LocationHandler shows the location of the device.  The location can be viewed and/or set manually.
+func LocationHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method == "GET" || r.Method == "" {
+
+		// Handle GET request
+
+		type locationResponse struct {
+			Location         LocationData
+			ErrorEncountered bool
+			ErrorMessage     string
+		}
+
+		errorMessage := ""
+		// Read the location of this device from 'location.yaml'
+		location, err := ParseLocationFile(deviceLocationFile)
+		if err != nil {
+			errorMessage += "Failed to read location data file. " + err.Error()
+			// Create a default location struct so that the page will still load.
+			location = &LocationData{}
+		}
+
+		resp := locationResponse{
+			Location:         *location,
+			ErrorEncountered: err != nil,
+			ErrorMessage:     errorMessage}
+
+		tmpl.ExecuteTemplate(w, "location.html", resp)
+
+	} else {
+
+		// Handle POST request
+		handleLocationPostRequest(w, r)
+
+	}
+
+}
+
+// APILocationHandler writes the location of the device to the deviceLocationFile
+func APILocationHandler(w http.ResponseWriter, r *http.Request) {
+
+	// This should be a POST request
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusBadRequest)
+	} else {
+		handleLocationPostRequest(w, r)
+	}
+
 }
