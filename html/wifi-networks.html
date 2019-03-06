@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <title>WIfi Networks</title>
+        <title>WiFi Networks</title>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" href="/static/css/bootstrap.min.css">
@@ -9,23 +9,16 @@
 
     <body>
         {{template "navbar"}}
-
-
-
         <div class="container">
-
-            {{if eq .Error ""}}
-            <div id="errorAlert" class="alert alert-warning alert-dismissible" style="visibility: hidden">
-            {{else}}
-            <div id="errorAlert" class="alert alert-warning alert-dismissible" style="">
-            {{end}}
-              <a href="#" onclick="closeAlert()"  class="close"  aria-label="close">&times;</a>
+            <div id="errorAlert" class="alert alert-danger alert-dismissible" {{if eq .Error ""}} style="visibility: hidden" {{else}} style="" {{end}}> 
+              <a href="#" onclick="closeAlert()" class="close" aria-label="close">&times;</a>
               <strong><span id="errorSpan">{{.Error}}</span></strong> 
             </div>
             <div class="container pl-0">
-                <h2>WIfi Networks<br></h2>
+                <h2>WiFi Networks<br></h2>
             </div>
-            <form method="POST">
+            <form method="POST" name="form" id="form">
+                <input type="hidden" id="deleteID" name="deleteID" value=""></input>
                <div class="col-md-12" >
                     <h5 class="card-title"><strong>Add a Network</strong></h5>
                     <div class="form-group">
@@ -52,8 +45,8 @@
                 <div class="col-md-5 wifi-item" >
                     <div class="card mb-3">
                         <div class="card-body">
-                            <h5 class="card-title"><strong>{{.Ssid}}</strong></h5>
-                            {{if ne .Ssid "bushnet"}}
+                            <h5 class="card-title"><strong>{{.SSID}}</strong></h5>
+                            {{if ne .SSID "bushnet"}}
                                 <div class="text-right">
                                     <a onclick="removeNetwork(this,{{.NetworkID}})" class="btn btn-info btn-md">
                                       Remove 
@@ -71,25 +64,15 @@
         <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
         <script src="/static/js/bootstrap.min.js"></script>
         <script>
+
             function closeAlert(){
                 $("#errorAlert").css("visibility","hidden");
             }
-            function removeNetwork(domLink, id){
-                fetch(
-                    "/wifi-networks/" + id,
-                    {method: "DELETE"}
-                ).then(function(response) {
-                   return response.json();
-                }).then(function(result) {
-                    if(result.length==0){
-                        $($(domLink).closest(".wifi-item")).remove()
-                    }else{
-                        $("#errorSpan").text(result);
-                        $("#errorAlert").css("visibility","visible");
-                    }
-                });
-            }
 
+            function removeNetwork(domLink, id){
+                document.getElementById("deleteID").value = id;
+                document.getElementById('form').submit();
+            }
         </script>
 
     </body>
