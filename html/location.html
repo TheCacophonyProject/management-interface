@@ -30,20 +30,28 @@
         <form id="locationForm" action="/location" method="POST">
 
             <div class="row">
-                <div class="form-group col-md-4"> 
-                    <label for="latitude">Latitude</label>
-                    <input type="text" class="form-control" id="lat" name="latitude" placeholder="Enter latitude" value="{{.Location.Latitude}}">
-                </div>
+              <div class="form-group col-md-4"> 
+                <label for="latitude">Latitude</label>
+                <input type="text" class="form-control" id="lat" name="latitude"
+                placeholder="Enter latitude" 
+                {{if ne .Location.Latitude 0.0}}
+                  value="{{.Location.Latitude}}"
+                {{end}}>                
+              </div>
             </div>
 
             <div class="row">
-                <div class="form-group col-md-4">
-                    <label for="longitude">Longitude</label>
-                    <input type="text" class="form-control" id="long" name="longitude" placeholder="Enter longitude" value="{{.Location.Longitude}}">
-                </div>
+              <div class="form-group col-md-4">
+                <label for="longitude">Longitude</label>
+                <input type="text" class="form-control" id="long" name="longitude"
+                placeholder="Enter longitude" 
+                {{if ne .Location.Longitude 0.0}}
+                  value="{{.Location.Longitude}}"
+                {{end}}>                
+              </div>
             </div>
 
-        <button type="submit" class="btn btn-primary" onclick="handleLocationChange(event)" >Submit</button>
+          <button type="submit" class="btn btn-primary" onclick="handleLocationChange(event)" >Submit</button>
 
         </form>  
 
