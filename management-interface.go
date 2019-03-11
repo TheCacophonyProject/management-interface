@@ -292,12 +292,9 @@ func NetworkHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "network.html", state)
 }
 
-//getNetworkSSID -gets the ssid of the network associated with this id
+// getNetworkSSID gets the ssid from the wpa_supplicant configuration with the specified id
 func getNetworkSSID(networkID string) (string, error) {
-	var out []byte
-	err := error(nil)
-	//get network
-	out, err = exec.Command("wpa_cli", "get_network", networkID, "ssid").Output()
+	out, err := exec.Command("wpa_cli", "get_network", networkID, "ssid").Output()
 	if err != nil {
 		return "", fmt.Errorf("error executing wpa_cli get_network %s - error %s output %s", networkID, err, out)
 	}
@@ -311,29 +308,26 @@ func getNetworkSSID(networkID string) (string, error) {
 
 }
 
-//deleteNetwork - delets network with id using wpa_cli and saves config
+// deleteNetwork removes the network from the wpa_supplicant configuration with specified id.
 func deleteNetwork(id string) error {
-	var out []byte
-	err := error(nil)
-
 	//check if is bushnet
 	var ssid string
-	ssid, err = getNetworkSSID(id)
+	ssid, err := getNetworkSSID(id)
 	if strings.ToLower(ssid) == "\"bushnet\"" {
 		return errors.New("error bushnet cannot be deleted")
 	}
 
 	//remove network
 	cmd := exec.Command("wpa_cli")
-	var stdin io.WriteCloser
-	stdin, err = cmd.StdinPipe()
+	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("error getting stdin pipe from cmd -error %s", err)
 	}
 	defer stdin.Close()
 	io.WriteString(stdin, fmt.Sprintf("remove_network %s\n", id))
 	io.WriteString(stdin, "quit\n")
-	out, err = cmd.CombinedOutput()
+
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("error deleting wpa network -error %s", err)
 	}
@@ -353,22 +347,22 @@ func deleteNetwork(id string) error {
 	return err
 }
 
-//doesWpaNetworkExist - checks if ssid is already specified in wpa_supplicant
+// doesWpaNetworkExist checks for a network with the specified ssid in the wpa_supplicant configuration.
 func doesWPANetworkExist(ssid string) (bool, error) {
-	exists := false
 	networks, err := parseWPASupplicantConfig()
 	if err != nil {
 		return false, err
 	}
 	for _, v := range networks {
 		if strings.ToLower(v.SSID) == strings.ToLower(ssid) {
-			exists = true
+			return true, nil
 		}
 	}
-	return exists, err
+	return false, nil
 }
 
-//addWPANetwork - adds a new wpa network with specified ssid and password (if it doesn't already exist)
+// addWPANetwork adds a new wpa network in the wpa_supplication configuration
+// with specified ssid and password (if it doesn't already exist)
 func addWPANetwork(ssid string, password string) error {
 	if ssid == "" {
 		return errors.New("SSID must have a value")
@@ -376,9 +370,7 @@ func addWPANetwork(ssid string, password string) error {
 		return errors.New("SSID cannot be bushnet")
 	}
 
-	var networkExists bool
-	err := error(nil)
-	networkExists, err = doesWPANetworkExist(ssid)
+	networkExists, err := doesWPANetworkExist(ssid)
 	if err != nil {
 		return err
 	}
@@ -386,8 +378,7 @@ func addWPANetwork(ssid string, password string) error {
 		return fmt.Errorf("SSID %s already exists", ssid)
 	}
 
-	var networkId int
-	networkId, err = addNewNetwork()
+	networkId, err := addNewNetwork()
 	if err != nil {
 		return err
 	}
@@ -405,7 +396,7 @@ func addWPANetwork(ssid string, password string) error {
 	return err
 }
 
-//addNewNetwork - a a new network and returns the network id
+// addNewNetwork adds a new network in the wpa_supplication configuration and returns the new network id
 func addNewNetwork() (int, error) {
 	out, err := exec.Command("wpa_cli", "add_network").Output()
 	var networkId int = -1
@@ -428,7 +419,7 @@ func addNewNetwork() (int, error) {
 	return networkId, err
 }
 
-//setWPANetworkDetails - sets the ssid and password of the specified networkID
+// setWPANetworkDetails sets the ssid and password of the specified networkID in the wpa_supplication configuration
 func setWPANetworkDetails(ssid string, password string, networkId int) error {
 	cmd := exec.Command("wpa_cli")
 	stdin, err := cmd.StdinPipe()
@@ -441,10 +432,7 @@ func setWPANetworkDetails(ssid string, password string, networkId int) error {
 	io.WriteString(stdin, fmt.Sprintf("set_network %d psk \"%s\"\n", networkId, password))
 	io.WriteString(stdin, fmt.Sprintf("enable_network %d\n", networkId))
 	io.WriteString(stdin, "quit\n")
-	var out []byte
-
-	out, err = cmd.CombinedOutput()
-
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("error adding wpa network -error %s", err)
 	}
@@ -457,7 +445,7 @@ func setWPANetworkDetails(ssid string, password string, networkId int) error {
 	return err
 }
 
-//reloadWPAConfig - executes wpa_cli reconfigure
+// reloadWPAConfig executes wpa_cli reconfigure
 func reloadWPAConfig() error {
 	out, err := exec.Command("wpa_cli", "reconfigure").Output()
 	if err != nil {
@@ -471,13 +459,13 @@ func reloadWPAConfig() error {
 	return err
 }
 
-//hasErrorOccured - checks stdout for FAIL text
+// hasErrorOccured checks string for FAIL text
 func hasErrorOccured(stdOut string) bool {
 	errorOccured := strings.Contains(stdOut, "\nFAIL\n")
 	return errorOccured
 }
 
-//saveWPAConfig - executes wpa_cli save config
+// saveWPAConfig executes wpa_cli save config
 func saveWPAConfig() error {
 	out, err := exec.Command("wpa_cli", "save", "config").Output()
 	if err != nil {
@@ -495,25 +483,22 @@ type wifiNetwork struct {
 	NetworkID int
 }
 
-//parseWPASupplicantConfig - uses wpa_cli list_networks to get current networks in wpa_supplicant
+// parseWPASupplicantConfig uses wpa_cli list_networks to get all networks in the wpa_supplicant configuration
 func parseWPASupplicantConfig() ([]wifiNetwork, error) {
-	var out []byte
-	err := error(nil)
-	out, err = exec.Command("wpa_cli", "list_networks").Output()
+	out, err := exec.Command("wpa_cli", "list_networks").Output()
 	networks := []wifiNetwork{}
 
 	if err != nil {
 		return networks, fmt.Errorf("error listing networks: %v", err)
 	}
 	networkList := string(out)
-	var id int
 	scanner := bufio.NewScanner(strings.NewReader(networkList))
 	scanner.Scan() //skip interface listing
 	for scanner.Scan() {
 		line := scanner.Text()
 		parts := strings.Split(line, "\t")
 		if len(parts) > 2 {
-			if id, err = strconv.Atoi(parts[0]); err == nil {
+			if id, err := strconv.Atoi(parts[0]); err == nil {
 				if strings.ToLower(parts[1]) != "bushnet" {
 					wNetwork := wifiNetwork{SSID: parts[1], NetworkID: id}
 					networks = append(networks, wNetwork)
@@ -528,7 +513,7 @@ func parseWPASupplicantConfig() ([]wifiNetwork, error) {
 	return networks, err
 }
 
-// WifiNetworkHandler - Show the wireless netowrks the pi can see throu wpa_supplicant
+// WifiNetworkHandler show the wireless networks listed in the wpa_supplicant configuration
 func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 
 	type wifiProperties struct {
