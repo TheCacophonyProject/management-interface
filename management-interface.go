@@ -23,9 +23,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gobuffalo/packr"
-	"github.com/gorilla/mux"
-	yaml "gopkg.in/yaml.v2"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -39,6 +36,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/gobuffalo/packr"
+	"github.com/gorilla/mux"
+	yaml "gopkg.in/yaml.v2"
 )
 
 const fileName = "IEEE_float_mono_32kHz.wav"          // Default sound file name.
@@ -298,8 +299,7 @@ func getNetworkSSID(networkID string) (string, error) {
 	//get network
 	out, err = exec.Command("wpa_cli", "get_network", networkID, "ssid").Output()
 	if err != nil {
-		err = errors.New(fmt.Sprintf("error executing wpa_cli get_network %s - error %s output %s", networkID, err, out))
-		return "", err
+		return "", fmt.Errorf("error executing wpa_cli get_network %s - error %s output %s", networkID, err, out)
 	}
 
 	stdOut := string(out)
@@ -320,8 +320,7 @@ func deleteNetwork(id string) error {
 	var ssid string
 	ssid, err = getNetworkSSID(id)
 	if strings.ToLower(ssid) == "\"bushnet\"" {
-		err = errors.New(fmt.Sprintf("error bushnet cannot be deleted"))
-		return err
+		return errors.New("error bushnet cannot be deleted")
 	}
 
 	//remove network
@@ -329,16 +328,14 @@ func deleteNetwork(id string) error {
 	var stdin io.WriteCloser
 	stdin, err = cmd.StdinPipe()
 	if err != nil {
-		err = errors.New(fmt.Sprintf("error getting stdin pipe from cmd -error %s", err))
-		return err
+		return fmt.Errorf("error getting stdin pipe from cmd -error %s", err)
 	}
 	defer stdin.Close()
 	io.WriteString(stdin, fmt.Sprintf("remove_network %s\n", id))
 	io.WriteString(stdin, "quit\n")
 	out, err = cmd.CombinedOutput()
 	if err != nil {
-		err = errors.New(fmt.Sprintf("error deleting wpa network -error %s", err))
-		return err
+		return fmt.Errorf("error deleting wpa network -error %s", err)
 	}
 	errOccured := hasErrorOccured(string(out))
 	if errOccured {
@@ -368,28 +365,25 @@ func doesWPANetworkExist(ssid string) (bool, error) {
 			exists = true
 		}
 	}
-	return exists, nil
+	return exists, err
 }
 
 //addWPANetwork - adds a new wpa network with specified ssid and password (if it doesn't already exist)
 func addWPANetwork(ssid string, password string) error {
-	err := error(nil)
 	if ssid == "" {
-		err = errors.New("SSID must have a value")
-		return err
+		return errors.New("SSID must have a value")
 	} else if strings.ToLower(ssid) == "bushnet" {
-		err = errors.New("SSID cannot be bushnet")
-		return err
+		return errors.New("SSID cannot be bushnet")
 	}
 
 	var networkExists bool
+	err := error(nil)
 	networkExists, err = doesWPANetworkExist(ssid)
 	if err != nil {
 		return err
 	}
 	if networkExists {
-		err = errors.New("SSID already exists " + ssid)
-		return err
+		return fmt.Errorf("SSID %s already exists", ssid)
 	}
 
 	var networkId int
@@ -417,8 +411,7 @@ func addNewNetwork() (int, error) {
 	var networkId int = -1
 
 	if err != nil {
-		err = errors.New(fmt.Sprintf("error executing wpa_cli add_network - error %s output %s", err, out))
-		return networkId, err
+		return networkId, fmt.Errorf("error executing wpa_cli add_network - error %s output %s", err, out)
 	}
 	stdOut := string(out)
 
@@ -429,8 +422,7 @@ func addNewNetwork() (int, error) {
 		line := scanner.Text()
 		networkId, err = strconv.Atoi(line)
 		if err != nil {
-			err = errors.New(fmt.Sprintf("could not find network id - error %s from stdout %s", err, stdOut))
-			return -1, err
+			return -1, fmt.Errorf("could not find network id - error %s from stdout %s", err, stdOut)
 		}
 	}
 	return networkId, err
@@ -441,8 +433,7 @@ func setWPANetworkDetails(ssid string, password string, networkId int) error {
 	cmd := exec.Command("wpa_cli")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		err = errors.New(fmt.Sprintf("error getting stdin pipe from cmd: %s", err))
-		return err
+		return fmt.Errorf("error getting stdin pipe from cmd: %s", err)
 	}
 
 	defer stdin.Close()
@@ -455,8 +446,7 @@ func setWPANetworkDetails(ssid string, password string, networkId int) error {
 	out, err = cmd.CombinedOutput()
 
 	if err != nil {
-		err = errors.New(fmt.Sprintf("error adding wpa network -error %s", err))
-		return err
+		return fmt.Errorf("error adding wpa network -error %s", err)
 	}
 
 	errOccured := hasErrorOccured(string(out))
@@ -471,8 +461,7 @@ func setWPANetworkDetails(ssid string, password string, networkId int) error {
 func reloadWPAConfig() error {
 	out, err := exec.Command("wpa_cli", "reconfigure").Output()
 	if err != nil {
-		err = errors.New(fmt.Sprintf("error reloading config - error %s output %s", err, out))
-		return err
+		return fmt.Errorf("error reloading config - error %s output %s", err, out)
 	}
 
 	errOccured := hasErrorOccured(string(out))
@@ -492,8 +481,7 @@ func hasErrorOccured(stdOut string) bool {
 func saveWPAConfig() error {
 	out, err := exec.Command("wpa_cli", "save", "config").Output()
 	if err != nil {
-		err = errors.New(fmt.Sprintf("error saving config - error %s output %s", err, out))
-		return err
+		return fmt.Errorf("error saving config - error %s output %s", err, out)
 	}
 	errOccured := hasErrorOccured(string(out))
 	if errOccured {
@@ -515,8 +503,7 @@ func parseWPASupplicantConfig() ([]wifiNetwork, error) {
 	networks := []wifiNetwork{}
 
 	if err != nil {
-		err = errors.New(fmt.Sprintf("error listing networks: %v", err))
-		return networks, err
+		return networks, fmt.Errorf("error listing networks: %v", err)
 	}
 	networkList := string(out)
 	var id int
@@ -532,7 +519,7 @@ func parseWPASupplicantConfig() ([]wifiNetwork, error) {
 					networks = append(networks, wNetwork)
 				}
 			} else {
-				err = errors.New(fmt.Sprintf("error parsing network_id %s for line %s", err, line))
+				err = fmt.Errorf("error parsing network_id %s for line %s", err, line)
 			}
 		}
 	}
@@ -552,12 +539,12 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
 			log.Printf("WifiNetworkHandler error parsing form: %s", err)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		deleteID := r.FormValue("deleteID")
 		if deleteID != "" {
 			err = deleteNetwork(deleteID)
-			//log.Print("Delete " + deleteID)
 		} else {
 			ssid := r.FormValue("ssid")
 			password := r.FormValue("password")

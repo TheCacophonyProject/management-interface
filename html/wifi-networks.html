@@ -46,13 +46,11 @@
                     <div class="card mb-3">
                         <div class="card-body">
                             <h5 class="card-title"><strong>{{.SSID}}</strong></h5>
-                            {{if ne .SSID "bushnet"}}
-                                <div class="text-right">
-                                    <a onclick="removeNetwork(this,{{.NetworkID}})" class="btn btn-info btn-md">
-                                      Remove 
-                                    </a>
-                                </div>
-                            {{end}}
+                            <div class="text-right">
+                                <a onclick="removeNetwork(this,{{.NetworkID}})" class="btn btn-info btn-md">
+                                  Remove 
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -70,8 +68,8 @@
             }
 
             function removeNetwork(domLink, id){
-                document.getElementById("deleteID").value = id;
-                document.getElementById('form').submit();
+                $("#deleteID").val(id);
+                $("#form").submit();
             }
         </script>
 
