@@ -66,6 +66,7 @@ func main() {
 	router.HandleFunc("/speaker", managementinterface.SpeakerTestHandler).Methods("GET")
 	router.HandleFunc("/speaker/status", managementinterface.SpeakerStatusHandler).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
+	router.HandleFunc("/location", managementinterface.LocationHandler).Methods("GET", "POST") // Form to view and/or set location manually.
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
 	router.HandleFunc("/camera/snapshot", managementinterface.CameraSnapshot).Methods("GET")
 
@@ -77,6 +78,7 @@ func main() {
 	apiRouter.HandleFunc("/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
 	apiRouter.HandleFunc("/camera/snapshot", apiObj.TakeSnapshot).Methods("PUT")
 	apiRouter.HandleFunc("/signal-strength", apiObj.GetSignalStrength).Methods("GET")
+	apiRouter.HandleFunc("/location", managementinterface.APILocationHandler).Methods("POST") // Set location via a POST request.
 	apiRouter.Use(basicAuth)
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
