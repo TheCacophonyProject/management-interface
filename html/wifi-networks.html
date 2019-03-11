@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>WiFi Networks</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    </head>
+
+    <body>
+        {{template "navbar"}}
+        <div class="container">
+            <div id="errorAlert" class="alert alert-danger alert-dismissible" {{if eq .Error ""}} style="visibility: hidden" {{else}} style="" {{end}}> 
+              <a href="#" onclick="closeAlert()" class="close" aria-label="close">&times;</a>
+              <strong><span id="errorSpan">{{.Error}}</span></strong> 
+            </div>
+            <div class="container pl-0">
+                <h2>WiFi Networks<br></h2>
+            </div>
+            <form method="POST" name="form" id="form">
+                <input type="hidden" id="deleteID" name="deleteID" value=""></input>
+               <div class="col-md-12" >
+                    <h5 class="card-title"><strong>Add a Network</strong></h5>
+                    <div class="form-group">
+                        <label for="text-ssid">Network Name (SSID)</label>
+                        <div class="input-group">
+                          <input type="text" class="form-control" id="text-ssid" name="ssid" value="">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="text-password">Password</label>
+                        <div class="input-group">
+                          <input type="password" class="form-control" id="text-password" name="password"  value="">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Network</button>
+                </div>
+            </form>
+
+            <br>
+
+            <h2>Current Networks<br></h2>
+            <div class="row">
+                 {{range .Networks}}
+                <div class="col-md-5 wifi-item" >
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title"><strong>{{.SSID}}</strong></h5>
+                            <div class="text-right">
+                                <a onclick="removeNetwork(this,{{.NetworkID}})" class="btn btn-info btn-md">
+                                  Remove 
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {{end}}         
+            </div>
+        </div>
+
+
+        <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+        <script src="/static/js/bootstrap.min.js"></script>
+        <script>
+
+            function closeAlert(){
+                $("#errorAlert").css("visibility","hidden");
+            }
+
+            function removeNetwork(domLink, id){
+                $("#deleteID").val(id);
+                $("#form").submit();
+            }
+        </script>
+
+    </body>
+</html>
