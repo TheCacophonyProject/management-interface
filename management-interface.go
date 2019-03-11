@@ -311,7 +311,6 @@ func getNetworkSSID(networkID string) (string, error) {
 // deleteNetwork removes the network from the wpa_supplicant configuration with specified id.
 func deleteNetwork(id string) error {
 	//check if is bushnet
-	var ssid string
 	ssid, err := getNetworkSSID(id)
 	if strings.ToLower(ssid) == "\"bushnet\"" {
 		return errors.New("error bushnet cannot be deleted")
@@ -520,7 +519,7 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 		Networks []wifiNetwork
 		Error    string
 	}
-	err := error(nil)
+	var err error
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
 			log.Printf("WifiNetworkHandler error parsing form: %s", err)
