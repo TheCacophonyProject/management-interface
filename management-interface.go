@@ -79,12 +79,6 @@ type NetworkConfig struct {
 	Online bool `yaml:"online"`
 }
 
-// LocationData is a struct to store our location values in.
-type LocationData struct {
-	Latitude  float64 `yaml:"latitude"`
-	Longitude float64 `yaml:"longitude"`
-}
-
 // WriteNetworkConfig writes the config value(s) to the network config file.
 // If it doesn't exist, it is created.
 func WriteNetworkConfig(filepath string, config *NetworkConfig) error {
@@ -115,7 +109,7 @@ func ParseNetworkConfig(filepath string) (*NetworkConfig, error) {
 
 // WriteLocationData writes the location values to the location data file.
 // If it doesn't exist, it is created.
-func WriteLocationData(filepath string, location LocationData) error {
+func WriteLocationData(filepath string, location *LocationData) error {
 	outBuf, err := yaml.Marshal(location)
 	if err != nil {
 		return err
@@ -738,86 +732,157 @@ func CameraSnapshot(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleLocationPostRequest handles a POST request to set the location coordinates of a device.
-func handleLocationPostRequest(w http.ResponseWriter, r *http.Request) {
-
-	// Get the latitude and longitude values from the request.
-	location := LocationData{}
-	fLatitude, err := parseFormFloat(r, "latitude")
+func handleLocationPostRequest(w http.ResponseWriter, r *http.Request) (*FormLocationData, error) {
+	formLocation := locationFromForm(r)
+	location, err := formLocation.Location()
 	if err != nil {
-		log.Printf("invalid latitude: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		return formLocation, err
 	}
-	location.Latitude = fLatitude
-
-	fLongitude, err := parseFormFloat(r, "longitude")
-	if err != nil {
-		log.Printf("invalid longitude: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
+	if err := WriteLocationData(deviceLocationFile, location); err != nil {
+		log.Printf("Could not write to location file: %v", err)
+		return nil, errors.New("could not write location file")
 	}
-	location.Longitude = fLongitude
-
-	// Now write them to the location file.
-	err = WriteLocationData(deviceLocationFile, location)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		log.Printf("Failed to update location. Could not write to location file. " + err.Error())
-		return
-	}
-
-	// Everything is fine in the world :)
-	w.WriteHeader(http.StatusOK)
+	return formLocation, nil
 }
 
 // LocationHandler shows the location of the device.  The location can be viewed and/or set manually.
 func LocationHandler(w http.ResponseWriter, r *http.Request) {
+	type locationResponse struct {
+		Location     *FormLocationData
+		Message      string
+		ErrorMessage string
+	}
 
-	if r.Method == "GET" || r.Method == "" {
-
-		// Handle GET request
-
-		type locationResponse struct {
-			Location     LocationData
-			ErrorMessage string
-		}
-
-		errorMessage := ""
-		// Read the location of this device from 'location.yaml'
+	switch r.Method {
+	case "GET", "":
 		location, err := ParseLocationFile(deviceLocationFile)
-		if err != nil {
-			errorMessage += "Failed to read location data file. " + err.Error()
-			// Create a default location struct so that the page will still load.
-			location = &LocationData{}
-		}
-
-		resp := locationResponse{
-			Location:     *location,
-			ErrorMessage: errorMessage,
+		resp := &locationResponse{
+			Location:     location.formLocation(),
+			ErrorMessage: errorMessage(err),
 		}
 		tmpl.ExecuteTemplate(w, "location.html", resp)
 
-	} else {
+	case "POST":
+		formLocation, err := handleLocationPostRequest(w, r)
+		resp := &locationResponse{
+			Location:     formLocation,
+			Message:      successMessage(err, "Location updated"),
+			ErrorMessage: errorMessage(err),
+		}
+		tmpl.ExecuteTemplate(w, "location.html", resp)
 
-		// Handle POST request
-		handleLocationPostRequest(w, r)
-
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
-
 }
 
 // APILocationHandler writes the location of the device to the deviceLocationFile
 func APILocationHandler(w http.ResponseWriter, r *http.Request) {
-
-	// This should be a POST request
 	if r.Method != "POST" {
-		w.WriteHeader(http.StatusBadRequest)
-	} else {
-		handleLocationPostRequest(w, r)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
 	}
 
+	_, err := handleLocationPostRequest(w, r)
+	if isClientError(err) {
+		w.WriteHeader(http.StatusBadRequest)
+	} else if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func parseFormFloat(r *http.Request, name string) (float64, error) {
 	return strconv.ParseFloat(strings.TrimSpace(r.FormValue(name)), 64)
+}
+
+func newClientError(msg string) *clientError {
+	return &clientError{msg}
+}
+
+type clientError struct {
+	msg string
+}
+
+func (e *clientError) Error() string {
+	return e.msg
+}
+
+func isClientError(err error) bool {
+	_, ok := err.(*clientError)
+	return ok
+}
+
+func locationFromForm(r *http.Request) *FormLocationData {
+	return &FormLocationData{
+		Latitude:  trimmedFormValue(r, "latitude"),
+		Longitude: trimmedFormValue(r, "longitude"),
+	}
+}
+
+// FormLocationData holds unconverted location form values
+type FormLocationData struct {
+	Latitude  string
+	Longitude string
+}
+
+func (fl *FormLocationData) Location() (*LocationData, error) {
+	lat, ok := parseFloat(fl.Latitude)
+	if !ok {
+		return nil, newClientError("Invalid latitude")
+	}
+	lon, ok := parseFloat(fl.Longitude)
+	if !ok {
+		return nil, newClientError("Invalid longitude")
+	}
+	return &LocationData{
+		Latitude:  lat,
+		Longitude: lon,
+	}, nil
+}
+
+// LocationData is a struct to store our location values in.
+type LocationData struct {
+	Latitude  float64 `yaml:"latitude"`
+	Longitude float64 `yaml:"longitude"`
+}
+
+func (l *LocationData) formLocation() *FormLocationData {
+	return &FormLocationData{
+		Latitude:  floatToString(l.Latitude),
+		Longitude: floatToString(l.Longitude),
+	}
+}
+
+func trimmedFormValue(r *http.Request, name string) string {
+	return strings.TrimSpace(r.FormValue(name))
+}
+
+func parseFloat(val string) (float64, bool) {
+	f, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return 0, false
+	}
+	return f, true
+}
+
+func floatToString(val float64) string {
+	if val == 0 {
+		return ""
+	}
+	return fmt.Sprint(val)
+}
+
+func successMessage(err error, msg string) string {
+	if err == nil {
+		return msg
+	}
+	return ""
+}
+
+func errorMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
