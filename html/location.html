@@ -82,11 +82,8 @@
         var formMethod = form.method;
         var formData = new FormData(form);
 
-        var lat = document.getElementById("lat").value;
-        var long = document.getElementById("long").value;
-
         fetch(formURL, {
-          method: formMethod ,
+          method: formMethod,
           body: formData
         }).then(function(response) {
           if(response.ok) {
