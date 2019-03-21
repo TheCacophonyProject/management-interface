@@ -120,7 +120,7 @@ func WriteLocationData(filepath string, location LocationData) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filepath, outBuf, 0640)
+	return ioutil.WriteFile(filepath, outBuf, 0644)
 }
 
 // ParseLocationFile retrieves values from the location data file.
