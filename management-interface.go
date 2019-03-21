@@ -742,15 +742,17 @@ func handleLocationPostRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Get the latitude and longitude values from the request.
 	location := LocationData{}
-	fLatitude, err := strconv.ParseFloat(r.FormValue("latitude"), 64)
+	fLatitude, err := parseFormFloat(r, "latitude")
 	if err != nil {
+		log.Printf("invalid latitude: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	location.Latitude = fLatitude
 
-	fLongitude, err := strconv.ParseFloat(r.FormValue("longitude"), 64)
+	fLongitude, err := parseFormFloat(r, "longitude")
 	if err != nil {
+		log.Printf("invalid longitude: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -816,4 +818,8 @@ func APILocationHandler(w http.ResponseWriter, r *http.Request) {
 		handleLocationPostRequest(w, r)
 	}
 
+}
+
+func parseFormFloat(r *http.Request, name string) (float64, error) {
+	return strconv.ParseFloat(strings.TrimSpace(r.FormValue(name)), 64)
 }
