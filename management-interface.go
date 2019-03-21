@@ -46,7 +46,6 @@ const fileName = "IEEE_float_mono_32kHz.wav"          // Default sound file name
 const secondaryPath = "/usr/lib/management-interface" // Check here if the file is not found in the executable directory.
 
 const networkConfigFile = "/etc/cacophony/network.yaml"
-const deviceLocationFile = "/etc/cacophony/location.yaml"
 
 // The file system location of this execuable.
 var executablePath = ""
@@ -105,35 +104,6 @@ func ParseNetworkConfig(filepath string) (*NetworkConfig, error) {
 		return nil, err
 	}
 	return config, nil
-}
-
-// WriteLocationData writes the location values to the location data file.
-// If it doesn't exist, it is created.
-func WriteLocationData(filepath string, location *LocationData) error {
-	outBuf, err := yaml.Marshal(location)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(filepath, outBuf, 0644)
-}
-
-// ParseLocationFile retrieves values from the location data file.
-func ParseLocationFile(filepath string) (*LocationData, error) {
-
-	// Create a default config
-	location := &LocationData{}
-
-	inBuf, err := ioutil.ReadFile(filepath)
-	if os.IsNotExist(err) {
-		return location, nil
-	} else if err != nil {
-		return nil, err
-	}
-
-	if err := yaml.Unmarshal(inBuf, location); err != nil {
-		return nil, err
-	}
-	return location, nil
 }
 
 // Get the host name (device name) this executable was started on.
@@ -731,71 +701,6 @@ func CameraSnapshot(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "/var/spool/cptv/still.png")
 }
 
-// handleLocationPostRequest handles a POST request to set the location coordinates of a device.
-func handleLocationPostRequest(w http.ResponseWriter, r *http.Request) (*FormLocationData, error) {
-	formLocation := locationFromForm(r)
-	location, err := formLocation.Location()
-	if err != nil {
-		return formLocation, err
-	}
-	if err := WriteLocationData(deviceLocationFile, location); err != nil {
-		log.Printf("Could not write to location file: %v", err)
-		return nil, errors.New("could not write location file")
-	}
-	return formLocation, nil
-}
-
-// LocationHandler shows the location of the device.  The location can be viewed and/or set manually.
-func LocationHandler(w http.ResponseWriter, r *http.Request) {
-	type locationResponse struct {
-		Location     *FormLocationData
-		Message      string
-		ErrorMessage string
-	}
-
-	switch r.Method {
-	case "GET", "":
-		location, err := ParseLocationFile(deviceLocationFile)
-		resp := &locationResponse{
-			Location:     location.formLocation(),
-			ErrorMessage: errorMessage(err),
-		}
-		tmpl.ExecuteTemplate(w, "location.html", resp)
-
-	case "POST":
-		formLocation, err := handleLocationPostRequest(w, r)
-		resp := &locationResponse{
-			Location:     formLocation,
-			Message:      successMessage(err, "Location updated"),
-			ErrorMessage: errorMessage(err),
-		}
-		tmpl.ExecuteTemplate(w, "location.html", resp)
-
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-	}
-}
-
-// APILocationHandler writes the location of the device to the deviceLocationFile
-func APILocationHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	_, err := handleLocationPostRequest(w, r)
-	if isClientError(err) {
-		w.WriteHeader(http.StatusBadRequest)
-	} else if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
-func parseFormFloat(r *http.Request, name string) (float64, error) {
-	return strconv.ParseFloat(strings.TrimSpace(r.FormValue(name)), 64)
-}
-
 func newClientError(msg string) *clientError {
 	return &clientError{msg}
 }
@@ -811,47 +716,6 @@ func (e *clientError) Error() string {
 func isClientError(err error) bool {
 	_, ok := err.(*clientError)
 	return ok
-}
-
-func locationFromForm(r *http.Request) *FormLocationData {
-	return &FormLocationData{
-		Latitude:  trimmedFormValue(r, "latitude"),
-		Longitude: trimmedFormValue(r, "longitude"),
-	}
-}
-
-// FormLocationData holds unconverted location form values
-type FormLocationData struct {
-	Latitude  string
-	Longitude string
-}
-
-func (fl *FormLocationData) Location() (*LocationData, error) {
-	lat, ok := parseFloat(fl.Latitude)
-	if !ok {
-		return nil, newClientError("Invalid latitude")
-	}
-	lon, ok := parseFloat(fl.Longitude)
-	if !ok {
-		return nil, newClientError("Invalid longitude")
-	}
-	return &LocationData{
-		Latitude:  lat,
-		Longitude: lon,
-	}, nil
-}
-
-// LocationData is a struct to store our location values in.
-type LocationData struct {
-	Latitude  float64 `yaml:"latitude"`
-	Longitude float64 `yaml:"longitude"`
-}
-
-func (l *LocationData) formLocation() *FormLocationData {
-	return &FormLocationData{
-		Latitude:  floatToString(l.Latitude),
-		Longitude: floatToString(l.Longitude),
-	}
 }
 
 func trimmedFormValue(r *http.Request, name string) string {
