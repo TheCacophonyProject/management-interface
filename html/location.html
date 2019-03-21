@@ -14,10 +14,10 @@
     <div class="container">
         <div 
             id="resultMessage" class="alert alert-danger" 
-            {{if .ErrorEncountered}} 
-                style="display: block;" 
+            {{if ne .ErrorMessage ""}}
+                style="display: block;"
             {{else}} 
-                style="display: none;" 
+                style="display: none;"
             {{end}}> {{.ErrorMessage}}
         </div>
 

@@ -778,9 +778,8 @@ func LocationHandler(w http.ResponseWriter, r *http.Request) {
 		// Handle GET request
 
 		type locationResponse struct {
-			Location         LocationData
-			ErrorEncountered bool
-			ErrorMessage     string
+			Location     LocationData
+			ErrorMessage string
 		}
 
 		errorMessage := ""
@@ -793,10 +792,9 @@ func LocationHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		resp := locationResponse{
-			Location:         *location,
-			ErrorEncountered: err != nil,
-			ErrorMessage:     errorMessage}
-
+			Location:     *location,
+			ErrorMessage: errorMessage,
+		}
 		tmpl.ExecuteTemplate(w, "location.html", resp)
 
 	} else {
