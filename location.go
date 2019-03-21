@@ -78,10 +78,19 @@ func APILocationHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleLocationPostRequest(w http.ResponseWriter, r *http.Request) (*rawLocationData, error) {
-	rawLocation := newRawLocationData(r)
-	location, err := rawLocation.locationData()
-	if err != nil {
-		return rawLocation, err
+	var rawLocation *rawLocationData
+	var location *locationData
+
+	if r.FormValue("action") == "clear" {
+		location = new(locationData)
+		rawLocation = new(rawLocationData)
+	} else {
+		var err error
+		rawLocation = newRawLocationData(r)
+		location, err = rawLocation.locationData()
+		if err != nil {
+			return rawLocation, err
+		}
 	}
 	if err := writeLocationFile(deviceLocationFile, location); err != nil {
 		log.Printf("Could not write to location file: %v", err)

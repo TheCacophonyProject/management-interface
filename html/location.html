@@ -30,21 +30,26 @@
         <hr>
 
         <form action="/location" method="POST">
-            <div class="row">
-              <div class="form-group col-md-4">
+            <div class="form-row">
+              <div class="form-group col-md-6">
                 <label for="latitude">Latitude</label>
                 <input type="text" class="form-control" name="latitude" placeholder="Enter latitude" value="{{.Location.Latitude}}">
               </div>
             </div>
 
-            <div class="row">
-              <div class="form-group col-md-4">
+            <div class="form-row">
+              <div class="form-group col-md-6">
                 <label for="longitude">Longitude</label>
                 <input type="text" class="form-control" name="longitude" placeholder="Enter longitude" value="{{.Location.Longitude}}">
               </div>
             </div>
 
-            <button type="submit" class="btn btn-primary">Update</button>
+            <div class="form-row">
+              <div class="form-group col-md-6">
+                <button type="submit" name="action" value="update" class="btn btn-primary">Update</button>
+                <button type="submit" name="action" value="clear" class="btn float-right">Clear</button>
+              </div>
+            </div>
         </form>
     </div>
 
