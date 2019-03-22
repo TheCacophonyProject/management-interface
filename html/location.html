@@ -12,92 +12,49 @@
     {{template "navbar"}}
 
     <div class="container">
-        <div 
-            id="resultMessage" class="alert alert-danger" 
-            {{if .ErrorEncountered}} 
-                style="display: block;" 
-            {{else}} 
-                style="display: none;" 
-            {{end}}> {{.ErrorMessage}}
+        {{if ne .ErrorMessage ""}}
+        <div class="alert alert-danger">
+            {{.ErrorMessage}}
         </div>
+        {{end}}
+
+        {{if ne .Message ""}}
+        <div class="alert alert-success">
+            {{.Message}}
+        </div>
+        {{end}}
 
         <div class="container pt-5 pl-0">
             <h2>Device Location<br></h2>
         </div>
         <hr>
 
-
-        <form id="locationForm" action="/location" method="POST">
-
-            <div class="row">
-              <div class="form-group col-md-4"> 
+        <form action="/location" method="POST">
+            <div class="form-row">
+              <div class="form-group col-md-6">
                 <label for="latitude">Latitude</label>
-                <input type="text" class="form-control" id="lat" name="latitude"
-                placeholder="Enter latitude" 
-                {{if ne .Location.Latitude 0.0}}
-                  value="{{.Location.Latitude}}"
-                {{end}}>                
+                <input type="text" class="form-control" name="latitude" placeholder="Enter latitude" value="{{.Location.Latitude}}">
               </div>
             </div>
 
-            <div class="row">
-              <div class="form-group col-md-4">
+            <div class="form-row">
+              <div class="form-group col-md-6">
                 <label for="longitude">Longitude</label>
-                <input type="text" class="form-control" id="long" name="longitude"
-                placeholder="Enter longitude" 
-                {{if ne .Location.Longitude 0.0}}
-                  value="{{.Location.Longitude}}"
-                {{end}}>                
+                <input type="text" class="form-control" name="longitude" placeholder="Enter longitude" value="{{.Location.Longitude}}">
               </div>
             </div>
 
-          <button type="submit" class="btn btn-primary" onclick="handleLocationChange(event)" >Submit</button>
-
-        </form>  
-
+            <div class="form-row">
+              <div class="form-group col-md-6">
+                <button type="submit" name="action" value="update" class="btn btn-primary">Update</button>
+                <button type="submit" name="action" value="clear" class="btn float-right">Clear</button>
+              </div>
+            </div>
+        </form>
     </div>
-
 
     <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
     <script src="/static/js/bootstrap.min.js"></script>
-    <script>
-      function showMessage(message, state) {
-        var messageBox = $("#resultMessage");
-        messageBox.text(message);
-        if (state === "success") {
-          messageBox.addClass("alert-success");
-          messageBox.removeClass("alert-danger");
-        } else if (state === "error") {
-          messageBox.removeClass("alert-success");
-          messageBox.addClass("alert-danger");
-        }
-        messageBox.show();
-      }
-
-      function handleLocationChange(event) {
-        event.preventDefault();
-
-        var form = document.getElementById("locationForm");
-        var formURL = form.action;
-        var formMethod = form.method;
-        var formData = new FormData(form);
-
-        var lat = document.getElementById("lat").value;
-        var long = document.getElementById("long").value;
-
-        fetch(formURL, {
-          method: formMethod ,
-          body: formData
-        }).then(function(response) {
-          if(response.ok) {
-            showMessage("Successfully set location", "success");
-          } else {
-            showMessage("Failed to set location", "error");
-          }
-        });
-
-      }
-    </script>
 </body>
 
 </html>

@@ -46,7 +46,6 @@ const fileName = "IEEE_float_mono_32kHz.wav"          // Default sound file name
 const secondaryPath = "/usr/lib/management-interface" // Check here if the file is not found in the executable directory.
 
 const networkConfigFile = "/etc/cacophony/network.yaml"
-const deviceLocationFile = "/etc/cacophony/location.yaml"
 
 // The file system location of this execuable.
 var executablePath = ""
@@ -79,12 +78,6 @@ type NetworkConfig struct {
 	Online bool `yaml:"online"`
 }
 
-// LocationData is a struct to store our location values in.
-type LocationData struct {
-	Latitude  float64 `yaml:"latitude"`
-	Longitude float64 `yaml:"longitude"`
-}
-
 // WriteNetworkConfig writes the config value(s) to the network config file.
 // If it doesn't exist, it is created.
 func WriteNetworkConfig(filepath string, config *NetworkConfig) error {
@@ -111,35 +104,6 @@ func ParseNetworkConfig(filepath string) (*NetworkConfig, error) {
 		return nil, err
 	}
 	return config, nil
-}
-
-// WriteLocationData writes the location values to the location data file.
-// If it doesn't exist, it is created.
-func WriteLocationData(filepath string, location LocationData) error {
-	outBuf, err := yaml.Marshal(location)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(filepath, outBuf, 0640)
-}
-
-// ParseLocationFile retrieves values from the location data file.
-func ParseLocationFile(filepath string) (*LocationData, error) {
-
-	// Create a default config
-	location := &LocationData{}
-
-	inBuf, err := ioutil.ReadFile(filepath)
-	if os.IsNotExist(err) {
-		return location, nil
-	} else if err != nil {
-		return nil, err
-	}
-
-	if err := yaml.Unmarshal(inBuf, location); err != nil {
-		return nil, err
-	}
-	return location, nil
 }
 
 // Get the host name (device name) this executable was started on.
@@ -735,85 +699,4 @@ func CameraHandler(w http.ResponseWriter, r *http.Request) {
 // CameraSnapshot - Still image from Lepton camera
 func CameraSnapshot(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "/var/spool/cptv/still.png")
-}
-
-// handleLocationPostRequest handles a POST request to set the location coordinates of a device.
-func handleLocationPostRequest(w http.ResponseWriter, r *http.Request) {
-
-	// Get the latitude and longitude values from the request.
-	location := LocationData{}
-	fLatitude, err := strconv.ParseFloat(r.FormValue("latitude"), 64)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	location.Latitude = fLatitude
-
-	fLongitude, err := strconv.ParseFloat(r.FormValue("longitude"), 64)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	location.Longitude = fLongitude
-
-	// Now write them to the location file.
-	err = WriteLocationData(deviceLocationFile, location)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		log.Printf("Failed to update location. Could not write to location file. " + err.Error())
-		return
-	}
-
-	// Everything is fine in the world :)
-	w.WriteHeader(http.StatusOK)
-}
-
-// LocationHandler shows the location of the device.  The location can be viewed and/or set manually.
-func LocationHandler(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method == "GET" || r.Method == "" {
-
-		// Handle GET request
-
-		type locationResponse struct {
-			Location         LocationData
-			ErrorEncountered bool
-			ErrorMessage     string
-		}
-
-		errorMessage := ""
-		// Read the location of this device from 'location.yaml'
-		location, err := ParseLocationFile(deviceLocationFile)
-		if err != nil {
-			errorMessage += "Failed to read location data file. " + err.Error()
-			// Create a default location struct so that the page will still load.
-			location = &LocationData{}
-		}
-
-		resp := locationResponse{
-			Location:         *location,
-			ErrorEncountered: err != nil,
-			ErrorMessage:     errorMessage}
-
-		tmpl.ExecuteTemplate(w, "location.html", resp)
-
-	} else {
-
-		// Handle POST request
-		handleLocationPostRequest(w, r)
-
-	}
-
-}
-
-// APILocationHandler writes the location of the device to the deviceLocationFile
-func APILocationHandler(w http.ResponseWriter, r *http.Request) {
-
-	// This should be a POST request
-	if r.Method != "POST" {
-		w.WriteHeader(http.StatusBadRequest)
-	} else {
-		handleLocationPostRequest(w, r)
-	}
-
 }
