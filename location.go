@@ -30,7 +30,7 @@ import (
 
 const deviceLocationFile = "/etc/cacophony/location.yaml"
 
-// LocationHandler shows the location of the device.  The location can be viewed and/or set manually.
+// LocationHandler shows and updates the location of the device.
 func LocationHandler(w http.ResponseWriter, r *http.Request) {
 	type locationResponse struct {
 		Location     *rawLocationData
