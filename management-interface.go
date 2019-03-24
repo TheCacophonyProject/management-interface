@@ -627,54 +627,6 @@ func ToggleOnlineState(w http.ResponseWriter, r *http.Request) {
 
 }
 
-// SpeakerTestHandler will show a frame from the camera to help with positioning
-func SpeakerTestHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl.ExecuteTemplate(w, "speaker-test.html", nil)
-}
-
-var audioBox = packr.NewBox("./audio")
-
-// SpeakerStatusHandler attempts to play a sound on connected speaker(s).
-func SpeakerStatusHandler(w http.ResponseWriter, r *http.Request) {
-
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	response := make(map[string]string)
-
-	if output, err := playTestAudio(); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		log.Printf("audio output failed: %v", err)
-		response["result"] = fmt.Sprintf("Error: %v. Output:\n%s", err.Error(), string(output))
-	} else {
-		w.WriteHeader(http.StatusOK)
-		response["result"] = string(output)
-	}
-
-	// Encode data to be sent back to html.
-	json.NewEncoder(w).Encode(response)
-}
-
-func playTestAudio() ([]byte, error) {
-	wav := audioBox.Bytes("test.wav")
-	if wav == nil {
-		return nil, errors.New("unable to load test audio")
-	}
-	cmd := exec.Command("play", "-t", "wav", "--norm", "-q", "-")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, fmt.Errorf("unable to play audio: %v", err)
-	}
-
-	go func() {
-		defer stdin.Close()
-		w := bufio.NewWriter(stdin)
-		if _, err := w.Write(wav); err != nil {
-			log.Printf("unable to pass audio: %v", err)
-		}
-	}()
-
-	return cmd.CombinedOutput()
-}
-
 // CameraHandler will show a frame from the camera to help with positioning
 func CameraHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "camera.html", nil)
