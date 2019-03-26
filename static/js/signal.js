@@ -4,6 +4,7 @@ window.onload = function() {
 
 async function updateSignalLoop() {
   const refreshTime =2 * 1000 
+
   var xmlHttp = new XMLHttpRequest();
   xmlHttp.open("GET", "/api/signal-strength", true);
   xmlHttp.setRequestHeader("Authorization", "Basic "+btoa("admin:feathers"))
@@ -22,6 +23,7 @@ async function updateSignalLoop() {
   xmlHttp.onerror = function(err) {
     console.log('error:', err);
   }
+
   xmlHttp.send( null );
 }
 
