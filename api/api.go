@@ -59,11 +59,12 @@ func (api *ManagementAPI) GetRecordings(w http.ResponseWriter, r *http.Request) 
 
 func (api *ManagementAPI) GetSignalStrength(w http.ResponseWriter, r *http.Request) {
 	sig, err := signalstrength.Run()
-	w.WriteHeader(http.StatusOK)
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "failed to connect to modem\n")
 		return
 	}
+	w.WriteHeader(http.StatusOK)
 	io.WriteString(w, strconv.Itoa(sig))
 }
 
