@@ -1,4 +1,7 @@
-updateSignal();
+
+window.onload = function() {
+  updateSignal();
+};
 
 const refreshTime =2 * 1000
 const clearSignalAttempts = 3 
@@ -16,7 +19,6 @@ async function updateSignal() {
   xmlHttp.setRequestHeader("Authorization", "Basic "+btoa("admin:feathers"))
   
   xmlHttp.onload = async function() {
-    var signalElement = document.getElementById("signal-strength");
     if (xmlHttp.status == 200) {
       handleSignalSuccess(xmlHttp.response);
     } else {
