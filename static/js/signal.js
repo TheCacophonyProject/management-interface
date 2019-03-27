@@ -23,7 +23,7 @@ async function updateSignal() {
   }
 
   xmlHttp.onerror = function() {
-    handleFailure("error occured accesing " + "/api/signal-strength")
+    handleSignalFailure("error occured accesing " + "/api/signal-strength")
     reCheckSignal(refreshTime); 
   }
 
@@ -31,11 +31,13 @@ async function updateSignal() {
 }
 
 function handleSignalSuccess(signalVal){
-  refreshTime = refreshSeconds;
-  signalFails = 0;
-  $(".signal-unavail").hide();
   var strength =parseInt(signalVal);
-  
+  signalFails = 0;
+  refreshTime = refreshSeconds;
+
+  $(".signal-unavail").hide();
+  $(".svg-signal").show();
+
   for(var i = 1; i <= bars; i++){
     var bar = $(".signal-" + i);
     if(i <= strength){
