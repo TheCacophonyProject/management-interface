@@ -1,4 +1,5 @@
 {{define "navbar"}}
+<link rel="stylesheet" href="/static/css/navbar.css">
 <script type="text/javascript" src="/static/js/signal.js"></script>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
   <a class="navbar-brand" href="/">{{DeviceName}}</a>
@@ -28,7 +29,21 @@
       </li>
     </ul>
     <span class="navbar-text">
-      Signal: <span id="signal-strength"> - </span> dB
+      <svg aria-hidden="true" focusable="false" class="svg-signal" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512">
+        <path class="signal-1" fill="currentColor" 
+        d="M88 384H40c-8.84 0-16 7.16-16 16v96c0 8.84 7.16 16 16 16h48c8.84 0 16-7.16 16-16v-96c0-8.84-7.16-16-16-16z"/>
+        <path class="signal-2" fill="currentColor" 
+        d="M216 288h-48c-8.84 0-16 7.16-16 16v192c0 8.84 7.16 16 16 16h48c8.84 0 16-7.16 16-16V304c0-8.84-7.16-16-16-16z"/>
+        <path class="signal-3" fill="currentColor" 
+        d="M344 192h-48c-8.84 0-16 7.16-16 16v288c0 8.84 7.16 16 16 16h48c8.84 0 16-7.16 16-16V208c0-8.84-7.16-16-16-16z"/>
+        <path class="signal-4" fill="currentColor"
+        d="m472 96h-48c-8.84 0-16 7.16-16 16v384c0 8.84 7.16 16 16 16h48c8.84 0 16-7.16 16-16V112c0-8.84-7.16-16-16-16z"/>
+        <path class="signal-5" fill="currentColor" 
+        d="M600 0h-48c-8.84 0-16 7.16-16 16v480c0 8.84 7.16 16 16 16h48c8.84 0 16-7.16 16-16V16c0-8.84-7.16-16-16-16z"></path>
+      </svg>
+      <div style="display:inline-block">
+        <div id="signal-strength" class="signal-value-div"> - </div> dB
+      </div>
     </span>
   </div>
 </nav>
