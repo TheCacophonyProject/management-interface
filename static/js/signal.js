@@ -1,7 +1,4 @@
-
-window.onload = function() {
-  updateSignal();
-};
+updateSignal();
 
 const refreshTime =2 * 1000
 const clearSignalAttempts = 3 
