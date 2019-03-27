@@ -1,20 +1,23 @@
 .signal{
-	stroke: :black;
+	stroke: black;
 	fill: black;
 }
 
 .no-signal{
-	stroke: :black;
-	stroke-width:2px;
+	stroke: black;
+	stroke-width: 2px;
 	fill: white;
+	color: white;
 }
 
 .signal-value-div{
-	display:inline-block;
-	width:30px;
-	text-align:right;
+	display: inline-block;
+	width: 30px;
+	text-align: right;
 }
 
 .svg-signal{
-	width:40px;
+	width: 40px;
+	fill: white;
+	color: white;
 }

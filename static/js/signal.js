@@ -1,13 +1,11 @@
 updateSignal();
 
-const refreshTime =2 * 1000
+const refreshSeconds = 2 * 1000
+const maxRefreshDelay = 10
 const clearSignalAttempts = 3 
-const maxStrength = 100;
-const minStrength = 0;
 const bars = 5;
-const signalRange = maxStrength - minStrength
-const signalPerBar = signalRange / parseFloat(bars);
 
+var refreshTime = refreshSeconds
 var signalFails = 0;
 
 async function updateSignal() {
@@ -33,15 +31,14 @@ async function updateSignal() {
 }
 
 function handleSignalSuccess(signalVal){
+  refreshTime = refreshSeconds;
   signalFails = 0;
-  var signalElement = document.getElementById("signal-strength");
+  $(".signal-unavail").hide();
   var strength =parseInt(signalVal);
-
-  signalElement.innerText = strength;
-  var signalBars = Math.ceil(strength / signalPerBar);
+  
   for(var i = 1; i <= bars; i++){
     var bar = $(".signal-" + i);
-    if(i <= signalBars){
+    if(i <= strength){
       bar.addClass("signal")
       bar.removeClass("no-signal")
     }else{
@@ -52,13 +49,17 @@ function handleSignalSuccess(signalVal){
 }
 
 function handleSignalFailure(errorMessage){
+  $(".signal-unavail").show();
   if(signalFails == 0){
     console.log(errorMessage);
   }
   signalFails++;
   if(signalFails >= clearSignalAttempts){
-    var signalElement = document.getElementById("signal-strength");
-    signalElement.innerText = " - "
+    $(".signal-unavail").show();
+    $('*[class^="signal-"]').removeClass("signal");
+    $('*[class^="signal-"]').addClass("no-signal")
+    refreshTime += refreshSeconds;
+    refreshTime = Math.max(refreshTime,maxRefreshDelay);
   }
 }
 
