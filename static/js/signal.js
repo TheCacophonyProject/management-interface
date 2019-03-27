@@ -21,12 +21,12 @@ async function updateSignal() {
     } else {
       handleSignalFailure("status:" + xmlHttp.status + " response:" + xmlHttp.response);
     }
-    reCheckSignalIn(refreshTime); 
+    rechecksignal(refreshTime); 
   }
 
   xmlHttp.onerror = function() {
     handleFailure("error occured accesing " + "/api/signal-strength")
-    reCheckSignalIn(refreshTime); 
+    rechecksignal(refreshTime); 
   }
 
   xmlHttp.send(null);
@@ -62,6 +62,6 @@ function handleSignalFailure(errorMessage){
   }
 }
 
-function reCheckSignalIn(ms) {
+function reCheckSignal(ms) {
   setTimeout(updateSignal, ms);
 }
