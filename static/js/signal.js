@@ -1,11 +1,11 @@
 updateSignal();
 
-const refreshSeconds = 2 * 1000
-const maxRefreshDelay = 10
+const refreshMillis = 2 * 1000
+const maxRefreshDelayMillis = 10 * 1000
 const clearSignalAttempts = 3 
 const bars = 5;
 
-var refreshTime = refreshSeconds
+var refreshTime = refreshMillis
 var signalFails = 0;
 
 async function updateSignal() {
@@ -23,7 +23,7 @@ async function updateSignal() {
   }
 
   xmlHttp.onerror = function() {
-    handleSignalFailure("error occured accesing " + "/api/signal-strength")
+    handleSignalFailure("error occurred accessing " + "/api/signal-strength")
     reCheckSignal(refreshTime); 
   }
 
@@ -33,7 +33,7 @@ async function updateSignal() {
 function handleSignalSuccess(signalVal){
   var strength =parseInt(signalVal);
   signalFails = 0;
-  refreshTime = refreshSeconds;
+  refreshTime = refreshMillis;
 
   $(".signal-unavail").hide();
   $(".svg-signal").show();
@@ -64,8 +64,8 @@ function handleSignalFailure(errorMessage){
 
   signalFails++;
   if(signalFails >= clearSignalAttempts){
-    refreshTime += refreshSeconds;
-    refreshTime = Math.max(refreshTime,maxRefreshDelay);
+    refreshTime += refreshMillis;
+    refreshTime = Math.max(refreshTime,maxRefreshDelayMillis);
   }
 }
 
