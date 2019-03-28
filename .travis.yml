@@ -1,8 +1,17 @@
 language: go
 
 go:
-  - "1.10.x"
-  - "1.11"
+  - "1.11.x"
+  - "1.12.x"
 
 script:
   - go vet ./... && go test ./...
+
+# Create a release using goreleaser when tests pass and revision is tagged.
+deploy:
+- provider: script
+  skip_cleanup: true
+  script: curl -sL https://git.io/goreleaser | bash
+  on:
+    tags: true
+    go: "1.12.x"
