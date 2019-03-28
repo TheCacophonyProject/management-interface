@@ -38,6 +38,10 @@ function handleSignalSuccess(signalVal){
   $(".signal-unavail").hide();
   $(".svg-signal").show();
 
+  if(strength == 0 ){
+    $(".signal-unavail").show().removeClass("no-modem");
+  }
+
   for(var i = 1; i <= bars; i++){
     var bar = $(".signal-" + i);
     if(i <= strength){
@@ -51,15 +55,15 @@ function handleSignalSuccess(signalVal){
 }
 
 function handleSignalFailure(errorMessage){
-  $(".signal-unavail").show();
+  $(".signal-unavail").show().addClass("no-modem");
+  $('*[class^="signal-"]').removeClass("signal").addClass("no-signal")
+
   if(signalFails == 0){
     console.log(errorMessage);
   }
+
   signalFails++;
   if(signalFails >= clearSignalAttempts){
-    $(".signal-unavail").show();
-    $('*[class^="signal-"]').removeClass("signal");
-    $('*[class^="signal-"]').addClass("no-signal")
     refreshTime += refreshSeconds;
     refreshTime = Math.max(refreshTime,maxRefreshDelay);
   }

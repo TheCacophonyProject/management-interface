@@ -1,13 +1,16 @@
 .signal{
 	stroke: black;
-	fill: black;
+	color: white;
+	stroke-width: 2;
+}
+
+.no-modem{
+	color: #ff7575;
 }
 
 .no-signal{
 	stroke: black;
-	stroke-width: 2px;
-	fill: white;
-	color: white;
+	stroke-width:1;
 }
 
 .signal-value-div{
@@ -18,7 +21,5 @@
 
 .svg-signal{
 	height: 100%;
-	fill: white;
-	color: white;
-	display: none;
+	color: black;
 }
