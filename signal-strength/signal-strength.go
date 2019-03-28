@@ -23,11 +23,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
+	"time"
 )
 
 const (
 	modemURL  = "http://192.168.8.1"
 	statusURL = modemURL + "/api/monitoring/status"
+	timeout   = time.Second * 10
 )
 
 type responseHolder struct {
@@ -44,7 +46,8 @@ func Run() (int, error) {
 		return 0, err
 	}
 	client := &http.Client{
-		Jar: cookieJar,
+		Jar:     cookieJar,
+		Timeout: timeout,
 	}
 	_, err = client.Get(modemURL) // Goto homepage first to get cookie for API request
 	if err != nil {

@@ -1,0 +1,25 @@
+.signal{
+	stroke: black;
+	color: white;
+	stroke-width: 2;
+}
+
+.no-modem{
+	color: #ff7575;
+}
+
+.no-signal{
+	stroke: black;
+	stroke-width:1;
+}
+
+.signal-value-div{
+	display: inline-block;
+	width: 30px;
+	text-align: right;
+}
+
+.svg-signal{
+	height: 100%;
+	color: black;
+}
