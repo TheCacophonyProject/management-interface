@@ -2,4 +2,4 @@ debug
 *.exe
 /.vscode/
 /dist/
-./managementd
+/managementd
