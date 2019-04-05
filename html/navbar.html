@@ -1,33 +1,18 @@
 {{define "navbar"}}
-<link rel="stylesheet" href="/static/css/navbar.css">
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<link rel="stylesheet" href="/static/css/navbar.css"> 
+<link rel="stylesheet" href="/static/css/all.min.css"> <!-- Font Awesome -->
+<nav class="navbar navbar-expand navbar-dark bg-dark">
+    <a id="btnBack" class="btn btn-dark" href="/">
+        <i class="fas fa-chevron-left mr-2" style="color:whitesmoke"></i>
+    </a>
   <a class="navbar-brand" href="/">{{DeviceName}}</a>
   <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
   </button>
 
   <div class="collapse navbar-collapse" id="navbarSupportedContent">
-    <ul class="navbar-nav mr-auto">
-      <li class="nav-item">
-        <a class="nav-link" href="/camera">Camera</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="/disk-memory">Disk &amp; Memory</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="/network">Network</a>
-      </li>
-         <li class="nav-item">
-        <a class="nav-link" href="/wifi-networks">WiFi Networks</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="/speaker">Speaker Test</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="/location">Location</a>
-      </li>
-    </ul>
-    <span class="navbar-text" style="height:40px">
+
+    <span class="navbar-text ml-auto" style="height:40px">
       <svg aria-hidden="true" focusable="false" class="svg-signal" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512">
         <path
           class="signal-1"
@@ -60,6 +45,7 @@
           id="path3777-5-2" />
       </svg>
     </span>
+    
   </div>
 </nav>
 <script type="text/javascript" src="/static/js/signal.js"></script>
