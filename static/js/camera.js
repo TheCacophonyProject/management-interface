@@ -1,3 +1,4 @@
+"use strict";
 window.onload = function() {
   updateSnapshotLoop()
 };
@@ -11,18 +12,17 @@ function restartCameraViewing() {
   updateSnapshotLoop();
 }
 
-async function updateSnapshotLoop() {
+function updateSnapshotLoop() {
   var xmlHttp = new XMLHttpRequest();
   xmlHttp.open("PUT", "/api/camera/snapshot", true);
   xmlHttp.setRequestHeader("Authorization", "Basic "+btoa("admin:feathers"))
-  xmlHttp.onload = async function() {
+  xmlHttp.onload = function() {
     if (xmlHttp.status == 200) {
       let snapshot = document.getElementById("snapshot-image")
       snapshot.src = "/camera/snapshot?"+ new Date().getTime();
-      await sleep(500);
       snapshotCount++;
       if (snapshotCount < 200) {
-        updateSnapshotLoop();
+        setTimeout(updateSnapshotLoop, 500);
       } else {
         stopSnapshots('Timeout for camera viewing.');
       }
@@ -43,8 +43,4 @@ function stopSnapshots(message) {
   document.getElementById("snapshot-stopped-message").innerText = message;
   document.getElementById("snapshot-stopped").style.display = '';
   document.getElementById("snapshot-image").style.display = 'none';
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
