@@ -46,6 +46,27 @@
 
             <div class="form-row">
               <div class="form-group col-md-6">
+                <label for="timestamp">Timestamp</label>
+                <input type="text" class="form-control" name="timestamp" placeholder="Enter Timestamp" value="{{.Location.Timestamp}}" disabled>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col-md-6">
+                <label for="altitude">Altitude</label>
+                <input type="text" class="form-control" name="altitude" placeholder="Enter altitude" value="{{.Location.Altitude}}">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col-md-6">
+                <label for="precision">Precision</label>
+                <input type="text" class="form-control" name="precision" placeholder="Enter precision" value="{{.Location.Precision}}">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col-md-6">
                 <button type="submit" name="action" value="update" class="btn btn-primary">Update</button>
                 <button type="submit" name="action" value="clear" class="btn float-right">Clear</button>
               </div>

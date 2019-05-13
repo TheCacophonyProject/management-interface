@@ -24,6 +24,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -87,6 +88,7 @@ func handleLocationPostRequest(w http.ResponseWriter, r *http.Request) (*rawLoca
 	} else {
 		var err error
 		rawLocation = newRawLocationData(r)
+		rawLocation.Timestamp = time.Now().Format(time.RFC3339) // Update the timestamp.
 		location, err = rawLocation.locationData()
 		if err != nil {
 			return rawLocation, err
@@ -99,16 +101,22 @@ func handleLocationPostRequest(w http.ResponseWriter, r *http.Request) (*rawLoca
 	return rawLocation, nil
 }
 
-// locationData holds a (latitude, longitude) pair
+// locationData holds location information
 type locationData struct {
-	Latitude  float64 `yaml:"latitude"`
-	Longitude float64 `yaml:"longitude"`
+	Latitude  float64   `yaml:"latitude"`
+	Longitude float64   `yaml:"longitude"`
+	Timestamp time.Time `yaml:"timestamp"`
+	Altitude  float64   `yaml:"altitude"`
+	Precision float64   `yaml:"precision"`
 }
 
 func (l *locationData) rawLocationData() *rawLocationData {
 	return &rawLocationData{
 		Latitude:  floatToString(l.Latitude),
 		Longitude: floatToString(l.Longitude),
+		Timestamp: timestampToString(l.Timestamp),
+		Altitude:  floatToString(l.Altitude),
+		Precision: floatToString(l.Precision),
 	}
 }
 
@@ -116,12 +124,18 @@ func (l *locationData) rawLocationData() *rawLocationData {
 type rawLocationData struct {
 	Latitude  string
 	Longitude string
+	Timestamp string
+	Altitude  string
+	Precision string
 }
 
 func newRawLocationData(r *http.Request) *rawLocationData {
 	return &rawLocationData{
 		Latitude:  trimmedFormValue(r, "latitude"),
 		Longitude: trimmedFormValue(r, "longitude"),
+		Timestamp: trimmedFormValue(r, "timestamp"),
+		Altitude:  trimmedFormValue(r, "altitude"),
+		Precision: trimmedFormValue(r, "precision"),
 	}
 }
 
@@ -134,9 +148,24 @@ func (fl *rawLocationData) locationData() (*locationData, error) {
 	if !ok {
 		return nil, newClientError("Invalid longitude")
 	}
+	ts, ok := parseTimestamp(fl.Timestamp)
+	if !ok {
+		return nil, newClientError("Invalid timestamp")
+	}
+	alt, ok := parseFloat(fl.Altitude)
+	if !ok && fl.Altitude != "" {
+		return nil, newClientError("Invalid altitude")
+	}
+	pre, ok := parseFloat(fl.Precision)
+	if !ok && fl.Precision != "" {
+		return nil, newClientError("Invalid precision")
+	}
 	return &locationData{
 		Latitude:  lat,
 		Longitude: lon,
+		Timestamp: ts,
+		Altitude:  alt,
+		Precision: pre,
 	}, nil
 }
 
