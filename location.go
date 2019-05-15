@@ -29,7 +29,15 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-const deviceLocationFile = "/etc/cacophony/location.yaml"
+const (
+	deviceLocationFile = "/etc/cacophony/location.yaml"
+	maxLatitude        = 90
+	maxLongitude       = 180
+	minAltitude        = 0
+	maxAltitude        = 10000
+	minPrecision       = 0.0
+	maxPrecision       = 1.0
+)
 
 // LocationHandler shows and updates the location of the device.
 func LocationHandler(w http.ResponseWriter, r *http.Request) {
@@ -141,11 +149,11 @@ func newRawLocationData(r *http.Request) *rawLocationData {
 
 func (fl *rawLocationData) locationData() (*locationData, error) {
 	lat, ok := parseFloat(fl.Latitude)
-	if !ok {
+	if !ok || lat < -maxLatitude || lat > maxLatitude {
 		return nil, newClientError("Invalid latitude")
 	}
 	lon, ok := parseFloat(fl.Longitude)
-	if !ok {
+	if !ok || lon < -maxLongitude || lon > maxLongitude {
 		return nil, newClientError("Invalid longitude")
 	}
 	ts, ok := parseTimestamp(fl.Timestamp)
@@ -153,11 +161,27 @@ func (fl *rawLocationData) locationData() (*locationData, error) {
 		return nil, newClientError("Invalid timestamp")
 	}
 	alt, ok := parseFloat(fl.Altitude)
-	if !ok && fl.Altitude != "" {
+	if !ok && fl.Altitude == "" {
+		ok = true // This field is optional, so can be left empty
+	} else {
+		// A value has been set.  Check if it's a sane one.
+		if alt < minAltitude || alt > maxAltitude {
+			ok = false
+		}
+	}
+	if !ok {
 		return nil, newClientError("Invalid altitude")
 	}
 	pre, ok := parseFloat(fl.Precision)
-	if !ok && fl.Precision != "" {
+	if !ok && fl.Precision == "" {
+		ok = true // This field is optional, so can be left empty
+	} else {
+		// A value has been set.  Check if it's a sane one.
+		if pre < minPrecision || pre > maxPrecision {
+			ok = false
+		}
+	}
+	if !ok {
 		return nil, newClientError("Invalid precision")
 	}
 	return &locationData{
