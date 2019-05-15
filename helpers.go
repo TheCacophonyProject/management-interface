@@ -52,7 +52,7 @@ func parseTimestamp(val string) (time.Time, bool) {
 	}
 	t, err := time.Parse(time.RFC3339, val)
 	if err != nil {
-		return time.Now(), false
+		return time.Time{}, false
 	}
 	return t, true
 }

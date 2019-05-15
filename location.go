@@ -88,7 +88,7 @@ func handleLocationPostRequest(w http.ResponseWriter, r *http.Request) (*rawLoca
 	} else {
 		var err error
 		rawLocation = newRawLocationData(r)
-		rawLocation.Timestamp = time.Now().Format(time.RFC3339) // Update the timestamp.
+		rawLocation.Timestamp = timestampToString(time.Now()) // Update the timestamp.
 		location, err = rawLocation.locationData()
 		if err != nil {
 			return rawLocation, err
