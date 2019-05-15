@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func trimmedFormValue(r *http.Request, name string) string {
@@ -42,6 +43,22 @@ func floatToString(val float64) string {
 		return ""
 	}
 	return fmt.Sprint(val)
+}
+
+// Timestamp returns the field at 'val' as a time value
+func parseTimestamp(val string) (time.Time, bool) {
+	if val == "" {
+		return time.Now(), true
+	}
+	t, err := time.Parse(time.RFC3339, val)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return t, true
+}
+
+func timestampToString(t time.Time) string {
+	return t.Format(time.RFC3339)
 }
 
 func successMessage(err error, msg string) string {
