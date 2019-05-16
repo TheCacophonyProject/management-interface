@@ -38,6 +38,17 @@ func parseFloat(val string) (float64, bool) {
 	return f, true
 }
 
+func parseOptionalFloat(val string) (float64, bool) {
+	if val == "" {
+		return 0, true
+	}
+	f, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return 0, false
+	}
+	return f, true
+}
+
 func floatToString(val float64) string {
 	if val == 0 {
 		return ""

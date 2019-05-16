@@ -20,6 +20,7 @@ package managementinterface
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -150,40 +151,25 @@ func newRawLocationData(r *http.Request) *rawLocationData {
 func (fl *rawLocationData) locationData() (*locationData, error) {
 	lat, ok := parseFloat(fl.Latitude)
 	if !ok || lat < -maxLatitude || lat > maxLatitude {
-		return nil, newClientError("Invalid latitude")
+		return nil, newClientError(fmt.Sprintf("Invalid latitude. Should be between %d and %d", -maxLatitude, maxLatitude))
 	}
 	lon, ok := parseFloat(fl.Longitude)
 	if !ok || lon < -maxLongitude || lon > maxLongitude {
-		return nil, newClientError("Invalid longitude")
+		return nil, newClientError(fmt.Sprintf("Invalid longitude. Should be between %d and %d", -maxLongitude, maxLongitude))
 	}
 	ts, ok := parseTimestamp(fl.Timestamp)
 	if !ok {
 		return nil, newClientError("Invalid timestamp")
 	}
-	alt, ok := parseFloat(fl.Altitude)
-	if !ok && fl.Altitude == "" {
-		ok = true // This field is optional, so can be left empty
-	} else {
-		// A value has been set.  Check if it's a sane one.
-		if alt < minAltitude || alt > maxAltitude {
-			ok = false
-		}
+	alt, ok := parseOptionalFloat(fl.Altitude)
+	if !ok || alt < minAltitude || alt > maxAltitude {
+		return nil, newClientError(fmt.Sprintf("Invalid altitude. Should be between %d and %d", minAltitude, maxAltitude))
 	}
-	if !ok {
-		return nil, newClientError("Invalid altitude")
+	pre, ok := parseOptionalFloat(fl.Precision)
+	if !ok || pre < minPrecision || pre > maxPrecision {
+		return nil, newClientError(fmt.Sprintf("Invalid precision. Should be between %2.0f and %2.0f", minPrecision, maxPrecision))
 	}
-	pre, ok := parseFloat(fl.Precision)
-	if !ok && fl.Precision == "" {
-		ok = true // This field is optional, so can be left empty
-	} else {
-		// A value has been set.  Check if it's a sane one.
-		if pre < minPrecision || pre > maxPrecision {
-			ok = false
-		}
-	}
-	if !ok {
-		return nil, newClientError("Invalid precision")
-	}
+
 	return &locationData{
 		Latitude:  lat,
 		Longitude: lon,
