@@ -36,8 +36,8 @@ const (
 	maxLongitude       = 180
 	minAltitude        = 0
 	maxAltitude        = 10000
-	minPrecision       = 0.0
-	maxPrecision       = 1.0
+	minAccuracy        = 0.0
+	maxAccuracy        = 1.0
 )
 
 // LocationHandler shows and updates the location of the device.
@@ -116,7 +116,7 @@ type locationData struct {
 	Longitude float64   `yaml:"longitude"`
 	Timestamp time.Time `yaml:"timestamp"`
 	Altitude  float64   `yaml:"altitude"`
-	Precision float64   `yaml:"precision"`
+	Accuracy  float64   `yaml:"accuracy"`
 }
 
 func (l *locationData) rawLocationData() *rawLocationData {
@@ -125,7 +125,7 @@ func (l *locationData) rawLocationData() *rawLocationData {
 		Longitude: floatToString(l.Longitude),
 		Timestamp: timestampToString(l.Timestamp),
 		Altitude:  floatToString(l.Altitude),
-		Precision: floatToString(l.Precision),
+		Accuracy:  floatToString(l.Accuracy),
 	}
 }
 
@@ -135,7 +135,7 @@ type rawLocationData struct {
 	Longitude string
 	Timestamp string
 	Altitude  string
-	Precision string
+	Accuracy  string
 }
 
 func newRawLocationData(r *http.Request) *rawLocationData {
@@ -144,11 +144,12 @@ func newRawLocationData(r *http.Request) *rawLocationData {
 		Longitude: trimmedFormValue(r, "longitude"),
 		Timestamp: trimmedFormValue(r, "timestamp"),
 		Altitude:  trimmedFormValue(r, "altitude"),
-		Precision: trimmedFormValue(r, "precision"),
+		Accuracy:  trimmedFormValue(r, "accuracy"),
 	}
 }
 
 func (fl *rawLocationData) locationData() (*locationData, error) {
+
 	lat, ok := parseFloat(fl.Latitude)
 	if !ok || lat < -maxLatitude || lat > maxLatitude {
 		return nil, newClientError(fmt.Sprintf("Invalid latitude. Should be between %d and %d", -maxLatitude, maxLatitude))
@@ -165,9 +166,9 @@ func (fl *rawLocationData) locationData() (*locationData, error) {
 	if !ok || alt < minAltitude || alt > maxAltitude {
 		return nil, newClientError(fmt.Sprintf("Invalid altitude. Should be between %d and %d", minAltitude, maxAltitude))
 	}
-	pre, ok := parseOptionalFloat(fl.Precision)
-	if !ok || pre < minPrecision || pre > maxPrecision {
-		return nil, newClientError(fmt.Sprintf("Invalid precision. Should be between %2.0f and %2.0f", minPrecision, maxPrecision))
+	acc, ok := parseOptionalFloat(fl.Accuracy)
+	if !ok || acc < minAccuracy || acc > maxAccuracy {
+		return nil, newClientError(fmt.Sprintf("Invalid accuracy. Should be between %2.0f and %2.0f", minAccuracy, maxAccuracy))
 	}
 
 	return &locationData{
@@ -175,7 +176,7 @@ func (fl *rawLocationData) locationData() (*locationData, error) {
 		Longitude: lon,
 		Timestamp: ts,
 		Altitude:  alt,
-		Precision: pre,
+		Accuracy:  acc,
 	}, nil
 }
 
