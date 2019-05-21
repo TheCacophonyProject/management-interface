@@ -20,6 +20,7 @@ package managementinterface
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -29,7 +30,15 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-const deviceLocationFile = "/etc/cacophony/location.yaml"
+const (
+	deviceLocationFile = "/etc/cacophony/location.yaml"
+	maxLatitude        = 90
+	maxLongitude       = 180
+	minAltitude        = 0
+	maxAltitude        = 10000
+	minAccuracy        = 0.0
+	maxAccuracy        = 1.0
+)
 
 // LocationHandler shows and updates the location of the device.
 func LocationHandler(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +116,7 @@ type locationData struct {
 	Longitude float64   `yaml:"longitude"`
 	Timestamp time.Time `yaml:"timestamp"`
 	Altitude  float64   `yaml:"altitude"`
-	Precision float64   `yaml:"precision"`
+	Accuracy  float64   `yaml:"accuracy"`
 }
 
 func (l *locationData) rawLocationData() *rawLocationData {
@@ -116,7 +125,7 @@ func (l *locationData) rawLocationData() *rawLocationData {
 		Longitude: floatToString(l.Longitude),
 		Timestamp: timestampToString(l.Timestamp),
 		Altitude:  floatToString(l.Altitude),
-		Precision: floatToString(l.Precision),
+		Accuracy:  floatToString(l.Accuracy),
 	}
 }
 
@@ -126,7 +135,7 @@ type rawLocationData struct {
 	Longitude string
 	Timestamp string
 	Altitude  string
-	Precision string
+	Accuracy  string
 }
 
 func newRawLocationData(r *http.Request) *rawLocationData {
@@ -135,37 +144,39 @@ func newRawLocationData(r *http.Request) *rawLocationData {
 		Longitude: trimmedFormValue(r, "longitude"),
 		Timestamp: trimmedFormValue(r, "timestamp"),
 		Altitude:  trimmedFormValue(r, "altitude"),
-		Precision: trimmedFormValue(r, "precision"),
+		Accuracy:  trimmedFormValue(r, "accuracy"),
 	}
 }
 
 func (fl *rawLocationData) locationData() (*locationData, error) {
+
 	lat, ok := parseFloat(fl.Latitude)
-	if !ok {
-		return nil, newClientError("Invalid latitude")
+	if !ok || lat < -maxLatitude || lat > maxLatitude {
+		return nil, newClientError(fmt.Sprintf("Invalid latitude. Should be between %d and %d", -maxLatitude, maxLatitude))
 	}
 	lon, ok := parseFloat(fl.Longitude)
-	if !ok {
-		return nil, newClientError("Invalid longitude")
+	if !ok || lon < -maxLongitude || lon > maxLongitude {
+		return nil, newClientError(fmt.Sprintf("Invalid longitude. Should be between %d and %d", -maxLongitude, maxLongitude))
 	}
 	ts, ok := parseTimestamp(fl.Timestamp)
 	if !ok {
 		return nil, newClientError("Invalid timestamp")
 	}
-	alt, ok := parseFloat(fl.Altitude)
-	if !ok && fl.Altitude != "" {
-		return nil, newClientError("Invalid altitude")
+	alt, ok := parseOptionalFloat(fl.Altitude)
+	if !ok || alt < minAltitude || alt > maxAltitude {
+		return nil, newClientError(fmt.Sprintf("Invalid altitude. Should be between %d and %d", minAltitude, maxAltitude))
 	}
-	pre, ok := parseFloat(fl.Precision)
-	if !ok && fl.Precision != "" {
-		return nil, newClientError("Invalid precision")
+	acc, ok := parseOptionalFloat(fl.Accuracy)
+	if !ok || acc < minAccuracy || acc > maxAccuracy {
+		return nil, newClientError(fmt.Sprintf("Invalid accuracy. Should be between %2.0f and %2.0f", minAccuracy, maxAccuracy))
 	}
+
 	return &locationData{
 		Latitude:  lat,
 		Longitude: lon,
 		Timestamp: ts,
 		Altitude:  alt,
-		Precision: pre,
+		Accuracy:  acc,
 	}, nil
 }
 
