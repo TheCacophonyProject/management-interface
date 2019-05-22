@@ -36,8 +36,8 @@ const (
 	maxLongitude       = 180
 	minAltitude        = 0
 	maxAltitude        = 10000
-	minAccuracy        = 0.0
-	maxAccuracy        = 1.0
+	minAccuracy        = 0
+	maxAccuracy        = 10000
 )
 
 // LocationHandler shows and updates the location of the device.
@@ -168,7 +168,7 @@ func (fl *rawLocationData) locationData() (*locationData, error) {
 	}
 	acc, ok := parseOptionalFloat(fl.Accuracy)
 	if !ok || acc < minAccuracy || acc > maxAccuracy {
-		return nil, newClientError(fmt.Sprintf("Invalid accuracy. Should be between %2.0f and %2.0f", minAccuracy, maxAccuracy))
+		return nil, newClientError(fmt.Sprintf("Invalid accuracy. Should be between %d and %d", minAccuracy, maxAccuracy))
 	}
 
 	return &locationData{
