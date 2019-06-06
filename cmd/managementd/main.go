@@ -67,6 +67,7 @@ func main() {
 	router.HandleFunc("/speaker/status", managementinterface.SpeakerStatusHandler).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
 	router.HandleFunc("/location", managementinterface.LocationHandler).Methods("GET", "POST") // Form to view and/or set location manually.
+	router.HandleFunc("/advanced", managementinterface.AdvancedMenuHandler).Methods("GET")
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
 	router.HandleFunc("/camera/snapshot", managementinterface.CameraSnapshot).Methods("GET")
 

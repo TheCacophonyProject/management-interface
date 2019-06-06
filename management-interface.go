@@ -178,7 +178,10 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 	rows := strings.Split(diskData, "\n")
 	for _, row := range rows[1:] {
 		words := strings.Fields(row)
-		outputStrings = append(outputStrings, words)
+		if len(words) >= 6 {
+			words[0], words[5] = words[5], words[0] // This swaps these 2 columns
+			outputStrings = append(outputStrings, words)
+		}
 	}
 
 	memoryData, err := getMemoryStats()
@@ -194,8 +197,14 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 		if len(words) > 1 && strings.HasPrefix(words[1], "K ") {
 			words[0] = words[0] + " K"
 			words[1] = words[1][2:]
+			words[0], words[1] = words[1], words[0] // This reverses the 2 columns
+			words[0] = strings.Title(words[0])
 		}
 		outputStrings2 = append(outputStrings2, words)
+		if words[0] == "Free Swap" {
+			// Don't want any of the output after this line.
+			break
+		}
 	}
 
 	// Put it all in a struct so we can access it from HTML
@@ -216,6 +225,11 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 // IndexHandler is the root handler.
 func IndexHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "index.html", nil)
+}
+
+// AdvancedMenuHandler is a screen to more advanced settings.
+func AdvancedMenuHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl.ExecuteTemplate(w, "advanced.html", nil)
 }
 
 // Get the IP address for a given interface.  There can be 0, 1 or 2 (e.g. IPv4 and IPv6)
