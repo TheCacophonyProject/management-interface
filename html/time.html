@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Time</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+</head>
+
+<body>
+    {{template "navbar"}}
+
+    <div class="container">
+        {{if ne .ErrorMessage ""}}
+        <div class="alert alert-danger">
+            {{.ErrorMessage}}
+        </div>
+        {{end}}
+
+        {{if ne .Message ""}}
+        <div class="alert alert-success">
+            {{.Message}}
+        </div>
+        {{end}}
+
+        <div class="container pt-5 pl-0">
+            <h2>Device Location<br></h2>
+        </div>
+        <hr>
+
+        <form action="/time" method="POST">
+            <div class="form-row">
+              <div class="form-group col-md-6">
+                <label for="rtctime">Latitude</label>
+                <input type="datetime" class="form-control" name="rtctime" placeholder="Enter RTC Time" value="{{.TimeSetttings.RTCTime}}">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col-md-6">
+                <label for="systemtime">System Time</label>
+                <input type="datetime" class="form-control" name="systemtime" placeholder="Enter System Time" value="{{.TimeSetttings.SystemTime}}">
+              </div>
+            </div>
+
+
+            <div class="form-row">
+              <div class="form-group col-md-6">
+                <button type="submit" name="action" value="setrtctimetouservalue" class="btn btn-primary">Update</button>
+                <button type="submit" name="action" value="setrtctimetosystemtime" class="btn float-right">Set RTC to System Time</button>
+              </div>
+            </div>
+        </form>
+        
+    </div>
+
+    <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+</body>
+
+</html>

@@ -56,7 +56,7 @@ func floatToString(val float64) string {
 	return fmt.Sprint(val)
 }
 
-// Timestamp returns the field at 'val' as a time value
+// parseTimestamp returns the field at 'val' as a time value
 func parseTimestamp(val string) (time.Time, bool) {
 	if val == "" {
 		return time.Now(), true
@@ -66,6 +66,18 @@ func parseTimestamp(val string) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	return t, true
+}
+
+// parseTimeString parses a string containing a time and returns a time.Time value.
+func parseTimeString(val string) (time.Time, error) {
+	if val == "" {
+		return time.Time{}, newClientError("Could not parse time string.")
+	}
+	t, err := time.Parse(time.RFC3339, val)
+	if err != nil {
+		return time.Time{}, newClientError("Could not parse time string.")
+	}
+	return t, nil
 }
 
 func timestampToString(t time.Time) string {
