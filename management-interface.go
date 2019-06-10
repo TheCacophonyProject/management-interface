@@ -36,7 +36,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
@@ -179,7 +178,10 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 	rows := strings.Split(diskData, "\n")
 	for _, row := range rows[1:] {
 		words := strings.Fields(row)
-		outputStrings = append(outputStrings, words)
+		if len(words) >= 6 {
+			words[0], words[5] = words[5], words[0] // This swaps these 2 columns
+			outputStrings = append(outputStrings, words)
+		}
 	}
 
 	memoryData, err := getMemoryStats()
@@ -195,8 +197,14 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 		if len(words) > 1 && strings.HasPrefix(words[1], "K ") {
 			words[0] = words[0] + " K"
 			words[1] = words[1][2:]
+			words[0], words[1] = words[1], words[0] // This reverses the 2 columns
+			words[0] = strings.Title(words[0])
 		}
 		outputStrings2 = append(outputStrings2, words)
+		if words[0] == "Free Swap" {
+			// Don't want any of the output after this line.
+			break
+		}
 	}
 
 	// Put it all in a struct so we can access it from HTML
@@ -219,114 +227,9 @@ func IndexHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "index.html", nil)
 }
 
-// TimeSettings is a struct which hold the time settings.
-type TimeSettings struct {
-	RTCTime    time.Time
-	SystemTime time.Time
-}
-
-func getTimes() (*TimeSettings, error) {
-	if runtime.GOOS != "windows" {
-		// 'Nix.  Run hwclock command to get the times we want.
-		timeSettings := &TimeSettings{SystemTime: time.Now()}
-		out, err := exec.Command("sh", "-c", "hwclock -r").Output()
-		if err != nil {
-			log.Printf(err.Error())
-			return timeSettings, err
-		}
-		// Convert to time.Time
-		timeSettings.RTCTime, err = parseTimeString(strings.Trim(string(out), " /t/n"))
-		if err != nil {
-			log.Printf(err.Error())
-			return timeSettings, err
-		}
-	}
-
-	return &TimeSettings{}, nil
-
-}
-
-func setRTCTime(ts string) error {
-	if runtime.GOOS != "windows" {
-		// 'Nix.  Run hwclock command to set the RTC time
-		out, err := exec.Command("sh", "-c", "hwclock --set --date "+ts).Output()
-		if err != nil {
-			log.Printf(string(out) + err.Error())
-			return err
-		}
-		return nil
-	}
-	return nil
-}
-
-func setRTCTimeToSystemTime() error {
-	if runtime.GOOS != "windows" {
-		// 'Nix.  Run hwclock command to set the RTC to the system time..
-		out, err := exec.Command("sh", "-c", "hwclock --systohc").Output()
-		if err != nil {
-			log.Printf(string(out) + err.Error())
-			return err
-		}
-	}
-	return nil
-}
-
-// TimeHandler shows and updates the time settings for the device
-func TimeHandler(w http.ResponseWriter, r *http.Request) {
-	type timeSettingsResponse struct {
-		TimeSettings *TimeSettings
-		Message      string
-		ErrorMessage string
-	}
-
-	switch r.Method {
-	case "GET", "":
-		timeSettings, err := getTimes()
-		resp := &timeSettingsResponse{
-			TimeSettings: timeSettings,
-			ErrorMessage: errorMessage(err),
-		}
-		tmpl.ExecuteTemplate(w, "time.html", resp)
-
-	case "POST":
-		resp := &timeSettingsResponse{TimeSettings: &TimeSettings{SystemTime: time.Now()}}
-		if r.FormValue("action") == "setrtctimetouservalue" {
-			// The user wants to set the RTC time from the date/time they have set in the html form.
-			err := setRTCTime(trimmedFormValue(r, "rtctime"))
-			if err != nil {
-				resp.ErrorMessage = errorMessage(err)
-			} else {
-				timeSettings, err := getTimes()
-				if err != nil {
-					resp.ErrorMessage = errorMessage(err)
-				} else {
-					resp.TimeSettings = timeSettings
-					resp.Message = "Run time clock successfully set."
-				}
-			}
-			tmpl.ExecuteTemplate(w, "time.html", resp)
-
-		} else {
-			// Set RTC time to system time.
-			err := setRTCTimeToSystemTime()
-			if err != nil {
-				resp.ErrorMessage = errorMessage(err)
-			} else {
-				timeSettings, err := getTimes()
-				if err != nil {
-					resp.ErrorMessage = errorMessage(err)
-				} else {
-					resp.TimeSettings = timeSettings
-					resp.Message = "Run time clock successfully set."
-				}
-			}
-			tmpl.ExecuteTemplate(w, "time.html", resp)
-		}
-
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-	}
-
+// AdvancedMenuHandler is a screen to more advanced settings.
+func AdvancedMenuHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl.ExecuteTemplate(w, "advanced.html", nil)
 }
 
 // Get the IP address for a given interface.  There can be 0, 1 or 2 (e.g. IPv4 and IPv6)

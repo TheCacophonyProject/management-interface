@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>Cacophonator Setup</title>
+    <title>Advanced Settings</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
@@ -19,25 +19,31 @@
 <body>
     {{template "navbar"}}
 
+    <div class="container pt-5 pl-0">
+        <h2 class="text-center">Advanced Settings<br></h2>
+    </div>
+    <hr>
+
+
     <div class="container">
             <div class="row">
                 <div class="col-xs-12 w-100" >
-                    <a class="btn btn-primary btn-block mt-3" href="/camera" role="button">Camera</a>
+                    <a class="btn btn-primary btn-block mt-3" href="/network" role="button">Network</a>
                 </div>
             </div>
             <div class="row">
                 <div class="col-xs-12 w-100" >
-                    <a class="btn btn-primary btn-block mt-3" href="/wifi-networks" role="button">WiFi Networks</a>
+                    <a class="btn btn-primary btn-block mt-3" href="/speaker" role="button">Speaker Test</a>
                 </div>
             </div>
             <div class="row">
                 <div class="col-xs-12 w-100" >
-                    <a class="btn btn-primary btn-block mt-3" href="/location" role="button">Location</a>
+                    <a class="btn btn-primary btn-block mt-3" href="/disk-memory" role="button">Disk &amp; Memory</a>
                 </div>
             </div>
             <div class="row">
                 <div class="col-xs-12 w-100" >
-                    <a class="btn btn-primary btn-block mt-3" href="/advanced" role="button">Advanced</a>
+                    <a class="btn btn-primary btn-block mt-3" href="/time-settings" role="button">Time Settings</a>
                 </div>
             </div>
                                                                             
@@ -45,12 +51,6 @@
     
     <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
     <script src="/static/js/bootstrap.min.js"></script>
-
-    <script>
-        $(document).ready(function(){
-            $("#btnBack").hide();
-        });
-    </script>
     
 </body>
 

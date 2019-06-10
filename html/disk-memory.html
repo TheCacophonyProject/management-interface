@@ -16,26 +16,31 @@
             </div>
             <hr>
         
-            <div class="container p-5">
-                    <h3>Disk:</h3>
+            <div class="container pt-5 pb-4 pl-2">
+                <h3>Disk:</h3>
             </div>
     
             <div class="table-responsive">
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Filesystem</th> 
+                            <th>Mounted on</th> 
                             <th>Size</th> 
-                            <th>Used</th> 
+                            <th><div class="d-none d-lg-block">Used</div></th> 
                             <th>Avail</th> 
                             <th>Use %</th> 
-                            <th>Mounted on</th> 
+                            <th>Filesystem</th> 
                         </tr>
                     </thead>
                     <tbody>
                         {{range .DiskDataRows}}
                             <tr>
-                                {{range .}}<td>{{.}}</td>{{end}}                
+                                <td>{{index . 0}}</td>       
+                                <td>{{index . 1}}</td>       
+                                <td><div class="d-none d-lg-block">{{index . 2}}</div></td>       
+                                <td>{{index . 3}}</td>       
+                                <td>{{index . 4}}</td>       
+                                <td>{{index . 5}}</td>       
                             </tr>
                         {{end}}
                     </tbody>
@@ -43,7 +48,7 @@
             </div>
     
     
-            <div class="container p-5">
+            <div class="container pt-5 pb-4 pl-2">
                 <h3>Memory:</h3>
             </div>
     
@@ -51,14 +56,15 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <th class="w-25" class="text-right">Memory Amount</th> 
-                            <th>Memory Type</th> 
+                            <th style="width: 33%">Memory Type</th> 
+                            <th><div class="text-right" style="width: 33%">Memory Amount</div></th> 
                         </tr>
                     </thead>
                     <tbody>
                         {{range .MemoryDataRows}}
                             <tr>
-                                {{range .}}<td>{{.}}</td>{{end}}                
+                                <td style="width: 33%" >{{index . 0}}</td>
+                                <td><div class="text-right" style="width: 33%">{{index . 1}}</div></td>
                             </tr>
                         {{end}}
                     </tbody>
@@ -70,6 +76,14 @@
     
         <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
         <script src="/static/js/bootstrap.min.js"></script>
+
+        <script>
+            $(document).ready(function(){
+                document.getElementById("btnBack").href="/advanced";
+                document.getElementById("navDeviceName").href="/advanced";
+            });
+        </script>
+  
     
     
 

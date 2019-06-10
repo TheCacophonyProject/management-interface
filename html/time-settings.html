@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Time Settings</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+</head>
+
+<body>
+    {{template "navbar"}}
+
+    <div class="container">
+        {{if ne .ErrorMessage ""}}
+        <div class="alert alert-danger">
+            {{.ErrorMessage}}
+        </div>
+        {{end}}
+
+        {{if ne .Message ""}}
+        <div class="alert alert-success">
+            {{.Message}}
+        </div>
+        {{end}}
+
+        <div class="container pt-5 pl-0">
+            <h2>Time Settings<br></h2>
+        </div>
+        <hr>
+
+        <form action="/time-settings" method="POST">
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="rtcdate">RTC Date</label>
+              <input type="date" class="form-control" name="rtcdate" value="{{.RTCDate}}">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="rtctime">RTC Time</label>
+              <input type="time" class="form-control" name="rtctime" value="{{.RTCTime}}">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <button type="submit" name="action" value="setrtctimetouservalue" class="btn btn-primary">Update RTC Time</button>
+            </div>
+          </div>
+
+
+          <div class="form-row">
+            <div class="form-group col-md-6 pt-4">
+              <label for="systemdate">System Date</label>
+              <input type="date" class="form-control" name="systemdate" value="{{.SystemDate}}" disabled>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-md-6 ">
+              <label for="systemtime">System Time</label>
+              <input type="time" class="form-control" name="systemtime" value="{{.SystemTime}}" disabled>
+            </div>
+          </div>
+
+
+            <div class="form-row">
+              <div class="form-group col-md-6">
+                <button type="submit" name="action" value="syncrtctimetosystemtime" class="btn btn-primary">Sync the RTC to System Time</button>
+              </div>
+            </div>
+        </form>
+        
+    </div>
+
+    <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+
+    <script>
+      $(document).ready(function(){
+          document.getElementById("btnBack").href="/advanced";
+          document.getElementById("navDeviceName").href="/advanced";
+      });
+    </script>
+
+</body>
+
+</html>
