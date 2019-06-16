@@ -37,16 +37,16 @@ func getTimes() (*timeSettings, error) {
 	if runtime.GOOS != "windows" {
 		// 'Nix.  Run hwclock command to get the times we want.
 		ts := &timeSettings{SystemTime: time.Now()}
-		out, err := exec.Command("sh", "-c", "hwclock -r").Output()
+		out, err := exec.Command("sh", "-c", "hwclock", "-r").Output()
 		if err != nil {
 			log.Printf(err.Error())
 			return ts, err
 		}
 		// Convert to time.Time
-		// log.Println(strings.Trim(string(out), " /t/n"))
+		log.Println("Hardware clock output:", strings.TrimSpace(string(out)))
 		ts.RTCTime, err = parseTimeString(strings.TrimSpace(string(out)))
 		if err != nil {
-			log.Printf(err.Error())
+			log.Println(err.Error())
 			return ts, err
 		}
 		return ts, nil
@@ -55,28 +55,25 @@ func getTimes() (*timeSettings, error) {
 
 }
 
-func setRTCTime(dateStr string, timeStr string) error {
+// Set both the hardware and system times to the date/time string passed in.
+func setTimes(dateTimeStr string) error {
 	if runtime.GOOS != "windows" {
-		// 'Nix.  Run hwclock command to set the RTC time
-		// If dateStr is blank, todays date is used by hwclock.  And if timeStr is blank, then 00:00 is used.
-		out, err := exec.Command("sh", "-c", "hwclock --set --date '"+dateStr+" "+timeStr+"'").Output()
-		if err != nil {
-			log.Printf(string(out) + err.Error())
-			return err
-		}
-		return nil
-	}
-	return nil
-}
 
-func syncRTCTimeToSystemTime() error {
-	if runtime.GOOS != "windows" {
-		// 'Nix.  Run hwclock command to set the RTC to the system time..
-		out, err := exec.Command("sh", "-c", "hwclock --systohc").Output()
+		//Run hwclock command to set the hardware clock to the given time.
+		out, err := exec.Command("sh", "-c", "hwclock --set --date '"+dateTimeStr+"'").Output()
+		log.Println("Setting times to:", dateTimeStr)
 		if err != nil {
 			log.Printf(string(out) + err.Error())
 			return err
 		}
+
+		// Now set the system time to that same time.
+		out, err = exec.Command("sh", "-c", "hwclock --hctosys").Output()
+		if err != nil {
+			log.Printf(string(out) + err.Error())
+			return err
+		}
+
 	}
 	return nil
 }
@@ -109,46 +106,55 @@ func TimeHandler(w http.ResponseWriter, r *http.Request) {
 		var resp *timeSettingsResponse
 		ts, err := getTimes()
 		resp = newTimeSettingsResponse(ts, errorMessage(err))
-		tmpl.ExecuteTemplate(w, "time-settings.html", resp)
+		if err != nil {
+			resp.ErrorMessage += " Could not retrieve times."
+		}
+		tmpl.ExecuteTemplate(w, "clock.html", resp)
 
 	case "POST":
 		var resp *timeSettingsResponse
 
-		if r.FormValue("action") == "setrtctimetouservalue" {
-			// The user wants to set the RTC time from the date/time they have set in the html form.
-			err := setRTCTime(trimmedFormValue(r, "rtcdate"), trimmedFormValue(r, "rtctime"))
-			if err != nil {
-				resp.ErrorMessage = errorMessage(err)
-			} else {
-				ts, err := getTimes()
-				if err != nil {
-					resp.ErrorMessage = errorMessage(err)
-				} else {
-					resp = newTimeSettingsResponse(ts, "")
-					resp.Message = "Run time clock successfully updated."
-				}
-			}
-			tmpl.ExecuteTemplate(w, "time-settings.html", resp)
-
-		} else {
-			// Sync RTC time to system time.
-			err := syncRTCTimeToSystemTime()
-			if err != nil {
-				resp.ErrorMessage = errorMessage(err)
-			} else {
-				ts, err := getTimes()
-				if err != nil {
-					resp.ErrorMessage = errorMessage(err)
-				} else {
-					resp = newTimeSettingsResponse(ts, "")
-					resp.Message = "Run time clock successfully synced to system time."
-				}
-			}
-			tmpl.ExecuteTemplate(w, "time-settings.html", resp)
+		err := handleTimePostRequest(w, r)
+		if err != nil {
+			resp.ErrorMessage = errorMessage(err) + " Could not set times."
+			tmpl.ExecuteTemplate(w, "clock.html", resp)
 		}
+
+		ts, err := getTimes()
+		resp = newTimeSettingsResponse(ts, errorMessage(err))
+		if err != nil {
+			resp.ErrorMessage += " Could not retrieve times."
+		} else {
+			resp.Message = "Times successfully updated."
+		}
+		tmpl.ExecuteTemplate(w, "clock.html", resp)
 
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
 
+}
+
+// Set both the system time and the hardware clock time to the time passed in.
+func handleTimePostRequest(w http.ResponseWriter, r *http.Request) error {
+
+	log.Println("Browser time: ", trimmedFormValue(r, "currenttime"))
+	return setTimes(trimmedFormValue(r, "currenttime"))
+
+}
+
+// APITimeHandler sets the hardware clock and system time via a post request.
+func APITimeHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := handleTimePostRequest(w, r)
+	if isClientError(err) {
+		w.WriteHeader(http.StatusBadRequest)
+	} else if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	w.WriteHeader(http.StatusOK)
 }
