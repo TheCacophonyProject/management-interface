@@ -5,7 +5,3 @@
 [[constraint]]
   name = "github.com/gobuffalo/packr"
   version = "1.12.0"
-
-[[constraint]]
-  name = "github.com/gferraro/go-api"
-  branch = "add-default-config"

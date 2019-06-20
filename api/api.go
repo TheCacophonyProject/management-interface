@@ -30,7 +30,7 @@ import (
 	"strconv"
 
 	signalstrength "github.com/TheCacophonyProject/management-interface/signal-strength"
-	goAPI "github.com/gferraro/go-api"
+	goapi "github.com/gferraro/go-api"
 	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
 )
@@ -52,10 +52,9 @@ func NewAPI(cptvDir string) *ManagementAPI {
 
 // GetDeviceInfo returns information about this device
 func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) {
-	log.Println("get device info")
-	config, err := goAPI.LoadConfig()
+	config, err := goapi.LoadConfig()
 	if err != nil {
-		fmt.Printf("error is %v", err)
+		log.Printf("/device-info failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "failed to read device config\n")
 		return
