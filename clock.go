@@ -37,13 +37,12 @@ func getTimes() (*timeSettings, error) {
 	if runtime.GOOS != "windows" {
 		// 'Nix.  Run hwclock command to get the times we want.
 		ts := &timeSettings{SystemTime: time.Now()}
-		out, err := exec.Command("sh", "-c", "hwclock", "-r").Output()
+		out, err := exec.Command("/sbin/hwclock", "-r").Output()
 		if err != nil {
 			log.Printf(err.Error())
 			return ts, err
 		}
 		// Convert to time.Time
-		log.Println("Hardware clock output:", strings.TrimSpace(string(out)))
 		ts.RTCTime, err = parseTimeString(strings.TrimSpace(string(out)))
 		if err != nil {
 			log.Println(err.Error())
@@ -56,19 +55,19 @@ func getTimes() (*timeSettings, error) {
 }
 
 // Set both the hardware and system times to the date/time string passed in.
-func setTimes(dateTimeStr string) error {
+func setTimes(ISOdateTimeStr string) error {
 	if runtime.GOOS != "windows" {
 
 		//Run hwclock command to set the hardware clock to the given time.
-		out, err := exec.Command("sh", "-c", "hwclock --set --date '"+dateTimeStr+"'").Output()
-		log.Println("Setting times to:", dateTimeStr)
+		out, err := exec.Command("/sbin/hwclock", "--set", "--date", ISOdateTimeStr).Output()
+
 		if err != nil {
 			log.Printf(string(out) + err.Error())
 			return err
 		}
 
 		// Now set the system time to that same time.
-		out, err = exec.Command("sh", "-c", "hwclock --hctosys").Output()
+		out, err = exec.Command("/sbin/hwclock", "--hctosys").Output()
 		if err != nil {
 			log.Printf(string(out) + err.Error())
 			return err
@@ -138,7 +137,6 @@ func TimeHandler(w http.ResponseWriter, r *http.Request) {
 // Set both the system time and the hardware clock time to the time passed in.
 func handleTimePostRequest(w http.ResponseWriter, r *http.Request) error {
 
-	log.Println("Browser time: ", trimmedFormValue(r, "currenttime"))
 	return setTimes(trimmedFormValue(r, "currenttime"))
 
 }

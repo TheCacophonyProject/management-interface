@@ -61,7 +61,7 @@
 
             <div class="form-row">
               <div class="form-group col-md-6">
-                <button id="setButton" type="submit" name="action" onclick="getTime()" class="btn btn-primary">Set</button>
+                <button id="setButton" type="submit" name="action" onclick="getTime()" class="btn btn-primary">Update Time</button>
               </div>
             </div>
 
@@ -85,7 +85,7 @@
   function getTime() {
     // Populate a hidden field so that the server can access it.
     var d = new Date();
-    $('#currenttime').val(d.toString().slice(0, 21));
+    $('#currenttime').val(d.toISOString());
 
   }
 </script>
