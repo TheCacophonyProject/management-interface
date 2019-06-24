@@ -30,7 +30,7 @@ import (
 	"strconv"
 
 	signalstrength "github.com/TheCacophonyProject/management-interface/signal-strength"
-	goapi "github.com/gferraro/go-api"
+	goapi "github.com/TheCacophonyProject/go-api"
 	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
 )
