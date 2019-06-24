@@ -1,6 +1,6 @@
 /*
 management-interface - Web based management of Raspberry Pis over WiFi
-Copyright (C) 2018, The Cacophony Project
+Copyright (C) 2019, The Cacophony Project
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package managementinterface
 
 import (
-	"log"
 	"net/http"
 	"os/exec"
 	"runtime"
@@ -39,13 +38,11 @@ func getTimes() (*timeSettings, error) {
 		ts := &timeSettings{SystemTime: time.Now()}
 		out, err := exec.Command("/sbin/hwclock", "-r").Output()
 		if err != nil {
-			log.Printf(err.Error())
 			return ts, err
 		}
 		// Convert to time.Time
 		ts.RTCTime, err = parseTimeString(strings.TrimSpace(string(out)))
 		if err != nil {
-			log.Println(err.Error())
 			return ts, err
 		}
 		return ts, nil
@@ -59,17 +56,15 @@ func setTimes(ISOdateTimeStr string) error {
 	if runtime.GOOS != "windows" {
 
 		//Run hwclock command to set the hardware clock to the given time.
-		out, err := exec.Command("/sbin/hwclock", "--set", "--date", ISOdateTimeStr).Output()
+		_, err := exec.Command("/sbin/hwclock", "--set", "--date", ISOdateTimeStr).Output()
 
 		if err != nil {
-			log.Printf(string(out) + err.Error())
 			return err
 		}
 
 		// Now set the system time to that same time.
-		out, err = exec.Command("/sbin/hwclock", "--hctosys").Output()
+		_, err = exec.Command("/sbin/hwclock", "--hctosys").Output()
 		if err != nil {
-			log.Printf(string(out) + err.Error())
 			return err
 		}
 

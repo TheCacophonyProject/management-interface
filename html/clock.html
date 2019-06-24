@@ -79,16 +79,14 @@
           document.getElementById("btnBack").href="/advanced";
           document.getElementById("navDeviceName").href="/advanced";
       });
+
+      function getTime() {
+        // Populate a hidden field so that the server can access it.
+        var d = new Date();
+        $('#currenttime').val(d.toISOString());
+
+      }
     </script>
-
-<script>
-  function getTime() {
-    // Populate a hidden field so that the server can access it.
-    var d = new Date();
-    $('#currenttime').val(d.toISOString());
-
-  }
-</script>
 
 
 </body>
