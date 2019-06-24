@@ -56,7 +56,7 @@ func floatToString(val float64) string {
 	return fmt.Sprint(val)
 }
 
-// Timestamp returns the field at 'val' as a time value
+// parseTimestamp returns the field at 'val' as a time value
 func parseTimestamp(val string) (time.Time, bool) {
 	if val == "" {
 		return time.Now(), true
@@ -68,8 +68,30 @@ func parseTimestamp(val string) (time.Time, bool) {
 	return t, true
 }
 
+// parseTimeString parses a string containing a time and returns a time.Time value.
+func parseTimeString(timeStr string) (time.Time, error) {
+	if timeStr == "" {
+		return time.Time{}, newClientError("Could not parse time string.")
+	}
+	t, err := time.Parse("2006-01-02 15:04:05.999999-0700", timeStr)
+	if err != nil {
+		return time.Time{}, newClientError("Could not parse time string." + err.Error())
+	}
+	return t, nil
+}
+
 func timestampToString(t time.Time) string {
 	return t.Format(time.RFC3339)
+}
+
+// Return the time part of the time.Time struct as a string.
+func extractTimeAsString(t time.Time) string {
+	return t.Format("15:04:05")
+}
+
+// Return the date part fo the time.Time struct as a string.
+func extractDateAsString(t time.Time) string {
+	return t.Format("2006-01-02")
 }
 
 func successMessage(err error, msg string) string {
