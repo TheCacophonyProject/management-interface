@@ -2,10 +2,10 @@
 
 
 [[projects]]
-  branch = "add-default-config"
-  name = "github.com/gferraro/go-api"
+  branch = "master"
+  name = "github.com/TheCacophonyProject/go-api"
   packages = ["."]
-  revision = "402c38c70638797315d3dd1681900acfbfd21100"
+  revision = "aa5784cc5b558f826285279c77b4284e4fe2fe03"
 
 [[projects]]
   name = "github.com/gobuffalo/packr"
@@ -44,6 +44,18 @@
   version = "v0.8.0"
 
 [[projects]]
+  name = "github.com/spf13/afero"
+  packages = [".","mem"]
+  revision = "588a75ec4f32903aa5e39a2619ba6a4631e28424"
+  version = "v1.2.2"
+
+[[projects]]
+  name = "golang.org/x/text"
+  packages = ["internal/gen","internal/triegen","internal/ucd","transform","unicode/cldr","unicode/norm"]
+  revision = "342b2e1fbaa52c93f31447ad2c6abc048c63e475"
+  version = "v0.3.2"
+
+[[projects]]
   name = "gopkg.in/yaml.v2"
   packages = ["."]
   revision = "51d6538a90f86fe93ac480b35f37b2be17fef232"
@@ -52,6 +64,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8fab2e0e174c7cc2982ae4e3adf854cffd388c083300ba052af9cba74d9d5d7d"
+  inputs-digest = "47d66c7c140e93f1ea1add911eff2b10dd3043cb28f9390e8fb9dcd18be59a61"
   solver-name = "gps-cdcl"
   solver-version = 1
