@@ -75,6 +75,7 @@ func main() {
 	// API
 	apiObj := api.NewAPI(config.CPTVDir)
 	apiRouter := router.PathPrefix("/api").Subrouter()
+	apiRouter.HandleFunc("/device-info", apiObj.GetDeviceInfo).Methods("GET")
 	apiRouter.HandleFunc("/recordings", apiObj.GetRecordings).Methods("GET")
 	apiRouter.HandleFunc("/recording/{id}", apiObj.GetRecording).Methods("GET")
 	apiRouter.HandleFunc("/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
