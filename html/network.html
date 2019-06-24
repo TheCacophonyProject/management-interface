@@ -30,7 +30,8 @@
                       <div class="card-body">
 
                             <!-- Grid within the card -->
-                            <div class="row">
+                            <div class="container">
+                              <div class="row">
                                 <div class="col-auto">
                                   <h5 class="card-title"><strong>{{.Name}}</strong></h5>
                                   {{ $addrs := .IPAddresses }}
@@ -38,11 +39,11 @@
                                       <h6 class="ml-2">{{$addr}}</h6>
                                   {{ end }}
                                 </div>
-                                <div class="col-2">
+                                <div class="col align-self-end text-right">
                                     <button id="interface-{{.Name}}-test" type="button" data-toggle="modal" data-target="#interfaceModal" data-name="{{.Name}}" class="btn btn-primary mb-4">Test</button>
                                 </div>
+                              </div>
                             </div>
-
                         </div>
                     </div>
                 </div>
