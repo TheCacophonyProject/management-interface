@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	deviceConfigPath     = "/etc/cacophony/device.yaml"
-	registeredConfigPath = "/etc/cacophony/device-priv.yaml"
+	DeviceConfigPath     = "/etc/cacophony/device.yaml"
+	RegisteredConfigPath = "/etc/cacophony/device-priv.yaml"
 )
 
 type Config struct {
@@ -69,7 +69,7 @@ func (conf *Config) Validate() error {
 
 // LoadConfig from deviceConfigPath with a read lock
 func LoadConfig() (*Config, error) {
-	buf, err := afero.ReadFile(Fs, deviceConfigPath)
+	buf, err := afero.ReadFile(Fs, DeviceConfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -94,6 +94,12 @@ const (
 	lockRetryDelay = 678 * time.Millisecond
 	lockTimeout    = 5 * time.Second
 )
+
+// LoadPrivateConfig acquires a readlock and reads private config
+func LoadPrivateConfig() (*PrivateConfig, error) {
+	lockSafeConfig := NewLockSafeConfig(RegisteredConfigPath)
+	return lockSafeConfig.Read()
+}
 
 type LockSafeConfig struct {
 	fileLock *flock.Flock
