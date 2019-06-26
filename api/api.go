@@ -62,12 +62,10 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 	}
 
 	type deviceInfo struct {
-		ServerURL  string `json:"serverURL"`
-		Group      string `json:"groupname"`
-		DeviceName string `json:"devicename"`
-		DeviceID   int    `json:"deviceID"`
+		*goapi.Config
+		DeviceID int `json:"deviceID"`
 	}
-	info := deviceInfo{ServerURL: config.ServerURL, Group: config.Group, DeviceName: config.DeviceName}
+	info := deviceInfo{Config: config}
 
 	privConfig, err := goapi.LoadPrivateConfig()
 	if err != nil {
