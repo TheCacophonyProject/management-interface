@@ -5,7 +5,7 @@
   branch = "master"
   name = "github.com/TheCacophonyProject/go-api"
   packages = ["."]
-  revision = "aa5784cc5b558f826285279c77b4284e4fe2fe03"
+  revision = "f75d610181035080b5552703221d44effc22d2ce"
 
 [[projects]]
   name = "github.com/gobuffalo/packr"

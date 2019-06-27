@@ -291,9 +291,9 @@ func createTestConfig(t *testing.T) string {
 	require.NoError(t, err, "Must be able to make Config yaml")
 
 	Fs = afero.NewMemMapFs()
-	afero.WriteFile(Fs, deviceConfigPath, d, 0600)
+	afero.WriteFile(Fs, DeviceConfigPath, d, 0600)
 
-	return deviceConfigPath
+	return DeviceConfigPath
 }
 
 // TestConfigFile test registered config is created with deviceid and password
@@ -301,9 +301,9 @@ func TestConfigFile(t *testing.T) {
 	_ = createTestConfig(t)
 	_, err := NewAPI()
 	assert.NoError(t, err)
-	lockSafeConfig := NewLockSafeConfig(registeredConfigPath)
+	lockSafeConfig := NewLockSafeConfig(RegisteredConfigPath)
 	config, err := lockSafeConfig.Read()
-	require.NoError(t, err, "Must be able to read "+registeredConfigPath)
+	require.NoError(t, err, "Must be able to read "+RegisteredConfigPath)
 	assert.NotEmpty(t, config.Password)
 
 	api, err := NewAPI()
@@ -327,11 +327,6 @@ func runMultipleRegistrations(configFile string, count int) (int, chan string) {
 		}()
 	}
 	return count, messages
-}
-
-func removeConfig() {
-	Fs.Remove(deviceConfigPath)
-	Fs.Remove(registeredConfigPath)
 }
 
 func TestMultipleRegistrations(t *testing.T) {

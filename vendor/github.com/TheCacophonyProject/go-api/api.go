@@ -100,7 +100,7 @@ func NewAPI() (*CacophonyAPI, error) {
 // saving the password if necessary
 func apiFromConfig(conf *Config) (*CacophonyAPI, error) {
 
-	lockSafeConfig := NewLockSafeConfig(registeredConfigPath)
+	lockSafeConfig := NewLockSafeConfig(RegisteredConfigPath)
 	_, err := lockSafeConfig.Read()
 	if err != nil {
 		return nil, err
