@@ -29,6 +29,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	goapi "github.com/TheCacophonyProject/go-api"
 	signalstrength "github.com/TheCacophonyProject/management-interface/signal-strength"
 	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
@@ -47,6 +48,34 @@ func NewAPI(cptvDir string) *ManagementAPI {
 	return &ManagementAPI{
 		cptvDir: cptvDir,
 	}
+}
+
+// GetDeviceInfo returns information about this device
+func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) {
+	config, err := goapi.LoadConfig()
+
+	if err != nil {
+		log.Printf("/device-info failed: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to read device config\n")
+		return
+	}
+
+	type deviceInfo struct {
+		*goapi.Config
+		DeviceID int `json:"deviceID"`
+	}
+	info := deviceInfo{Config: config}
+
+	privConfig, err := goapi.LoadPrivateConfig()
+	if err != nil {
+		log.Printf("/device-info error loading private config: %v", err)
+	} else {
+		info.DeviceID = privConfig.DeviceID
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(info)
 }
 
 // GetRecordings returns a list of cptv files in a array.
