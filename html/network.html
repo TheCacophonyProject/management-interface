@@ -25,39 +25,71 @@
 
             {{range .Interfaces}}
             <div class="row">
-                <div class="col-md-5" >
-                    <div class="card mb-3">
-                        <div class="card-body">
-                            <h5 class="card-title"><strong>{{.Name}}</strong></h5>
-                            <h6>IP Address(es):</h6>
-                            {{ $addrs := .IPAddresses }}
-                            {{ range $addr := $addrs }}
-                                <h6 class="ml-2">{{$addr}}</h6>
-                            {{ end }}
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="card mb-3">
-                        <div class="card-body">
-                            <h5 class="card-title"><strong>Status</strong></h5>
-                            <button id="interface-{{.Name}}-test" type="button" onclick="checkInterface({{.Name}})" class="btn btn-primary mb-4">Test</button>
-                            <h4 id="interface-{{.Name}}-indicator">&#x003F;</h4>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-5">
-                    <div class="card mb-3">
-                        <div class="card-body">
-                            <h5 class="card-title"><strong>Output</strong></h5>
-                            <p style="white-space: pre-wrap;" id="interface-{{.Name}}-statustext"></p>
+                <div class="col w-100" >
+                    <div class="card mb-3" style="max-width: 600px">
+                      <div class="card-body">
+
+                            <!-- Grid within the card -->
+                            <div class="container">
+                              <div class="row">
+                                <div class="col-auto">
+                                  <h5 class="card-title"><strong>{{.Name}}</strong></h5>
+                                  {{ $addrs := .IPAddresses }}
+                                  {{ range $addr := $addrs }}
+                                      <h6 class="ml-2">{{$addr}}</h6>
+                                  {{ end }}
+                                </div>
+                                <div class="col align-self-end text-right">
+                                    <button id="interface-{{.Name}}-test" type="button" data-toggle="modal" data-target="#interfaceModal" data-name="{{.Name}}" class="btn btn-primary mb-4">Test</button>
+                                </div>
+                              </div>
+                            </div>
+
                         </div>
                     </div>
                 </div>
             </div>
             {{end}}
 
+
+
+
+          <!-- Modal -->
+          <div class="modal" id="interfaceModal" role="dialog">
+            <div class="modal-dialog" role="document">
+            
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h4 class="modal-title">Output</h4>
+                  <button type="button" id="crossCloseButton" class="close" data-dismiss="modal">&times;</button>
+                </div>
+
+                <div class="modal-body">
+
+                  <div class="row justify-content-center">
+                      <h4 id="statusIndicator"></h4>
+                  </div>
+                  <div class="row justify-content-center">
+                    <div id="testingSpinner" class="spinner-border text-primary" style="width: 3rem; height: 3rem;" class="text-center"></div>
+                  </div>
+                  <div class="row justify-content-center">
+                      <p id="outputText" style="white-space: pre-wrap;" class="mx-3 px-3"></p>
+                  </div>
+
+                </div>
+
+                <div class="modal-footer">
+                  <button type="button" id="closeButton" class="btn btn-primary" data-dismiss="modal">Close</button>
+                </div>
+              </div>
+              
+            </div>
+          </div>
+
+
+
         </div>
+
 
 
         <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
@@ -72,6 +104,66 @@
 
 
         <script>
+
+          function checkInterface(interfaceName, modal) {
+
+            // Clear output text
+            modal.find('h4#statusIndicator').html("<h4></h4>")
+            modal.find('p#outputText').prop("textContent", "")
+
+            // Disable test button while waiting for response
+            var button = document.getElementById("interface-" + interfaceName + "-test");
+            button.disabled = true;
+            // Also make it so the modal can't be closed while the test is running.
+            modal.find('button#closeButton').prop("disabled", true)
+            modal.find('button#crossCloseButton').prop("disabled", true)
+
+            // Show spinner
+            modal.find('div#testingSpinner').prop("hidden", false)
+
+            fetch(
+              "/interface-status/" + interfaceName,
+              {method: "GET"}
+            ).then(function(response) {
+              return response.json();
+            }).then(function(json) {
+
+              // Hide spinner
+              modal.find('div#testingSpinner').prop("hidden", true)
+
+              // Show output text.
+              modal.find('p#outputText').prop("textContent", json["result"])
+
+              // Show a symbol indicating whether the test was successfull or not.
+              var state = json["status"];
+              if (state === "down") {
+                // Cross mark
+                modal.find('h4#statusIndicator').html("<h4>&#x2717;</h4>")
+              } else if (state === "up") {
+                // Check mark
+                modal.find('h4#statusIndicator').html("<h4>&#x2714;</h4>")
+              } else {
+                // Question mark
+                modal.find('h4#statusIndicator').html("<h4>&#x003F;</h4>")
+              }
+
+              // Enable buttons again.
+              button.disabled = false;
+              modal.find('button#closeButton').prop("disabled", false)
+              modal.find('button#crossCloseButton').prop("disabled", false)
+
+            });
+          }
+
+          $('#interfaceModal').on('show.bs.modal', function (event) {
+            var button = $(event.relatedTarget); // Button that triggered the modal
+            var interfaceName = button.data('name'); // Extract info from data-* attributes
+            var modal = $(this);
+            
+            checkInterface(interfaceName, modal);
+
+          })
+
           function handleEnableChange(event) {
             event.preventDefault();
             var checkBox = event.target;
@@ -100,38 +192,6 @@
               });
           }
 
-          function checkInterface(interfaceName) {
-            // Set status indicator
-            var statusIndicator = document.getElementById("interface-" + interfaceName + "-indicator");
-            statusIndicator.textContent = "...";
-            // Clear output text
-            var status = document.getElementById("interface-" + interfaceName + "-statustext");
-            status.textContent = "";
-            // Disable test button while waiting for response
-            var button = document.getElementById("interface-" + interfaceName + "-test");
-            button.disabled = true;
-            console.log("/interface-status/" + interfaceName)
-            fetch(
-              "/interface-status/" + interfaceName,
-              {method: "GET"}
-            ).then(function(response) {
-              return response.json();
-            }).then(function(json) {
-              status.textContent = json["result"];
-              button.disabled = false;
-              var state = json["status"];
-              if (state === "down") {
-                // Cross mark
-                statusIndicator.innerHTML = "&#x2717;";
-              } else if (state === "up") {
-                // Check mark
-                statusIndicator.innerHTML = "&#x2714;";
-              } else {
-                // Question mark
-                statusIndicator.innerHTML = "&#x003F;";
-              }
-            });
-          }
         </script>
 
     </body>
