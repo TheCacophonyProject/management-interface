@@ -68,7 +68,8 @@ func parseTimestamp(val string) (time.Time, bool) {
 	return t, true
 }
 
-// parseTimeString parses a string containing a time and returns a time.Time value.
+// parseTimeString parses a string containing a time in the format returned by hwclock
+// and returns a time.Time value.
 func parseTimeString(timeStr string) (time.Time, error) {
 	if timeStr == "" {
 		return time.Time{}, newClientError("Could not parse time string.")
@@ -80,8 +81,27 @@ func parseTimeString(timeStr string) (time.Time, error) {
 	return t, nil
 }
 
+// parseISOTimeString parses a string containing a time in ISO format and returns a time.Time value.
+func parseISOTimeString(timeStr string) (time.Time, error) {
+	if timeStr == "" {
+		return time.Time{}, newClientError("Could not parse time string.")
+	}
+	t, err := time.Parse("2006-01-02T15:04:05.999Z", timeStr)
+	if err != nil {
+		return time.Time{}, newClientError("Could not parse ISO time string." + err.Error())
+	}
+	return t, nil
+}
+
+// Return a time string in RFC3339 format
 func timestampToString(t time.Time) string {
 	return t.Format(time.RFC3339)
+}
+
+// Return a time string in ANSIC format
+func timeToANSICString(t time.Time) string {
+	// return t.Format("Mon Jan _2 15:04:05 2006")
+	return t.Format(time.ANSIC)
 }
 
 // Return the time part of the time.Time struct as a string.

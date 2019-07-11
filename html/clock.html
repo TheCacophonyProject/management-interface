@@ -29,8 +29,10 @@
         </div>
         <hr>
 
-        <form action="/clock" method="POST">
-          <div class="form-row">
+        <!-- This next line sets up a form that does a POST request and disables the Update button -->
+        <!-- so that it can not be clicked again until the server responds. -->
+        <form action="/clock" method="POST" onsubmit="updateButton.disabled = true; return true;">
+            <div class="form-row">
             <div class="form-group col-md-6">
               <label for="rtcdate">Hardware Clock Date</label>
               <input type="date" class="form-control" name="rtcdate" value="{{.RTCDate}}" disabled>
@@ -59,15 +61,16 @@
           </div>
 
 
-            <div class="form-row">
-              <div class="form-group col-md-6">
-                <button id="setButton" type="submit" name="action" onclick="getTime()" class="btn btn-primary">Update Time</button>
-              </div>
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <button id="updateButton" type="submit" name="updateButton" onclick="getTime()" class="btn btn-primary" enabled>Update Time</button>
             </div>
+          </div>
 
-            <input id=currenttime type="text" class="form-control" name="currenttime" hidden>
+          <input id=currenttime type="text" class="form-control" name="currenttime" hidden>
+          <input id=timezone type="text" class="form-control" name="timezone" hidden>
 
-          </form>
+        </form>
         
     </div>
 
@@ -81,10 +84,14 @@
       });
 
       function getTime() {
+
         // Populate a hidden field so that the server can access it.
         var d = new Date();
         $('#currenttime').val(d.toISOString());
-
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        $('#timezone').val(tz);
+        console.log(tz);
+        
       }
     </script>
 

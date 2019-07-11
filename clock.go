@@ -51,22 +51,44 @@ func getTimes() (*timeSettings, error) {
 
 }
 
-// Set both the hardware and system times to the date/time string passed in.
-func setTimes(ISOdateTimeStr string) error {
+// Set both the hardware and system times to the date/time info passed in.
+func setTimes(ISOdateTimeStr string, timeZone string) error {
 	if runtime.GOOS != "windows" {
 
-		//Run hwclock command to set the hardware clock to the given time.
-		_, err := exec.Command("/sbin/hwclock", "--set", "--date", ISOdateTimeStr).Output()
-
+		// Convert ISOdateTimeStr to a time.Time struct.
+		UTCTime, err := parseISOTimeString(ISOdateTimeStr)
 		if err != nil {
 			return err
 		}
+
+		// Convert UTC time to local time
+		loc, err := time.LoadLocation(timeZone)
+		if err != nil {
+			return err
+		}
+		localTime := UTCTime.In(loc)
+
+		// Now convert this back into a string suitable for the hardware call
+		dateStr := timeToANSICString(localTime)
+
+		//Run hwclock command to set the hardware clock to the given time.
+		_, err = exec.Command("/sbin/hwclock", "--set", "--localtime", "--date", dateStr).Output()
+		if err != nil {
+			return err
+		}
+
+		// The camera needs a small delay before the next hwclock command is issued.
+		time.Sleep(100 * time.Millisecond)
 
 		// Now set the system time to that same time.
 		_, err = exec.Command("/sbin/hwclock", "--hctosys").Output()
 		if err != nil {
 			return err
 		}
+
+		// And I put another delay here to make sure the above command has time to complete before
+		// another command is issued.
+		time.Sleep(100 * time.Millisecond)
 
 	}
 	return nil
@@ -132,7 +154,7 @@ func TimeHandler(w http.ResponseWriter, r *http.Request) {
 // Set both the system time and the hardware clock time to the time passed in.
 func handleTimePostRequest(w http.ResponseWriter, r *http.Request) error {
 
-	return setTimes(trimmedFormValue(r, "currenttime"))
+	return setTimes(trimmedFormValue(r, "currenttime"), trimmedFormValue(r, "timezone"))
 
 }
 
