@@ -4,7 +4,7 @@ This is a small web server which supports for management and
 configuration of Cacophononator devices from the [The Cacophony
 Project](https://cacophony.org.nz).
 
-## Installing packr ( will be done by make )
+## Installing packr (will be done by make)
 
 This project uses the [packr](https://github.com/gobuffalo/packr) tool
 to embed static resources (e.g. CSS, JS and image files) into the
@@ -46,12 +46,9 @@ For either case the resulting executable is `managementd`.
 
 ## Releases
 
-Releases are built using TravisCI. To create a release:
-
-* Ensure the desired revision to release is checked out.
-* Create an annotated release tag. For example: `git tag -a "v1.4" -m "1.4 release"`
-* Push the tag to Github: `git push origin v1.4`
-* TravisCI will see the pushed tag, run the tests, create a release package and create a
-  [Github Release](https://github.com/TheCacophonyProject/management-interface/releases).
+Releases are built using TravisCI. To create a release visit the
+[repository on Github](https://github.com/TheCacophonyProject/management-interface/releases)
+and then follow our [general instructions](https://docs.cacophony.org.nz/home/creating-releases)
+for creating a release.
 
 For more about the mechanics of how releases work, see `.travis.yml` and `.goreleaser.yml`.
