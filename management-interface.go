@@ -558,6 +558,65 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "wifi-networks.html", wifiProps)
 }
 
+// Return info on the packages that are currently installed on the device.
+func getInstalledPackages() (string, error) {
+	var out []byte
+	err := error(nil)
+	if runtime.GOOS != "windows" {
+		// 'Nix.
+		out, err = exec.Command("/usr/bin/dpkg-query", "--show", "--showformat", "${Package}|${Maintainer}|${Version}|${Source}\n").Output()
+	} else {
+		return "", nil
+	}
+
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+
+}
+
+// InstalledPackagesHandler shows the currently installed packages on the device.
+func InstalledPackagesHandler(w http.ResponseWriter, r *http.Request) {
+
+	type packagesResponse struct {
+		NumPackageRows  int
+		PackageDataRows [][]string
+		Message         string
+		ErrorMessage    string
+	}
+
+	packagesData, err := getInstalledPackages()
+	if err != nil {
+		resp := packagesResponse{
+			ErrorMessage: errorMessage(err),
+		}
+		tmpl.ExecuteTemplate(w, "installed-packages.html", resp)
+	}
+
+	// Want to separate this into separate fields so that can display in a table in HTML
+	outputStrings := [][]string{}
+	rows := strings.Split(packagesData, "\n")
+	for _, row := range rows {
+		// We only want packages related to cacophony.
+		if !strings.Contains(row, "cacophony") {
+			continue
+		}
+		cleanRow := strings.Trim(row, " \t")
+		words := strings.Split(cleanRow, "|")
+		outputStrings = append(outputStrings, words)
+	}
+
+	// Put it all in a struct so we can access it from HTML
+	resp := packagesResponse{
+		NumPackageRows:  len(outputStrings),
+		PackageDataRows: outputStrings,
+		Message:         "Installed packages successfully read."}
+
+	// Execute the actual template.
+	tmpl.ExecuteTemplate(w, "installed-packages.html", resp)
+}
+
 // CheckInterfaceHandler checks an interface to see if it is up or down.
 // To do this the ping command is used to send data to Cloudfare at 1.1.1.1
 func CheckInterfaceHandler(w http.ResponseWriter, r *http.Request) {

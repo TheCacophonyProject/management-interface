@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Installed Packages</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+</head>
+
+    <body>
+        {{template "navbar"}}
+
+        <div class="container">
+            {{if ne .ErrorMessage ""}}
+            <div class="alert alert-danger">
+                {{.ErrorMessage}}
+            </div>
+            {{end}}
+
+            {{if ne .Message ""}}
+            <div class="alert alert-success">
+                {{.Message}}
+            </div>
+            {{end}}
+
+            <div class="container pt-5 pl-0">
+                <h2>Installed Sofware<br></h2>
+            </div>
+            <hr>
+
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Package</th> 
+                            <th>Maintainer</th> 
+                            <th>Version</th> 
+                            <th>Source</th> 
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .PackageDataRows}}
+                            <tr>
+                                <td>{{index . 0}}</td>       
+                                <td>{{index . 1}}</td>       
+                                <td>{{index . 2}}</td>       
+                                <td>{{index . 3}}</td>       
+                            </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+
+            
+        </div>
+
+        <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+        <script src="/static/js/bootstrap.min.js"></script>
+
+        <script>
+            $(document).ready(function(){
+                document.getElementById("btnBack").href="/advanced";
+                document.getElementById("navDeviceName").href="/advanced";
+            });
+        </script>
+
+    </body>
+
+</html>
