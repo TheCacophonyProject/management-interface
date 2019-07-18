@@ -18,12 +18,6 @@
             </div>
             {{end}}
 
-            {{if ne .Message ""}}
-            <div class="alert alert-success">
-                {{.Message}}
-            </div>
-            {{end}}
-
             <div class="container pt-5 pl-0">
                 <h2>About<br></h2>
             </div>
@@ -44,7 +38,7 @@
                                 {{range .PackageDataRows}}
                                     <tr>
                                         <td>{{index . 0}}</td>       
-                                        <td>{{index . 2}}</td>   
+                                        <td>{{index . 1}}</td>   
                                         <td></td>    
                                         <td></td>    
                                     </tr>

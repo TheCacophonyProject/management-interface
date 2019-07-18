@@ -560,18 +560,17 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 
 // Return info on the packages that are currently installed on the device.
 func getInstalledPackages() (string, error) {
-	var out []byte
-	err := error(nil)
-	if runtime.GOOS != "windows" {
-		// 'Nix.
-		out, err = exec.Command("/usr/bin/dpkg-query", "--show", "--showformat", "${Package}|${Maintainer}|${Version}|${Source}\n").Output()
-	} else {
+
+	if runtime.GOOS == "windows" {
 		return "", nil
 	}
+
+	out, err := exec.Command("/usr/bin/dpkg-query", "--show", "--showformat", "${Package}|${Version}|${Maintainer}\n").Output()
 
 	if err != nil {
 		return "", err
 	}
+
 	return string(out), nil
 
 }
@@ -580,40 +579,28 @@ func getInstalledPackages() (string, error) {
 func AboutHandler(w http.ResponseWriter, r *http.Request) {
 
 	type packagesResponse struct {
-		NumPackageRows  int
 		PackageDataRows [][]string
-		Message         string
 		ErrorMessage    string
 	}
 
 	packagesData, err := getInstalledPackages()
 	if err != nil {
-		resp := packagesResponse{
-			ErrorMessage: errorMessage(err),
-		}
-		tmpl.ExecuteTemplate(w, "installed-packages.html", resp)
+		tmpl.ExecuteTemplate(w, "about.html", packagesResponse{ErrorMessage: errorMessage(err)})
 	}
 
 	// Want to separate this into separate fields so that can display in a table in HTML
-	outputStrings := [][]string{}
+	dataRows := [][]string{}
 	rows := strings.Split(packagesData, "\n")
 	for _, row := range rows {
 		// We only want packages related to cacophony.
-		if !strings.Contains(row, "cacophony") {
+		if !strings.Contains(strings.ToUpper(row), "CACOPHONY") {
 			continue
 		}
-		cleanRow := strings.Trim(row, " \t")
-		words := strings.Split(cleanRow, "|")
-		outputStrings = append(outputStrings, words)
+		words := strings.Split(strings.TrimSpace(row), "|")
+		dataRows = append(dataRows, words[:2])
 	}
 
-	// Put it all in a struct so we can access it from HTML
-	resp := packagesResponse{
-		NumPackageRows:  len(outputStrings),
-		PackageDataRows: outputStrings}
-
-	// Execute the actual template.
-	tmpl.ExecuteTemplate(w, "about.html", resp)
+	tmpl.ExecuteTemplate(w, "about.html", packagesResponse{PackageDataRows: dataRows})
 }
 
 // CheckInterfaceHandler checks an interface to see if it is up or down.
