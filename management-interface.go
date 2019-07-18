@@ -558,6 +558,51 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "wifi-networks.html", wifiProps)
 }
 
+// Return info on the packages that are currently installed on the device.
+func getInstalledPackages() (string, error) {
+
+	if runtime.GOOS == "windows" {
+		return "", nil
+	}
+
+	out, err := exec.Command("/usr/bin/dpkg-query", "--show", "--showformat", "${Package}|${Version}|${Maintainer}\n").Output()
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(out), nil
+
+}
+
+// AboutHandler shows the currently installed packages on the device.
+func AboutHandler(w http.ResponseWriter, r *http.Request) {
+
+	type packagesResponse struct {
+		PackageDataRows [][]string
+		ErrorMessage    string
+	}
+
+	packagesData, err := getInstalledPackages()
+	if err != nil {
+		tmpl.ExecuteTemplate(w, "about.html", packagesResponse{ErrorMessage: errorMessage(err)})
+	}
+
+	// Want to separate this into separate fields so that can display in a table in HTML
+	dataRows := [][]string{}
+	rows := strings.Split(packagesData, "\n")
+	for _, row := range rows {
+		// We only want packages related to cacophony.
+		if !strings.Contains(strings.ToUpper(row), "CACOPHONY") {
+			continue
+		}
+		words := strings.Split(strings.TrimSpace(row), "|")
+		dataRows = append(dataRows, words[:2])
+	}
+
+	tmpl.ExecuteTemplate(w, "about.html", packagesResponse{PackageDataRows: dataRows})
+}
+
 // CheckInterfaceHandler checks an interface to see if it is up or down.
 // To do this the ping command is used to send data to Cloudfare at 1.1.1.1
 func CheckInterfaceHandler(w http.ResponseWriter, r *http.Request) {
