@@ -576,8 +576,8 @@ func getInstalledPackages() (string, error) {
 
 }
 
-// InstalledPackagesHandler shows the currently installed packages on the device.
-func InstalledPackagesHandler(w http.ResponseWriter, r *http.Request) {
+// AboutHandler shows the currently installed packages on the device.
+func AboutHandler(w http.ResponseWriter, r *http.Request) {
 
 	type packagesResponse struct {
 		NumPackageRows  int
@@ -610,11 +610,10 @@ func InstalledPackagesHandler(w http.ResponseWriter, r *http.Request) {
 	// Put it all in a struct so we can access it from HTML
 	resp := packagesResponse{
 		NumPackageRows:  len(outputStrings),
-		PackageDataRows: outputStrings,
-		Message:         "Installed packages successfully read."}
+		PackageDataRows: outputStrings}
 
 	// Execute the actual template.
-	tmpl.ExecuteTemplate(w, "installed-packages.html", resp)
+	tmpl.ExecuteTemplate(w, "about.html", resp)
 }
 
 // CheckInterfaceHandler checks an interface to see if it is up or down.
