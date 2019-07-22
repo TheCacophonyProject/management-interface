@@ -7,30 +7,32 @@ release:
   name_template: '{{.Tag}}'
 
 builds:
-- goos:
+- id: "managementd"
+  binary: "managementd"
+  main: "./cmd/managementd"
+  goos:
   - linux
   goarch:
   - arm
   goarm:
   - "7"
-  main: ./cmd/managementd
   ldflags: -s -w -X main.version={{.Version}}
-  binary: managementd
   hooks:
     pre: packr
     post: packr clean
-- goos:
+- id: "signal-strength"
+  binary: "signal-strength"
+  main: "./cmd/signal-strength"
+  goos:
   - linux
   goarch:
   - arm
   goarm:
   - "7"
-  main: ./cmd/signal-strength
   ldflags: -s -w
-  binary: signal-strength
 
-nfpm:
-  vendor: The Cacophony Project
+nfpms:
+- vendor: The Cacophony Project
   homepage: http://cacophony.org.nz/
   maintainer: Cacophony Developers <dev@cacophony.org.nz>
   description: Management interface for Cacophonators
