@@ -1,6 +1,12 @@
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/TheCacophonyProject/go-api v0.0.0-20190626053918-f75d61018103 h1:Y95eKfNi+SmG8HI/dfbTItiJpce6D9OEVO4HPdW+5cI=
 github.com/TheCacophonyProject/go-api v0.0.0-20190626053918-f75d61018103/go.mod h1:tD8UcoBnVOb41Sgg+b5JOPVzdJMZnfxK7IpgGCNUvZw=
+github.com/TheCacophonyProject/go-api v0.0.0-20190805073513-1b5de057d569 h1:XKVvBK9tDr7uwL+OsICxW7xzOz6svYCxIQ4PyVtXTxE=
+github.com/TheCacophonyProject/go-api v0.0.0-20190805073513-1b5de057d569/go.mod h1:7OQjzdX6PbCJDxVRgTqNH9y12Ew+Q1sx9nwcRG7fj9s=
+github.com/TheCacophonyProject/go-api v0.0.0-20190808010155-72c26da172c2 h1:KtCKSoSNT/YuXvaNQmqTWJRJR4Oqhpl+ifdk3/eV0eI=
+github.com/TheCacophonyProject/go-api v0.0.0-20190808010155-72c26da172c2/go.mod h1:7OQjzdX6PbCJDxVRgTqNH9y12Ew+Q1sx9nwcRG7fj9s=
+github.com/TheCacophonyProject/go-api v0.0.0-20190808023539-d072de86cdd4 h1:+o9Cv+ievinix9TeveJzEhRVw8TnJofrs85DMp1sEvs=
+github.com/TheCacophonyProject/go-api v0.0.0-20190808023539-d072de86cdd4/go.mod h1:7OQjzdX6PbCJDxVRgTqNH9y12Ew+Q1sx9nwcRG7fj9s=
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
 github.com/coreos/go-etcd v2.0.0+incompatible/go.mod h1:Jez6KQU2B/sWsbdaef3ED8NzMklzPG4d5KIOhIy30Tk=
