@@ -82,6 +82,7 @@ func main() {
 	apiRouter.HandleFunc("/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
 	apiRouter.HandleFunc("/camera/snapshot", apiObj.TakeSnapshot).Methods("PUT")
 	apiRouter.HandleFunc("/signal-strength", apiObj.GetSignalStrength).Methods("GET")
+	apiRouter.HandleFunc("/rename", apiObj.Rename).Methods("POST")
 	apiRouter.HandleFunc("/location", managementinterface.APILocationHandler).Methods("POST") // Set location via a POST request.
 	apiRouter.HandleFunc("/clock", managementinterface.APITimeHandler).Methods("POST")        // Set times via a POST request.
 	apiRouter.Use(basicAuth)

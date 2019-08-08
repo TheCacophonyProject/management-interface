@@ -157,6 +157,38 @@ func (api *ManagementAPI) TakeSnapshot(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Rename can change the devices name and gruop
+func (api *ManagementAPI) Rename(w http.ResponseWriter, r *http.Request) {
+	group := r.FormValue("group")
+	name := r.FormValue("name")
+	if group == "" && name == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, "must set name or group\n")
+		return
+	}
+	apiClient, err := goapi.New()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, fmt.Sprintf("failed to get api client for device: %s", err.Error()))
+		return
+	}
+	if group == "" {
+		group = apiClient.GroupName()
+	}
+	if name == "" {
+		name = apiClient.DeviceName()
+	}
+
+	log.Printf("renaming with name: '%s' group: '%s'", name, group)
+	if err := apiClient.Rename(name, group); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	return
+}
+
 func getCptvNames(dir string) []string {
 	matches, _ := filepath.Glob(filepath.Join(dir, cptvGlob))
 	failedUploadMatches, _ := filepath.Glob(filepath.Join(dir, failedUploadsFolder, cptvGlob))
