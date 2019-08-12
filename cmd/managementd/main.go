@@ -72,6 +72,7 @@ func main() {
 	router.HandleFunc("/advanced", managementinterface.AdvancedMenuHandler).Methods("GET")
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
 	router.HandleFunc("/camera/snapshot", managementinterface.CameraSnapshot).Methods("GET")
+	router.HandleFunc("/rename", managementinterface.Rename).Methods("GET")
 
 	// API
 	apiObj := api.NewAPI(config.CPTVDir)
