@@ -1,6 +1,18 @@
 "use strict";
 window.onload = function() {
   loadDeviceDetails();
+
+  if (hasGroupList()) {
+    var groups = getGroups();
+    var groupsSelect = document.getElementById("group-list")
+    for (var i in groups) {
+      var group = groups[i];
+      var groupOpt = document.createElement('option');
+      groupOpt.value = group;
+      groupOpt.innerHTML = group;
+      groupsSelect.appendChild(groupOpt);
+    }
+  }
 };
 
 function loadDeviceDetails() {
@@ -11,8 +23,8 @@ function loadDeviceDetails() {
   xmlHttp.onload = async function() {
     if (xmlHttp.status == 200) {
       var response = JSON.parse(xmlHttp.response);
-      document.getElementById("new-name").value=response.devicename;
-      document.getElementById("new-group").value=response.groupname;
+      document.getElementById("new-name").placeholder=response.devicename;
+      document.getElementById("new-group").placeholder=response.groupname;
     } else {
       console.log("error with getting device details");
       console.log(xmlHttp);

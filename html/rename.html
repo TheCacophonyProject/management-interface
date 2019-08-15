@@ -18,26 +18,28 @@
         </div>
         <hr>
 
-        <form action="/api/rename" method="POST">
-            <div class="form-row">
-              <div class="form-group col-md-6">
-                <label for="new-name">New name</label>
-                <input id="new-name" type="text" class="form-control" placeholder="name">
-              </div>
+        <form>
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="new-name">New name</label>
+              <input id="new-name" type="text" class="form-control" placeholder="name">
             </div>
+          </div>
 
-            <div class="form-row">
-              <div class="form-group col-md-6">
-                <label for="new-gurop">New group</label>
-                <input id="new-group" type="text" class="form-control" placeholder="group">
-              </div>
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="new-group">New Group</label>
+              <input id="new-group" list="group-list" name="new-group" class="form-control" placeholder="group"/>
+              <datalist id="group-list">
+              </datalist>
             </div>
+          </div>
 
-            <div class="form-row">
-              <div class="form-group col-md-6">
-                <button id="rename-button" type="button" onclick="rename()" class="btn btn-primary">Rename</button>
-              </div>
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <button id="rename-button" type="button" onclick="rename()" class="btn btn-primary">Rename</button>
             </div>
+          </div>
         </form>
 
     </div>
