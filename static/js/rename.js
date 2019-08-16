@@ -44,8 +44,9 @@ function rename() {
   var data = $("#rename-form").serialize()
 
   var xmlHttp = new XMLHttpRequest();
-  xmlHttp.open('POST', '/api/rename?'+data, true);
+  xmlHttp.open('POST', '/api/rename', true);
   xmlHttp.setRequestHeader("Authorization", "Basic "+btoa("admin:feathers"))
+  xmlHttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded; charset=UTF-8");
   xmlHttp.onload = async function() {
     if (xmlHttp.status == 200) {
       alert("updated device name and gruop")
@@ -59,12 +60,12 @@ function rename() {
     renameError(xmlHttp);
   }
 
-  xmlHttp.send();
+  xmlHttp.send(data);
 }
 
 function renameError(xmlHttp) {
   resetRenameButton();
-  alert("error with renameing device: " + getResponseMessage(xmlHttp.responseText))
+  alert("error with renaming device: " + getResponseMessage(xmlHttp.responseText))
 }
 
 function resetRenameButton() {
