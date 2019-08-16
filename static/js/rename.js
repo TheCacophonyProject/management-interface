@@ -4,13 +4,12 @@ window.onload = function() {
 
   if (hasGroupList()) {
     var groups = getGroups();
-    var groupsSelect = document.getElementById("group-list")
     for (var i in groups) {
       var group = groups[i];
-      var groupOpt = document.createElement('option');
-      groupOpt.value = group;
-      groupOpt.innerHTML = group;
-      groupsSelect.appendChild(groupOpt);
+      $('<option/>', {
+        value: group,
+        innerHTML: group,
+      }).appendTo('#group-list');
     }
   }
 };
@@ -23,17 +22,15 @@ function loadDeviceDetails() {
   xmlHttp.onload = async function() {
     if (xmlHttp.status == 200) {
       var response = JSON.parse(xmlHttp.response);
-      document.getElementById("new-name").placeholder=response.devicename;
-      document.getElementById("new-group").placeholder=response.groupname;
+      $("#new-name").attr('placeholder', response.devicename)
+      $("#new-group").attr('placeholder', response.groupname)
     } else {
       console.log("error with getting device details");
-      console.log(xmlHttp);
     }
   }
 
   xmlHttp.onerror = async function() {
     console.log("error with getting device details");
-    console.log(xmlHttp);
   }
 
   xmlHttp.send(null)
@@ -44,12 +41,10 @@ function rename() {
   updateButton.disabled = true;
   updateButton.innerHTML = "Renaming";
 
-  var data = new FormData();
-  data.append('name', document.getElementById("new-name").value);
-  data.append('group', document.getElementById("new-group").value);
+  var data = $("#rename-form").serialize()
 
   var xmlHttp = new XMLHttpRequest();
-  xmlHttp.open('POST', '/api/rename', true);
+  xmlHttp.open('POST', '/api/rename?'+data, true);
   xmlHttp.setRequestHeader("Authorization", "Basic "+btoa("admin:feathers"))
   xmlHttp.onload = async function() {
     if (xmlHttp.status == 200) {
@@ -64,17 +59,27 @@ function rename() {
     renameError(xmlHttp);
   }
 
-  xmlHttp.send(data);
+  xmlHttp.send();
 }
 
 function renameError(xmlHttp) {
   resetRenameButton();
-  alert("error with renaming device");
-  console.log(xmlHttp);
+  alert("error with renameing device: " + getResponseMessage(xmlHttp.responseText))
 }
 
 function resetRenameButton() {
   var updateButton = document.getElementById("rename-button");
   updateButton.disabled = false;
   updateButton.innerHTML = "Rename";
+}
+
+
+function getResponseMessage(bodyString) {
+  // The body string needs to be sliced as the go-api will add a prefix onto the response from the server
+  var jsonString = bodyString.slice(bodyString.indexOf("{\""))
+  try {
+    return JSON.parse(jsonString).message;
+  } catch(e) {
+    return bodyString
+  }
 }

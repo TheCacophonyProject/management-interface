@@ -5,7 +5,6 @@ function loadGroupFromURL() {
   var groupsEncoded = url.searchParams.get("groups");
   if (groupsEncoded) {
     var groups = groupsEncoded.split("--");
-    console.log(groups);
     localStorage.setItem(groupStorageKey, JSON.stringify(groups));
   }
 };
@@ -16,7 +15,6 @@ function hasGroupList() {
 
 function getGroups() {
   var g = localStorage.getItem(groupStorageKey);
-  console.log(g);
   return JSON.parse(g);
 }
 

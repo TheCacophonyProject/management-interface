@@ -18,18 +18,18 @@
         </div>
         <hr>
 
-        <form>
+        <form id="rename-form">
           <div class="form-row">
             <div class="form-group col-md-6">
               <label for="new-name">New name</label>
-              <input id="new-name" type="text" class="form-control" placeholder="name">
+              <input id="new-name" name="name" type="text" class="form-control" placeholder="name">
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group col-md-6">
               <label for="new-group">New Group</label>
-              <input id="new-group" list="group-list" name="new-group" class="form-control" placeholder="group"/>
+              <input id="new-group" name="group" list="group-list" name="new-group" class="form-control" placeholder="group"/>
               <datalist id="group-list">
               </datalist>
             </div>
