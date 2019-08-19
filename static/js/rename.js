@@ -65,7 +65,7 @@ function rename() {
 
 function renameError(xmlHttp) {
   resetRenameButton();
-  alert("error with renaming device: " + getResponseMessage(xmlHttp.responseText))
+  alert("error renaming device: " + getResponseMessage(xmlHttp.responseText))
 }
 
 function resetRenameButton() {
