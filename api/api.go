@@ -40,7 +40,7 @@ import (
 const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
-	rebootDelaySeconds = 5
+	rebootDelay         = time.Second * 5
 )
 
 type ManagementAPI struct {
@@ -195,8 +195,8 @@ func (api *ManagementAPI) Rename(w http.ResponseWriter, r *http.Request) {
 // Reboot will reboot the device after a delay so a response can be sent back
 func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 	go func() {
-		log.Printf("device rebooting in %d seconds", rebootDelaySeconds)
-		time.Sleep(rebootDelaySeconds * time.Second)
+		log.Printf("device rebooting in %s seconds", rebootDelay)
+		time.Sleep(rebootDelay)
 		log.Println("rebooting")
 		log.Println(exec.Command("/sbin/reboot").Run())
 	}()
