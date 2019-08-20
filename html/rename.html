@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Rename</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+</head>
+
+<body>
+    {{template "navbar"}}
+
+    <div class="container">
+
+        <div class="container pt-5 pl-0">
+            <h2>Device Rename<br></h2>
+        </div>
+        <hr>
+
+        <form id="rename-form">
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="new-name">New name</label>
+              <input id="new-name" name="name" type="text" class="form-control" placeholder="name">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="new-group">New Group</label>
+              <input id="new-group" name="group" list="group-list" name="new-group" class="form-control" placeholder="group"/>
+              <datalist id="group-list">
+              </datalist>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <button id="rename-button" type="button" onclick="rename()" class="btn btn-primary">Rename</button>
+            </div>
+          </div>
+
+          <div id="reboot-div" class="form-row" style="display: none;">
+            <div class="form-group col-md-6">
+              <button id="reboot-button" type="button" onclick="reboot()" class="btn btn-primary">Reboot</button>
+            </div>
+          </div>
+
+        </form>
+
+    </div>
+
+    <script type="text/javascript" src="/static/js/rename.js"></script>
+    <script type="text/javascript" src="/static/js/reboot.js"></script>
+    <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="/static/js/datalist-polyfill.min.js"></script>
+</body>
+
+</html>
