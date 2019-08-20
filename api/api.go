@@ -26,8 +26,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	goapi "github.com/TheCacophonyProject/go-api"
 	signalstrength "github.com/TheCacophonyProject/management-interface/signal-strength"
@@ -38,6 +40,7 @@ import (
 const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
+	rebootDelaySeconds = 5
 )
 
 type ManagementAPI struct {
@@ -187,6 +190,17 @@ func (api *ManagementAPI) Rename(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	return
+}
+
+// Reboot will reboot the device after a delay so a response can be sent back
+func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
+	go func() {
+		log.Printf("device rebooting in %d seconds", rebootDelaySeconds)
+		time.Sleep(rebootDelaySeconds * time.Second)
+		log.Println("rebooting")
+		log.Println(exec.Command("/sbin/reboot").Run())
+	}()
+	w.WriteHeader(http.StatusOK)
 }
 
 func getCptvNames(dir string) []string {
