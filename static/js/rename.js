@@ -49,8 +49,9 @@ function rename() {
   xmlHttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded; charset=UTF-8");
   xmlHttp.onload = async function() {
     if (xmlHttp.status == 200) {
-      alert("updated device name and gruop")
+      alert("updated device name and gruop. Reboot device for changes to take place")
       resetRenameButton();
+      $("#reboot-div").show()
     } else {
       renameError(xmlHttp);
     }
