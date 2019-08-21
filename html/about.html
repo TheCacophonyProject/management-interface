@@ -98,6 +98,10 @@
     <script src="/static/js/bootstrap.min.js"></script>
 
     <script>
+        window.onload = function() {
+            loadDeviceDetails();
+        };
+
         $(document).ready(function () {
             document.getElementById("btnBack").href = "/advanced";
             document.getElementById("navDeviceName").href = "/advanced";
@@ -113,8 +117,8 @@
             xmlHttp.onload = async function() {
                 if (xmlHttp.status == 200) {
                     var response = JSON.parse(xmlHttp.response);
-                    $("#APIID").attr('value', response.devicename)
-                    $("#Group").attr('value', response.groupname)
+                    $("#APIID").text(response.deviceID)
+                    $("#Group").text(response.groupname)
                 } else {
                     console.log("error with getting device details");
                 }

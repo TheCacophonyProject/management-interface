@@ -116,12 +116,6 @@ func getDeviceName() string {
 	return strings.SplitN(name, ".", 2)[0]
 }
 
-// Each device is associated with a group. This info is contained in the Cacophony API.
-func getGroupName() string {
-	// myAPI := api.NewAPI()
-	return ""
-}
-
 func getAPIID() int {
 	return 0
 }
@@ -609,7 +603,6 @@ func getInstalledPackages() (string, error) {
 func AboutHandler(w http.ResponseWriter, r *http.Request) {
 
 	type aboutResponse struct {
-		Group                   string
 		APIID                   int
 		RaspberryPiSerialNumber string
 		PackageDataRows         [][]string
@@ -617,7 +610,6 @@ func AboutHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := aboutResponse{
-		Group:                   getGroupName(),
 		APIID:                   getAPIID(),
 		RaspberryPiSerialNumber: getRaspberryPiSerialNumber(),
 	}
