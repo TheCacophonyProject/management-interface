@@ -116,6 +116,36 @@ func getDeviceName() string {
 	return strings.SplitN(name, ".", 2)[0]
 }
 
+// Each device is associated with a group. This info is contained in the Cacophony API.
+func getGroupName() string {
+	// myAPI := api.NewAPI()
+	return ""
+}
+
+func getAPIID() int {
+	return 0
+}
+
+func getRaspberryPiSerialNumber() string {
+	if runtime.GOOS != "windows" {
+		// 'Nix.  Run /proc/cpuinfo command to get the info we want.
+		out, err := exec.Command("cat", "/proc/cpuinfo").Output()
+		if err != nil || len(out) == 0 {
+			return ""
+		}
+		// Extract the serial number. It's in the last row bar 1.  The last row of the output is blank.
+		rows := strings.Split(string(out), "\n")
+		lastRow := rows[len(rows)-2]
+		// Make sure the last row does in fact contain a serial number.
+		if !strings.Contains(strings.ToUpper(lastRow), "SERIAL") {
+			return ""
+		}
+		serial := strings.Split(lastRow, ":")
+		return serial[1][1:]
+	}
+	return ""
+}
+
 // Get the directory of where this executable was started.
 func getExecutablePath() string {
 	ex, err := os.Executable()
@@ -578,14 +608,24 @@ func getInstalledPackages() (string, error) {
 // AboutHandler shows the currently installed packages on the device.
 func AboutHandler(w http.ResponseWriter, r *http.Request) {
 
-	type packagesResponse struct {
-		PackageDataRows [][]string
-		ErrorMessage    string
+	type aboutResponse struct {
+		Group                   string
+		APIID                   int
+		RaspberryPiSerialNumber string
+		PackageDataRows         [][]string
+		ErrorMessage            string
+	}
+
+	resp := aboutResponse{
+		Group:                   getGroupName(),
+		APIID:                   getAPIID(),
+		RaspberryPiSerialNumber: getRaspberryPiSerialNumber(),
 	}
 
 	packagesData, err := getInstalledPackages()
 	if err != nil {
-		tmpl.ExecuteTemplate(w, "about.html", packagesResponse{ErrorMessage: errorMessage(err)})
+		resp.ErrorMessage = errorMessage(err)
+		tmpl.ExecuteTemplate(w, "about.html", resp)
 	}
 
 	// Want to separate this into separate fields so that can display in a table in HTML
@@ -600,7 +640,8 @@ func AboutHandler(w http.ResponseWriter, r *http.Request) {
 		dataRows = append(dataRows, words[:2])
 	}
 
-	tmpl.ExecuteTemplate(w, "about.html", packagesResponse{PackageDataRows: dataRows})
+	resp.PackageDataRows = dataRows
+	tmpl.ExecuteTemplate(w, "about.html", resp)
 }
 
 // CheckInterfaceHandler checks an interface to see if it is up or down.
