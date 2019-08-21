@@ -116,10 +116,7 @@ func getDeviceName() string {
 	return strings.SplitN(name, ".", 2)[0]
 }
 
-func getAPIID() int {
-	return 0
-}
-
+// Return the serial number for the Raspberr Pi in the device.
 func getRaspberryPiSerialNumber() string {
 	if runtime.GOOS != "windows" {
 		// 'Nix.  Run /proc/cpuinfo command to get the info we want.
@@ -603,14 +600,12 @@ func getInstalledPackages() (string, error) {
 func AboutHandler(w http.ResponseWriter, r *http.Request) {
 
 	type aboutResponse struct {
-		APIID                   int
 		RaspberryPiSerialNumber string
 		PackageDataRows         [][]string
 		ErrorMessage            string
 	}
 
 	resp := aboutResponse{
-		APIID:                   getAPIID(),
 		RaspberryPiSerialNumber: getRaspberryPiSerialNumber(),
 	}
 
