@@ -118,23 +118,29 @@ func getDeviceName() string {
 
 // Return the serial number for the Raspberr Pi in the device.
 func getRaspberryPiSerialNumber() string {
-	if runtime.GOOS != "windows" {
-		// 'Nix.  Run /proc/cpuinfo command to get the info we want.
-		out, err := exec.Command("cat", "/proc/cpuinfo").Output()
-		if err != nil || len(out) == 0 {
-			return ""
-		}
-		// Extract the serial number. It's in the last row bar 1.  The last row of the output is blank.
-		rows := strings.Split(string(out), "\n")
-		lastRow := rows[len(rows)-2]
-		// Make sure the last row does in fact contain a serial number.
-		if !strings.Contains(strings.ToUpper(lastRow), "SERIAL") {
-			return ""
-		}
-		serial := strings.Split(lastRow, ":")
-		return serial[1][1:]
+
+	if runtime.GOOS == "windows" {
+		return ""
 	}
-	return ""
+
+	// Run /proc/cpuinfo command to get the info we want.
+	out, err := exec.Command("cat", "/proc/cpuinfo").Output()
+	if err != nil || len(out) == 0 {
+		return ""
+	}
+	
+	// Extract the serial number.
+	serialNumber := ""
+	rows := strings.Split(string(out), "\n")
+	for _, row := range rows {
+		if strings.Contains(strings.ToUpper(row), "SERIAL") {
+			serial := strings.Split(row, ":")
+			serialNumber = serial[1][1:]
+			break
+		}
+	}
+
+	return serialNumber
 }
 
 // Get the directory of where this executable was started.

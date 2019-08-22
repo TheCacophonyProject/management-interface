@@ -39,7 +39,7 @@
                                 <td></td><td></td>
                             </tr>
                             <tr>
-                                <td >Group</td>
+                                <td>Group</td>
                                 <td id="Group"></td>
                                 <td></td><td></td>
                             </tr>
@@ -72,8 +72,7 @@
                             <tr>
                                 <th>Package</th>
                                 <th>Version</th>
-                                <th></th>
-                                <th></th>
+                                <th></th><th></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -81,8 +80,7 @@
                             <tr>
                                 <td>{{index . 0}}</td>
                                 <td class="text-center">{{index . 1}}</td>
-                                <td></td>
-                                <td></td>
+                                <td></td><td></td>
                             </tr>
                             {{end}}
                         </tbody>
@@ -98,7 +96,7 @@
     <script src="/static/js/bootstrap.min.js"></script>
 
     <script>
-        window.onload = function() {
+        window.onload = function () {
             loadDeviceDetails();
         };
 
@@ -112,9 +110,9 @@
         function loadDeviceDetails() {
             var xmlHttp = new XMLHttpRequest();
             xmlHttp.open("GET", "/api/device-info", true);
-            xmlHttp.setRequestHeader("Authorization", "Basic "+btoa("admin:feathers"))
+            xmlHttp.setRequestHeader("Authorization", "Basic " + btoa("admin:feathers"))
 
-            xmlHttp.onload = async function() {
+            xmlHttp.onload = async function () {
                 if (xmlHttp.status == 200) {
                     var response = JSON.parse(xmlHttp.response);
                     $("#APIID").text(response.deviceID)
@@ -124,7 +122,7 @@
                 }
             }
 
-            xmlHttp.onerror = async function() {
+            xmlHttp.onerror = async function () {
                 console.log("error with getting device details");
             }
 
