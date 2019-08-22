@@ -34,7 +34,7 @@ builds:
 nfpms:
 - vendor: The Cacophony Project
   homepage: http://cacophony.org.nz/
-  maintainer: Cacophony Developers <dev@cacophony.org.nz>
+  maintainer: Cacophony Developers <coredev@cacophony.org.nz>
   description: Management interface for Cacophonators
   license: GPL v3.0
   name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}"
@@ -42,8 +42,8 @@ nfpms:
     - deb
   bindir: /usr/bin
   files:
-    "_release/cacophonator-management-avahi.service": "/etc/avahi/services/cacophonator-management.service"
-    "_release/cacophonator-management-systemd.service": "/etc/systemd/system/cacophonator-management.service"
+    "_release/managementd-avahi.service": "/etc/avahi/services/managementd.service"
+    "_release/managementd.service": "/etc/systemd/system/managementd.service"
   config_files:
     "_release/managementd.yaml": "/etc/cacophony/managementd.yaml"
 
