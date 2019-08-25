@@ -37,6 +37,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/TheCacophonyProject/management-interface/api"
+	goapi "github.com/TheCacophonyProject/go-api"
+
+
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
 	yaml "gopkg.in/yaml.v2"
@@ -123,20 +127,27 @@ func getRaspberryPiSerialNumber() string {
 		return ""
 	}
 
-	// Run /proc/cpuinfo command to get the info we want.
-	out, err := exec.Command("cat", "/proc/cpuinfo").Output()
-	if err != nil || len(out) == 0 {
+	// The /proc/cpuinfo file normally contains a serial number.
+	file, err := os.Open("/proc/cpuinfo")
+	if err != nil {
 		return ""
 	}
-	
+	defer file.Close()
+	out, err := ioutil.ReadAll(file)
+	if err != nil {
+		return ""
+	}
+
 	// Extract the serial number.
 	serialNumber := ""
 	rows := strings.Split(string(out), "\n")
 	for _, row := range rows {
-		if strings.Contains(strings.ToUpper(row), "SERIAL") {
-			serial := strings.Split(row, ":")
-			serialNumber = serial[1][1:]
-			break
+		parts := strings.Split(row, ":")
+		if len(parts) == 2 {
+			field := strings.ToUpper(strings.TrimSpace(parts[0]))
+			if field == "SERIAL" {
+				return strings.TrimSpace(parts[1])
+			}
 		}
 	}
 
@@ -603,24 +614,46 @@ func getInstalledPackages() (string, error) {
 }
 
 // AboutHandler shows the currently installed packages on the device.
-func AboutHandler(w http.ResponseWriter, r *http.Request) {
+func AboutHandler(w http.ResponseWriter, r *http.Request, apiObj *api.ManagementAPI) {
 
 	type aboutResponse struct {
 		RaspberryPiSerialNumber string
+		Group string
+		DeviceID int
 		PackageDataRows         [][]string
 		ErrorMessage            string
 	}
 
+	// Create response
 	resp := aboutResponse{
 		RaspberryPiSerialNumber: getRaspberryPiSerialNumber(),
 	}
 
+
+	// Get the device group from the API
+	config, err := goapi.LoadConfig()
+	if err != nil {
+		log.Println("failed to read device config from API:", err)
+	} else {
+		resp.Group = config.Group
+	}
+
+	// Get the device ID from the device-priv.yaml file locally
+	privConfig, err := goapi.LoadPrivateConfig()
+	if err != nil {
+		log.Println("error loading private config:", err)
+	} else {
+		if privConfig != nil {
+			resp.DeviceID = privConfig.DeviceID
+		}
+	}
+
+	// Get installed packages.
 	packagesData, err := getInstalledPackages()
 	if err != nil {
 		resp.ErrorMessage = errorMessage(err)
 		tmpl.ExecuteTemplate(w, "about.html", resp)
 	}
-
 	// Want to separate this into separate fields so that can display in a table in HTML
 	dataRows := [][]string{}
 	rows := strings.Split(packagesData, "\n")
@@ -632,8 +665,8 @@ func AboutHandler(w http.ResponseWriter, r *http.Request) {
 		words := strings.Split(strings.TrimSpace(row), "|")
 		dataRows = append(dataRows, words[:2])
 	}
-
 	resp.PackageDataRows = dataRows
+
 	tmpl.ExecuteTemplate(w, "about.html", resp)
 }
 
