@@ -29,33 +29,25 @@
         </div>
 
         <div class="row">
-            <div class="col-xs-12">
+            <div class="col-xs-8">
                 <div class="table-responsive">
                     <table class="table">
                         <tbody>
                             <tr>
                                 <td>Name</td>
                                 <td>{{DeviceName}}</td>
-                                <td></td>
-                                <td></td>
                             </tr>
                             <tr>
                                 <td>Group</td>
                                 <td id="Group">{{.Group}}</td>
-                                <td></td>
-                                <td></td>
                             </tr>
                             <tr>
                                 <td>Serial Number</td>
                                 <td>{{.RaspberryPiSerialNumber}}</td>
-                                <td></td>
-                                <td></td>
                             </tr>
                             <tr>
                                 <td>API Identifier</td>
                                 <td id="APIID">{{.DeviceID}}</td>
-                                <td></td>
-                                <td></td>
                             </tr>
                         </tbody>
                     </table>
@@ -69,15 +61,13 @@
         </div>
 
         <div class="row">
-            <div class="col-xs-12">
+            <div class="col-xs-8">
                 <div class="table-responsive">
                     <table class="table">
                         <thead>
                             <tr>
                                 <th>Package</th>
                                 <th>Version</th>
-                                <th></th>
-                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -85,8 +75,6 @@
                             <tr>
                                 <td>{{index . 0}}</td>
                                 <td class="text-center">{{index . 1}}</td>
-                                <td></td>
-                                <td></td>
                             </tr>
                             {{end}}
                         </tbody>
