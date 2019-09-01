@@ -44,7 +44,7 @@ function rename() {
   var data = $("#rename-form").serialize()
 
   var xmlHttp = new XMLHttpRequest();
-  xmlHttp.open('POST', '/api/rename', true);
+  xmlHttp.open('POST', '/api/reregister', true);
   xmlHttp.setRequestHeader("Authorization", "Basic "+btoa("admin:feathers"))
   xmlHttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded; charset=UTF-8");
   xmlHttp.onload = async function() {
