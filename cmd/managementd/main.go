@@ -68,7 +68,7 @@ func main() {
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
 	router.HandleFunc("/location", managementinterface.LocationHandler).Methods("GET", "POST") // Form to view and/or set location manually.
 	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET", "POST")        // Form to view and/or adjust time settings.
-	// router.HandleFunc("/about", managementinterface.AboutHandler).Methods("GET")
+	router.HandleFunc("/about", managementinterface.AboutHandler).Methods("GET")
 
 	router.HandleFunc("/advanced", managementinterface.AdvancedMenuHandler).Methods("GET")
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
@@ -77,9 +77,6 @@ func main() {
 
 	// API
 	apiObj := api.NewAPI(config.CPTVDir)
-	router.HandleFunc("/about", func(w http.ResponseWriter, r *http.Request) {
-		managementinterface.AboutHandler(w, r, apiObj)
-	}).Methods("GET")
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.HandleFunc("/device-info", apiObj.GetDeviceInfo).Methods("GET")
 	apiRouter.HandleFunc("/recordings", apiObj.GetRecordings).Methods("GET")
