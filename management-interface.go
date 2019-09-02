@@ -37,6 +37,8 @@ import (
 	"strconv"
 	"strings"
 
+	goapi "github.com/TheCacophonyProject/go-api"
+
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
 	yaml "gopkg.in/yaml.v2"
@@ -114,6 +116,40 @@ func getDeviceName() string {
 	// Make sure we handle the case when name could be something like: 'host.corp.com'
 	// If it is, just use the part before the first dot.
 	return strings.SplitN(name, ".", 2)[0]
+}
+
+// Return the serial number for the Raspberr Pi in the device.
+func getRaspberryPiSerialNumber() string {
+
+	if runtime.GOOS == "windows" {
+		return ""
+	}
+
+	// The /proc/cpuinfo file normally contains a serial number.
+	file, err := os.Open("/proc/cpuinfo")
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+	out, err := ioutil.ReadAll(file)
+	if err != nil {
+		return ""
+	}
+
+	// Extract the serial number.
+	serialNumber := ""
+	rows := strings.Split(string(out), "\n")
+	for _, row := range rows {
+		parts := strings.Split(row, ":")
+		if len(parts) == 2 {
+			field := strings.ToUpper(strings.TrimSpace(parts[0]))
+			if field == "SERIAL" {
+				return strings.TrimSpace(parts[1])
+			}
+		}
+	}
+
+	return serialNumber
 }
 
 // Get the directory of where this executable was started.
@@ -386,12 +422,12 @@ func addWPANetwork(ssid string, password string) error {
 		return fmt.Errorf("SSID %s already exists", ssid)
 	}
 
-	networkId, err := addNewNetwork()
+	networkID, err := addNewNetwork()
 	if err != nil {
 		return err
 	}
 
-	err = setWPANetworkDetails(ssid, password, networkId)
+	err = setWPANetworkDetails(ssid, password, networkID)
 	if err != nil {
 		return err
 	}
@@ -407,10 +443,10 @@ func addWPANetwork(ssid string, password string) error {
 // addNewNetwork adds a new network in the wpa_supplication configuration and returns the new network id
 func addNewNetwork() (int, error) {
 	out, err := exec.Command("wpa_cli", "add_network").Output()
-	var networkId int = -1
+	var networkID = -1
 
 	if err != nil {
-		return networkId, fmt.Errorf("error executing wpa_cli add_network - error %s output %s", err, out)
+		return networkID, fmt.Errorf("error executing wpa_cli add_network - error %s output %s", err, out)
 	}
 	stdOut := string(out)
 
@@ -419,16 +455,16 @@ func addNewNetwork() (int, error) {
 	scanner.Scan() //skip interface line
 	if scanner.Scan() {
 		line := scanner.Text()
-		networkId, err = strconv.Atoi(line)
+		networkID, err = strconv.Atoi(line)
 		if err != nil {
 			return -1, fmt.Errorf("could not find network id - error %s from stdout %s", err, stdOut)
 		}
 	}
-	return networkId, err
+	return networkID, err
 }
 
 // setWPANetworkDetails sets the ssid and password of the specified networkID in the wpa_supplication configuration
-func setWPANetworkDetails(ssid string, password string, networkId int) error {
+func setWPANetworkDetails(ssid string, password string, networkID int) error {
 	cmd := exec.Command("wpa_cli")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -436,9 +472,9 @@ func setWPANetworkDetails(ssid string, password string, networkId int) error {
 	}
 
 	defer stdin.Close()
-	io.WriteString(stdin, fmt.Sprintf("set_network %d ssid \"%s\"\n", networkId, ssid))
-	io.WriteString(stdin, fmt.Sprintf("set_network %d psk \"%s\"\n", networkId, password))
-	io.WriteString(stdin, fmt.Sprintf("enable_network %d\n", networkId))
+	io.WriteString(stdin, fmt.Sprintf("set_network %d ssid \"%s\"\n", networkID, ssid))
+	io.WriteString(stdin, fmt.Sprintf("set_network %d psk \"%s\"\n", networkID, password))
+	io.WriteString(stdin, fmt.Sprintf("enable_network %d\n", networkID))
 	io.WriteString(stdin, "quit\n")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -578,16 +614,43 @@ func getInstalledPackages() (string, error) {
 // AboutHandler shows the currently installed packages on the device.
 func AboutHandler(w http.ResponseWriter, r *http.Request) {
 
-	type packagesResponse struct {
-		PackageDataRows [][]string
-		ErrorMessage    string
+	type aboutResponse struct {
+		RaspberryPiSerialNumber string
+		Group                   string
+		DeviceID                int
+		PackageDataRows         [][]string
+		ErrorMessage            string
 	}
 
+	// Create response
+	resp := aboutResponse{
+		RaspberryPiSerialNumber: getRaspberryPiSerialNumber(),
+	}
+
+	// Get the device group from the API
+	config, err := goapi.LoadConfig()
+	if err != nil {
+		log.Println("failed to read device config from API:", err)
+	} else {
+		resp.Group = config.Group
+	}
+
+	// Get the device ID from the device-priv.yaml file locally
+	privConfig, err := goapi.LoadPrivateConfig()
+	if err != nil {
+		log.Println("error loading private config:", err)
+	} else {
+		if privConfig != nil {
+			resp.DeviceID = privConfig.DeviceID
+		}
+	}
+
+	// Get installed packages.
 	packagesData, err := getInstalledPackages()
 	if err != nil {
-		tmpl.ExecuteTemplate(w, "about.html", packagesResponse{ErrorMessage: errorMessage(err)})
+		resp.ErrorMessage = errorMessage(err)
+		tmpl.ExecuteTemplate(w, "about.html", resp)
 	}
-
 	// Want to separate this into separate fields so that can display in a table in HTML
 	dataRows := [][]string{}
 	rows := strings.Split(packagesData, "\n")
@@ -599,8 +662,9 @@ func AboutHandler(w http.ResponseWriter, r *http.Request) {
 		words := strings.Split(strings.TrimSpace(row), "|")
 		dataRows = append(dataRows, words[:2])
 	}
+	resp.PackageDataRows = dataRows
 
-	tmpl.ExecuteTemplate(w, "about.html", packagesResponse{PackageDataRows: dataRows})
+	tmpl.ExecuteTemplate(w, "about.html", resp)
 }
 
 // CheckInterfaceHandler checks an interface to see if it is up or down.
