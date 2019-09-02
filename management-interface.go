@@ -1,6 +1,6 @@
 /*
 management-interface - Web based management of Raspberry Pis over WiFi
-Copyright (C) 2018, The Cacophony Project
+Copyright (C) 2019, The Cacophony Project
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
