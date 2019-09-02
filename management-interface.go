@@ -37,9 +37,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TheCacophonyProject/management-interface/api"
 	goapi "github.com/TheCacophonyProject/go-api"
-
 
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
@@ -424,12 +422,12 @@ func addWPANetwork(ssid string, password string) error {
 		return fmt.Errorf("SSID %s already exists", ssid)
 	}
 
-	networkId, err := addNewNetwork()
+	networkID, err := addNewNetwork()
 	if err != nil {
 		return err
 	}
 
-	err = setWPANetworkDetails(ssid, password, networkId)
+	err = setWPANetworkDetails(ssid, password, networkID)
 	if err != nil {
 		return err
 	}
@@ -445,10 +443,10 @@ func addWPANetwork(ssid string, password string) error {
 // addNewNetwork adds a new network in the wpa_supplication configuration and returns the new network id
 func addNewNetwork() (int, error) {
 	out, err := exec.Command("wpa_cli", "add_network").Output()
-	var networkId int = -1
+	var networkID = -1
 
 	if err != nil {
-		return networkId, fmt.Errorf("error executing wpa_cli add_network - error %s output %s", err, out)
+		return networkID, fmt.Errorf("error executing wpa_cli add_network - error %s output %s", err, out)
 	}
 	stdOut := string(out)
 
@@ -457,16 +455,16 @@ func addNewNetwork() (int, error) {
 	scanner.Scan() //skip interface line
 	if scanner.Scan() {
 		line := scanner.Text()
-		networkId, err = strconv.Atoi(line)
+		networkID, err = strconv.Atoi(line)
 		if err != nil {
 			return -1, fmt.Errorf("could not find network id - error %s from stdout %s", err, stdOut)
 		}
 	}
-	return networkId, err
+	return networkID, err
 }
 
 // setWPANetworkDetails sets the ssid and password of the specified networkID in the wpa_supplication configuration
-func setWPANetworkDetails(ssid string, password string, networkId int) error {
+func setWPANetworkDetails(ssid string, password string, networkID int) error {
 	cmd := exec.Command("wpa_cli")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -474,9 +472,9 @@ func setWPANetworkDetails(ssid string, password string, networkId int) error {
 	}
 
 	defer stdin.Close()
-	io.WriteString(stdin, fmt.Sprintf("set_network %d ssid \"%s\"\n", networkId, ssid))
-	io.WriteString(stdin, fmt.Sprintf("set_network %d psk \"%s\"\n", networkId, password))
-	io.WriteString(stdin, fmt.Sprintf("enable_network %d\n", networkId))
+	io.WriteString(stdin, fmt.Sprintf("set_network %d ssid \"%s\"\n", networkID, ssid))
+	io.WriteString(stdin, fmt.Sprintf("set_network %d psk \"%s\"\n", networkID, password))
+	io.WriteString(stdin, fmt.Sprintf("enable_network %d\n", networkID))
 	io.WriteString(stdin, "quit\n")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -614,12 +612,12 @@ func getInstalledPackages() (string, error) {
 }
 
 // AboutHandler shows the currently installed packages on the device.
-func AboutHandler(w http.ResponseWriter, r *http.Request, apiObj *api.ManagementAPI) {
+func AboutHandler(w http.ResponseWriter, r *http.Request) {
 
 	type aboutResponse struct {
 		RaspberryPiSerialNumber string
-		Group string
-		DeviceID int
+		Group                   string
+		DeviceID                int
 		PackageDataRows         [][]string
 		ErrorMessage            string
 	}
@@ -628,7 +626,6 @@ func AboutHandler(w http.ResponseWriter, r *http.Request, apiObj *api.Management
 	resp := aboutResponse{
 		RaspberryPiSerialNumber: getRaspberryPiSerialNumber(),
 	}
-
 
 	// Get the device group from the API
 	config, err := goapi.LoadConfig()
