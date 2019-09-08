@@ -160,12 +160,7 @@ func getSaltMinionID() string {
 	}
 
 	// The /etc/salt/minion_id file contains the ID.
-	file, err := os.Open("/etc/salt/minion_id")
-	if err != nil {
-		return ""
-	}
-	defer file.Close()
-	out, err := ioutil.ReadAll(file)
+	out, err := ioutil.ReadFile("/etc/salt/minion_id")
 	if err != nil {
 		return ""
 	}
