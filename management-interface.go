@@ -152,6 +152,22 @@ func getRaspberryPiSerialNumber() string {
 	return serialNumber
 }
 
+// Return the salt minion ID for the device.
+func getSaltMinionID() string {
+
+	if runtime.GOOS == "windows" {
+		return ""
+	}
+
+	// The /etc/salt/minion_id file contains the ID.
+	out, err := ioutil.ReadFile("/etc/salt/minion_id")
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(out))
+}
+
 // Get the directory of where this executable was started.
 func getExecutablePath() string {
 	ex, err := os.Executable()
@@ -616,6 +632,7 @@ func AboutHandler(w http.ResponseWriter, r *http.Request) {
 
 	type aboutResponse struct {
 		RaspberryPiSerialNumber string
+		SaltMinionID            string
 		Group                   string
 		DeviceID                int
 		PackageDataRows         [][]string
@@ -625,6 +642,7 @@ func AboutHandler(w http.ResponseWriter, r *http.Request) {
 	// Create response
 	resp := aboutResponse{
 		RaspberryPiSerialNumber: getRaspberryPiSerialNumber(),
+		SaltMinionID:            getSaltMinionID(),
 	}
 
 	// Get the device group from the API
