@@ -32,6 +32,7 @@ import (
 	"time"
 
 	goapi "github.com/TheCacophonyProject/go-api"
+	goconfig "github.com/TheCacophonyProject/go-config"
 	signalstrength "github.com/TheCacophonyProject/management-interface/signal-strength"
 	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
@@ -45,19 +46,25 @@ const (
 
 type ManagementAPI struct {
 	cptvDir string
+	config  *goconfig.Config
 }
 
-func NewAPI(cptvDir string) *ManagementAPI {
-	return &ManagementAPI{
-		cptvDir: cptvDir,
+func NewAPI(config *goconfig.Config) (*ManagementAPI, error) {
+	thermalRecorder := goconfig.DefaultThermalRecorder()
+	if err := config.Unmarshal(goconfig.ThermalRecorderKey, &thermalRecorder); err != nil {
+		return nil, err
 	}
+
+	return &ManagementAPI{
+		cptvDir: thermalRecorder.OutputDir,
+		config:  config,
+	}, nil
 }
 
 // GetDeviceInfo returns information about this device
 func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) {
-	config, err := goapi.LoadConfig()
-
-	if err != nil {
+	var device goconfig.Device
+	if err := api.config.Unmarshal(goconfig.DeviceKey, &device); err != nil {
 		log.Printf("/device-info failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "failed to read device config\n")
@@ -65,18 +72,18 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 	}
 
 	type deviceInfo struct {
-		*goapi.Config
-		DeviceID int `json:"deviceID"`
+		ServerURL  string `json:"serverURL"`
+		Groupname  string `json:"groupname"`
+		Devicename string `json:"devicename"`
+		DeviceID   int    `json:"deviceID"`
 	}
-	info := deviceInfo{Config: config}
-
-	privConfig, err := goapi.LoadPrivateConfig()
-	if err != nil {
-		log.Printf("/device-info error loading private config: %v", err)
-	} else {
-		info.DeviceID = privConfig.DeviceID
+	info := deviceInfo{
+		ServerURL:  device.Server,
+		Groupname:  device.Group,
+		Devicename: device.Name,
+		DeviceID:   device.ID,
 	}
-
+	log.Println(info)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(info)
 }

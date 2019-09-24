@@ -37,7 +37,7 @@ import (
 	"strconv"
 	"strings"
 
-	goapi "github.com/TheCacophonyProject/go-api"
+	goconfig "github.com/TheCacophonyProject/go-config"
 
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
@@ -627,8 +627,14 @@ func getInstalledPackages() (string, error) {
 
 }
 
+func AboutHandlerGen(conf *goconfig.Config) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		AboutHandler(w, r, conf)
+	}
+}
+
 // AboutHandler shows the currently installed packages on the device.
-func AboutHandler(w http.ResponseWriter, r *http.Request) {
+func AboutHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config) {
 
 	type aboutResponse struct {
 		RaspberryPiSerialNumber string
@@ -639,28 +645,21 @@ func AboutHandler(w http.ResponseWriter, r *http.Request) {
 		ErrorMessage            string
 	}
 
+	// Get the device group from the API
+	var device goconfig.Device
+	if err := conf.Unmarshal(goconfig.DeviceKey, &device); err != nil {
+		log.Printf("/device-info failed: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to read device config\n")
+		return
+	}
+
 	// Create response
 	resp := aboutResponse{
 		RaspberryPiSerialNumber: getRaspberryPiSerialNumber(),
 		SaltMinionID:            getSaltMinionID(),
-	}
-
-	// Get the device group from the API
-	config, err := goapi.LoadConfig()
-	if err != nil {
-		log.Println("failed to read device config from API:", err)
-	} else {
-		resp.Group = config.Group
-	}
-
-	// Get the device ID from the device-priv.yaml file locally
-	privConfig, err := goapi.LoadPrivateConfig()
-	if err != nil {
-		log.Println("error loading private config:", err)
-	} else {
-		if privConfig != nil {
-			resp.DeviceID = privConfig.DeviceID
-		}
+		Group:                   device.Group,
+		DeviceID:                device.ID,
 	}
 
 	// Get installed packages.
