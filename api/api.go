@@ -83,7 +83,6 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 		Devicename: device.Name,
 		DeviceID:   device.ID,
 	}
-	log.Println(info)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(info)
 }
@@ -217,8 +216,7 @@ func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 // GetConfig will return the config settings and the defaults
 func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 	if err := api.config.Update(); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		log.Println(err)
+		serverError(&w, err)
 		return
 	}
 
@@ -264,8 +262,7 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 
 	jsonString, err := json.Marshal(valuesAndDefaults)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		log.Println(err)
+		serverError(&w, err)
 		return
 	}
 	w.Write(jsonString)
@@ -281,7 +278,7 @@ func (api *ManagementAPI) ClearConfigSection(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-// SetLocation is a deprecated API endpoint specifically for writing to location settings. Use SetConfig instead.
+// SetLocation is for specifically writing to location setting.
 func (api *ManagementAPI) SetLocation(w http.ResponseWriter, r *http.Request) {
 	log.Println("update location")
 	latitude, err := strconv.ParseFloat(r.FormValue("latitude"), 32)
@@ -307,7 +304,6 @@ func (api *ManagementAPI) SetLocation(w http.ResponseWriter, r *http.Request) {
 
 	timeMillis, err := strconv.ParseInt(r.FormValue("timestamp"), 10, 64)
 	if err != nil {
-		log.Println("bad timestamp")
 		badRequest(&w, err)
 		return
 	}
@@ -321,14 +317,18 @@ func (api *ManagementAPI) SetLocation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := api.config.Set(goconfig.LocationKey, &location); err != nil {
-		badRequest(&w, err)
-		return
+		serverError(&w, err)
 	}
 }
 
 func badRequest(w *http.ResponseWriter, err error) {
 	(*w).WriteHeader(http.StatusBadRequest)
 	io.WriteString(*w, err.Error())
+}
+
+func serverError(w *http.ResponseWriter, err error) {
+	log.Printf("server error: %v", err)
+	(*w).WriteHeader(http.StatusInternalServerError)
 }
 
 func (api *ManagementAPI) writeConfig(newConfig map[string]interface{}) error {

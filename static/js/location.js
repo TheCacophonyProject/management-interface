@@ -1,5 +1,5 @@
 "use strict";
-z
+
 function clearLocation() {
   console.log("clear location");
   var data = [{"name":"section","value":"location"}]
