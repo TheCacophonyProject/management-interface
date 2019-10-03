@@ -44,8 +44,6 @@ nfpms:
   files:
     "_release/managementd-avahi.service": "/etc/avahi/services/managementd.service"
     "_release/managementd.service": "/etc/systemd/system/managementd.service"
-  config_files:
-    "_release/managementd.yaml": "/etc/cacophony/managementd.yaml"
 
 checksum:
   name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
