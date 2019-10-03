@@ -214,6 +214,133 @@ func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// GetConfig will return the config settings and the defaults
+func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
+	if err := api.config.Update(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+
+	configSections := []string{
+		goconfig.AudioKey,
+		goconfig.BatteryKey,
+		goconfig.DeviceKey,
+		goconfig.GPIOKey,
+		goconfig.LeptonKey,
+		goconfig.LocationKey,
+		goconfig.ModemdKey,
+		goconfig.PortsKey,
+		goconfig.TestHostsKey,
+		goconfig.ThermalMotionKey,
+		goconfig.ThermalRecorderKey,
+		goconfig.ThermalThrottlerKey,
+		goconfig.WindowsKey,
+	}
+
+	configDefaults := map[string]interface{}{
+		goconfig.AudioKey:            goconfig.DefaultAudio(),
+		goconfig.GPIOKey:             goconfig.DefaultGPIO(),
+		goconfig.LeptonKey:           goconfig.DefaultLepton(),
+		goconfig.ModemdKey:           goconfig.DefaultModemd(),
+		goconfig.PortsKey:            goconfig.DefaultPorts(),
+		goconfig.TestHostsKey:        goconfig.DefaultTestHosts(),
+		goconfig.ThermalMotionKey:    goconfig.DefaultThermalMotion(),
+		goconfig.ThermalRecorderKey:  goconfig.DefaultThermalRecorder(),
+		goconfig.ThermalThrottlerKey: goconfig.DefaultThermalThrottler(),
+		goconfig.WindowsKey:          goconfig.DefaultWindows(),
+	}
+
+	configMap := map[string]interface{}{}
+
+	for _, section := range configSections {
+		configMap[section] = api.config.Get(section)
+	}
+
+	valuesAndDefaults := map[string]interface{}{
+		"values":   configMap,
+		"defaults": configDefaults,
+	}
+
+	jsonString, err := json.Marshal(valuesAndDefaults)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+	w.Write(jsonString)
+}
+
+// ClearConfigSection will delet the config from a section so the defautl values will be used.
+func (api *ManagementAPI) ClearConfigSection(w http.ResponseWriter, r *http.Request) {
+	section := r.FormValue("section")
+	log.Printf("clearing config section %s", section)
+
+	if err := api.config.Unset(section); err != nil {
+		badRequest(&w, err)
+	}
+}
+
+// SetLocation is a deprecated API endpoint specifically for writing to location settings. Use SetConfig instead.
+func (api *ManagementAPI) SetLocation(w http.ResponseWriter, r *http.Request) {
+	log.Println("update location")
+	latitude, err := strconv.ParseFloat(r.FormValue("latitude"), 32)
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+	longitude, err := strconv.ParseFloat(r.FormValue("longitude"), 32)
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+	altitude, err := strconv.ParseFloat(r.FormValue("altitude"), 32)
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+	accuracy, err := strconv.ParseFloat(r.FormValue("accuracy"), 32)
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+
+	timeMillis, err := strconv.ParseInt(r.FormValue("timestamp"), 10, 64)
+	if err != nil {
+		log.Println("bad timestamp")
+		badRequest(&w, err)
+		return
+	}
+
+	location := goconfig.Location{
+		Latitude:  float32(latitude),
+		Longitude: float32(longitude),
+		Accuracy:  float32(accuracy),
+		Altitude:  float32(altitude),
+		Timestamp: time.Unix(timeMillis/1000, 0),
+	}
+
+	if err := api.config.Set(goconfig.LocationKey, &location); err != nil {
+		badRequest(&w, err)
+		return
+	}
+}
+
+func badRequest(w *http.ResponseWriter, err error) {
+	(*w).WriteHeader(http.StatusBadRequest)
+	io.WriteString(*w, err.Error())
+}
+
+func (api *ManagementAPI) writeConfig(newConfig map[string]interface{}) error {
+	log.Printf("writing to config: %s", newConfig)
+	for k, v := range newConfig {
+		if err := api.config.Set(k, v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func getCptvNames(dir string) []string {
 	matches, _ := filepath.Glob(filepath.Join(dir, cptvGlob))
 	failedUploadMatches, _ := filepath.Glob(filepath.Join(dir, failedUploadsFolder, cptvGlob))

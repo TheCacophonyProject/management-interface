@@ -26,8 +26,8 @@ import (
 
 // Config for management interface
 type Config struct {
-	Port    int    `yaml:"port"`
-	CPTVDir string `yaml:"cptv-dir"`
+	Port    int
+	CPTVDir string
 	config  *goconfig.Config
 }
 

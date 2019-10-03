@@ -9,6 +9,12 @@ github.com/TheCacophonyProject/go-api v0.0.0-20190923033957-174cea2ac81c h1:oe4a
 github.com/TheCacophonyProject/go-api v0.0.0-20190923033957-174cea2ac81c/go.mod h1:FfMpa4cFhNXQ9tuKG18HO6yLExezcJhzjUjBOFocrQw=
 github.com/TheCacophonyProject/go-config v0.0.0-20190922224052-7c2a21bc6b88 h1:b3CpL57RUjdlgRmm54qNj37tLEwmJzNDvxOXX7GHYBw=
 github.com/TheCacophonyProject/go-config v0.0.0-20190922224052-7c2a21bc6b88/go.mod h1:gPUJLVu408NRz9/P3BrsxzOzLc+KJLrv+jVdDw3RI0Y=
+github.com/TheCacophonyProject/go-config v0.0.0-20191001063829-bf05ee481a80 h1:wmj+QLUR90c/DwQq6aUCWL0Ca2ly2kQCayfHPVT7YZQ=
+github.com/TheCacophonyProject/go-config v0.0.0-20191001063829-bf05ee481a80/go.mod h1:QCgT+KCrz1CmLVpeeOMl5L8/X1QvWwpsLzR7afTmEJc=
+github.com/TheCacophonyProject/go-config v0.0.0-20191002030903-2dd35609b718 h1:yuTvOqpOmhnfiUers0C919RLwFAY22th5cdo+7z0rBI=
+github.com/TheCacophonyProject/go-config v0.0.0-20191002030903-2dd35609b718/go.mod h1:WuesghaKfkLjOSR07Aaw3el/KPOSB8rRsL3pg5RMr8o=
+github.com/TheCacophonyProject/go-config v0.0.0-20191003001220-bff132a03491 h1:QFWP26EWnV7mDUr6LTLzL7wvRNOpcMgETAGAA+njkUg=
+github.com/TheCacophonyProject/go-config v0.0.0-20191003001220-bff132a03491/go.mod h1:WuesghaKfkLjOSR07Aaw3el/KPOSB8rRsL3pg5RMr8o=
 github.com/TheCacophonyProject/window v0.0.0-20190821235241-ab92c2ee24b6/go.mod h1:Vww417iimOb0s46Ndsm8U/vYtwc0dZUet4uW8QzBo4M=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=

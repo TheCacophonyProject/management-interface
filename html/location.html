@@ -29,18 +29,18 @@
         </div>
         <hr>
 
-        <form action="/location" method="POST">
+        <form id="location-form">
             <div class="form-row">
               <div class="form-group col-md-6">
                 <label for="latitude">Latitude</label>
-                <input type="text" class="form-control" name="latitude" placeholder="Enter latitude" value="{{.Location.Latitude}}">
+                <input type="text" id="latitude" class="form-control" name="latitude" placeholder="Enter latitude" value="{{.Location.Latitude}}">
               </div>
             </div>
 
             <div class="form-row">
               <div class="form-group col-md-6">
                 <label for="longitude">Longitude</label>
-                <input type="text" class="form-control" name="longitude" placeholder="Enter longitude" value="{{.Location.Longitude}}">
+                <input type="text" id="longitude" class="form-control" name="longitude" placeholder="Enter longitude" value="{{.Location.Longitude}}">
               </div>
             </div>
 
@@ -54,27 +54,29 @@
             <div class="form-row">
               <div class="form-group col-md-6">
                 <label for="altitude">Altitude</label>
-                <input type="text" class="form-control" name="altitude" placeholder="Enter altitude" value="{{.Location.Altitude}}">
+                <input type="text" id="altitude" class="form-control" name="altitude" placeholder="Enter altitude" value="{{.Location.Altitude}}">
               </div>
             </div>
 
             <div class="form-row">
               <div class="form-group col-md-6">
                 <label for="accuracy">Accuracy</label>
-                <input type="text" class="form-control" name="accuracy" placeholder="Enter accuracy" value="{{.Location.Accuracy}}">
+                <input type="text" id="accuracy" class="form-control" name="accuracy" placeholder="Enter accuracy" value="{{.Location.Accuracy}}">
               </div>
             </div>
 
             <div class="form-row">
               <div class="form-group col-md-6">
-                <button type="submit" name="action" value="update" class="btn btn-primary">Update</button>
-                <button type="submit" name="action" value="clear" class="btn float-right">Clear</button>
+                <button type="button" value="update" onclick="updateLocation()" class="btn btn-primary">Update</button>
+                <button type="button" value="clear" onclick="clearLocation()" class="btn float-right">Clear</button>
               </div>
             </div>
         </form>
-        
+
     </div>
 
+    <script type="text/javascript" src="/static/js/util.js"></script>
+    <script type="text/javascript" src="/static/js/location.js"></script>
     <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
     <script src="/static/js/bootstrap.min.js"></script>
 </body>
