@@ -268,13 +268,13 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonString)
 }
 
-// ClearConfigSection will delet the config from a section so the defautl values will be used.
+// ClearConfigSection will delete the config from a section so the default values will be used.
 func (api *ManagementAPI) ClearConfigSection(w http.ResponseWriter, r *http.Request) {
 	section := r.FormValue("section")
 	log.Printf("clearing config section %s", section)
 
 	if err := api.config.Unset(section); err != nil {
-		badRequest(&w, err)
+		serverError(&w, err)
 	}
 }
 
