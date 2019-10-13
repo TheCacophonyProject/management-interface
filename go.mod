@@ -3,7 +3,8 @@ module github.com/TheCacophonyProject/management-interface
 go 1.12
 
 require (
-	github.com/TheCacophonyProject/go-api v0.0.0-20190901221455-8bdb00df1b38
+	github.com/TheCacophonyProject/go-api v0.0.0-20190923033957-174cea2ac81c
+	github.com/TheCacophonyProject/go-config v0.0.0-20191003001220-bff132a03491
 	github.com/gobuffalo/packr v1.30.1
 	github.com/godbus/dbus v4.1.0+incompatible
 	github.com/gorilla/context v1.1.1 // indirect

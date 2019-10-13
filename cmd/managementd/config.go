@@ -20,30 +20,41 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 
-	yaml "gopkg.in/yaml.v2"
+	goconfig "github.com/TheCacophonyProject/go-config"
 )
 
 // Config for management interface
 type Config struct {
-	Port    int    `yaml:"port"`
-	CPTVDir string `yaml:"cptv-dir"`
+	Port    int
+	CPTVDir string
+	config  *goconfig.Config
 }
 
 func (c Config) String() string {
 	return fmt.Sprintf("{ Port: %d, CPTVDir: %s }", c.Port, c.CPTVDir)
 }
 
-// ParseConfigFile parses the given file
-func ParseConfigFile(filepath string) (*Config, error) {
-	buf, err := ioutil.ReadFile(filepath)
+// ParseConfig parses the config
+func ParseConfig(configDir string) (*Config, error) {
+	config, err := goconfig.New(configDir)
 	if err != nil {
 		return nil, err
 	}
-	config := Config{}
-	if err := yaml.Unmarshal(buf, &config); err != nil {
+
+	ports := goconfig.DefaultPorts()
+	if err := config.Unmarshal(goconfig.PortsKey, &ports); err != nil {
 		return nil, err
 	}
-	return &config, nil
+
+	thermalRecorder := goconfig.DefaultThermalRecorder()
+	if err := config.Unmarshal(goconfig.ThermalRecorderKey, &thermalRecorder); err != nil {
+		return nil, err
+	}
+
+	return &Config{
+		Port:    ports.Managementd,
+		CPTVDir: thermalRecorder.OutputDir,
+		config:  config,
+	}, nil
 }

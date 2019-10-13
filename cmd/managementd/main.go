@@ -26,12 +26,13 @@ import (
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
 
+	goconfig "github.com/TheCacophonyProject/go-config"
 	managementinterface "github.com/TheCacophonyProject/management-interface"
 	"github.com/TheCacophonyProject/management-interface/api"
 )
 
 const (
-	configFile = "/etc/cacophony/managementd.yaml"
+	configDir = goconfig.DefaultConfigDir
 )
 
 var version = "<not set>"
@@ -41,7 +42,7 @@ func main() {
 	log.SetFlags(0) // Removes timestamp output
 	log.Printf("running version: %s", version)
 
-	config, err := ParseConfigFile(configFile)
+	config, err := ParseConfig(configDir)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -62,13 +63,12 @@ func main() {
 	router.HandleFunc("/wifi-networks", managementinterface.WifiNetworkHandler).Methods("GET", "POST")
 	router.HandleFunc("/network", managementinterface.NetworkHandler).Methods("GET")
 	router.HandleFunc("/interface-status/{name:[a-zA-Z0-9-* ]+}", managementinterface.CheckInterfaceHandler).Methods("GET")
-	router.HandleFunc("/online-state", managementinterface.ToggleOnlineState).Methods("POST")
 	router.HandleFunc("/speaker", managementinterface.SpeakerTestHandler).Methods("GET")
 	router.HandleFunc("/speaker/status", managementinterface.SpeakerStatusHandler).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
-	router.HandleFunc("/location", managementinterface.LocationHandler).Methods("GET", "POST") // Form to view and/or set location manually.
-	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET", "POST")        // Form to view and/or adjust time settings.
-	router.HandleFunc("/about", managementinterface.AboutHandler).Methods("GET")
+	router.HandleFunc("/location", managementinterface.GenLocationHandler(config.config)).Methods("GET") // Form to view and/or set location manually.
+	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET", "POST")                  // Form to view and/or adjust time settings.
+	router.HandleFunc("/about", managementinterface.AboutHandlerGen(config.config)).Methods("GET")
 
 	router.HandleFunc("/advanced", managementinterface.AdvancedMenuHandler).Methods("GET")
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
@@ -76,7 +76,11 @@ func main() {
 	router.HandleFunc("/rename", managementinterface.Rename).Methods("GET")
 
 	// API
-	apiObj := api.NewAPI(config.CPTVDir)
+	apiObj, err := api.NewAPI(config.config)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.HandleFunc("/device-info", apiObj.GetDeviceInfo).Methods("GET")
 	apiRouter.HandleFunc("/recordings", apiObj.GetRecordings).Methods("GET")
@@ -86,8 +90,10 @@ func main() {
 	apiRouter.HandleFunc("/signal-strength", apiObj.GetSignalStrength).Methods("GET")
 	apiRouter.HandleFunc("/reregister", apiObj.Reregister).Methods("POST")
 	apiRouter.HandleFunc("/reboot", apiObj.Reboot).Methods("POST")
-	apiRouter.HandleFunc("/location", managementinterface.APILocationHandler).Methods("POST") // Set location via a POST request.
-	apiRouter.HandleFunc("/clock", managementinterface.APITimeHandler).Methods("POST")        // Set times via a POST request.
+	apiRouter.HandleFunc("/config", apiObj.GetConfig).Methods("GET")
+	apiRouter.HandleFunc("/clear-config-section", apiObj.ClearConfigSection).Methods("POST")
+	apiRouter.HandleFunc("/location", apiObj.SetLocation).Methods("POST")              // Set location via a POST request.
+	apiRouter.HandleFunc("/clock", managementinterface.APITimeHandler).Methods("POST") // Set times via a POST request.
 	apiRouter.Use(basicAuth)
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
