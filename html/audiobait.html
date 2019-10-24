@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Audiobait</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+</head>
+
+<body>
+    {{template "navbar"}}
+
+    <div class="container">
+        {{if ne .ErrorMessage ""}}
+        <div class="alert alert-danger">
+            {{.ErrorMessage}}
+        </div>
+        {{end}}
+
+        <div class="container pt-5 pl-0">
+            <h2>Audiobait<br></h2>
+        </div>
+        <hr>
+
+        <div class="container pt-5 pb-4 pl-2">
+            <h3>Status:</h3>
+
+            <div class="row">
+                <div class="col-xs-6">
+                    <div class="card mt-2 ml-2">
+                        <div class="card-body">
+                            <h5 class="card-text">
+                                <strong>Audiobait is {{if not .Running}} not {{end}}running.</strong>
+                            </h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+
+            <div class="container pt-5 pb-4 pl-2">
+                <h3>Schedule:</h3>
+
+                <div class="row">
+                    <div class="col">
+                        <div class="card mt-2">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <strong>{{.Schedule.Description}}</strong>
+                                </h5>
+                                <h5 class="card-text">
+                                    Play sounds for {{.Schedule.PlayNights}} nights then have {{.Schedule.ControlNights}} nights
+                                    without sound (as a control) starting on day {{.Schedule.StartDay}}
+                                </h5>
+                            </div>
+                        </div>
+                    </div>
+                    {{range .Schedule.Combos}}
+                    <hr>
+                    <div class="container">
+                        <div class="row">
+                            <div class="col">
+                                <div class="card border-0 mt-2">
+                                    <div class="card-body">
+                                        <h5 class="card-title">
+                                            <strong>Timing</strong>
+                                        </h5>
+                                        <h5 class="card-text">
+                                            Play every {{.Every}} mins
+                                        </h5>
+                                        <h5 class="card-text">
+                                            From time {{TimeOfDayToString .From}}
+                                        </h5>
+                                        <h5 class="card-text">
+                                            Until {{TimeOfDayToString .Until}}
+                                        </h5>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="card mt-2">
+                                    <div class="card-body">
+                                        <h5 class="card-title">
+                                            <strong>Sounds</strong>
+                                        </h5>
+                                        {{range .SoundInfo}}
+                                            <h5 class="card-text">
+                                                Play sound {{.Sound}}
+                                            </h5>
+                                            <h5 class="card-text">
+                                                at volume {{.Volume}}
+                                            </h5>
+                                            {{if ne .Wait 0}}
+                                                <h5 class="card-text">
+                                                    then wait {{.Wait}} mins
+                                                </h5>
+                                            {{end}}
+                                        {{end}}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {{end}}
+            </div>
+
+
+                <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+                <script src="/static/js/bootstrap.min.js"></script>
+
+                <script>
+                    $(document).ready(function () {
+                        document.getElementById("btnBack").href = "/advanced";
+                        document.getElementById("navDeviceName").href = "/advanced";
+                    });
+                </script>
+
+
+
+
+</body>
+
+</html>
