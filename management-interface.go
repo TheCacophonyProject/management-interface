@@ -37,11 +37,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/TheCacophonyProject/audiobait/playlist"
 	goconfig "github.com/TheCacophonyProject/go-config"
 
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
 )
+
+const scheduleFilename = "schedule.json"
 
 // The file system location of this execuable.
 var executablePath = ""
@@ -59,7 +62,9 @@ func init() {
 	// The name of the device we are running this executable on.
 	deviceName := getDeviceName()
 	tmpl = template.New("")
-	tmpl.Funcs(template.FuncMap{"DeviceName": func() string { return deviceName }})
+	tmpl.Funcs(template.FuncMap{"DeviceName": func() string { return deviceName },
+		"TimeOfDayToString": func(theTime playlist.TimeOfDay) string { return extractTimeOfDayAsString(theTime) }})
+	// tmpl.Funcs(template.FuncMap{"DeviceName": func() string { return deviceName }, "TimeOfDayToString": func(theTime playlist.TimeOfDay) string { return "7:30" }})
 	for _, name := range templateBox.List() {
 		t := tmpl.New(name)
 		template.Must(t.Parse(templateBox.String(name)))
@@ -590,6 +595,7 @@ func getInstalledPackages() (string, error) {
 
 }
 
+// AboutHandlerGen is a wrapper for the AboutHandler function.
 func AboutHandlerGen(conf *goconfig.Config) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		AboutHandler(w, r, conf)
