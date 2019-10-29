@@ -69,6 +69,7 @@ func main() {
 	router.HandleFunc("/location", managementinterface.GenLocationHandler(config.config)).Methods("GET") // Form to view and/or set location manually.
 	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET", "POST")                  // Form to view and/or adjust time settings.
 	router.HandleFunc("/about", managementinterface.AboutHandlerGen(config.config)).Methods("GET")
+	router.HandleFunc("/audiobait", managementinterface.AudiobaitHandlerGen(config.config)).Methods("GET")
 
 	router.HandleFunc("/advanced", managementinterface.AdvancedMenuHandler).Methods("GET")
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")

@@ -51,14 +51,15 @@
                                     <strong>{{.Schedule.Description}}</strong>
                                 </h5>
                                 <h5 class="card-text">
-                                    Play sounds for {{.Schedule.PlayNights}} nights then have {{.Schedule.ControlNights}} nights
+                                    Play sounds for {{.Schedule.PlayNights}} nights then have
+                                    {{.Schedule.ControlNights}} nights
                                     without sound (as a control) starting on day {{.Schedule.StartDay}}
                                 </h5>
                             </div>
                         </div>
                     </div>
                     {{range .Schedule.Combos}}
-                    <hr>
+                    <hr width="95%">
                     <div class="container">
                         <div class="row">
                             <div class="col">
@@ -71,10 +72,10 @@
                                             Play every {{.Every}} mins
                                         </h5>
                                         <h5 class="card-text">
-                                            From time {{TimeOfDayToString .From}}
+                                            From time {{.From}}
                                         </h5>
                                         <h5 class="card-text">
-                                            Until {{TimeOfDayToString .Until}}
+                                            Until {{.Until}}
                                         </h5>
                                     </div>
                                 </div>
@@ -86,25 +87,25 @@
                                             <strong>Sounds</strong>
                                         </h5>
                                         {{range .SoundInfo}}
-                                            <h5 class="card-text">
-                                                Play sound {{.Sound}}
-                                            </h5>
-                                            <h5 class="card-text">
-                                                at volume {{.Volume}}
-                                            </h5>
-                                            {{if ne .Wait 0}}
-                                                <h5 class="card-text">
-                                                    then wait {{.Wait}} mins
-                                                </h5>
-                                            {{end}}
+                                        <h5 class="card-text">
+                                            Play sound: {{.Sound}}
+                                        </h5>
+                                        <h5 class="card-text">
+                                            at volume: {{.Volume}}
+                                        </h5>
+                                        {{if ne .Wait 0}}
+                                        <h5 class="card-text">
+                                            then wait: {{.Wait}} mins
+                                        </h5>
+                                        {{end}}
                                         {{end}}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                {{end}}
-            </div>
+                    {{end}}
+                </div>
 
 
                 <script src="/static/js/jquery-3.3.1.slim.min.js"></script>

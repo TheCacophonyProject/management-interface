@@ -37,7 +37,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TheCacophonyProject/audiobait/playlist"
 	goconfig "github.com/TheCacophonyProject/go-config"
 
 	"github.com/gobuffalo/packr"
@@ -62,8 +61,7 @@ func init() {
 	// The name of the device we are running this executable on.
 	deviceName := getDeviceName()
 	tmpl = template.New("")
-	tmpl.Funcs(template.FuncMap{"DeviceName": func() string { return deviceName },
-		"TimeOfDayToString": func(theTime playlist.TimeOfDay) string { return extractTimeOfDayAsString(theTime) }})
+	tmpl.Funcs(template.FuncMap{"DeviceName": func() string { return deviceName }})
 	// tmpl.Funcs(template.FuncMap{"DeviceName": func() string { return deviceName }, "TimeOfDayToString": func(theTime playlist.TimeOfDay) string { return "7:30" }})
 	for _, name := range templateBox.List() {
 		t := tmpl.New(name)
