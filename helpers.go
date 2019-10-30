@@ -127,3 +127,11 @@ func errorMessage(err error) string {
 	}
 	return err.Error()
 }
+
+// Reverse a slice of strings in place.
+func reverse(ss []string) {
+	last := len(ss) - 1
+	for i := 0; i < len(ss)/2; i++ {
+		ss[i], ss[last-i] = ss[last-i], ss[i]
+	}
+}

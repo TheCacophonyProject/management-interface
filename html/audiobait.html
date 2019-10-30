@@ -106,17 +106,29 @@
                     </div>
                     {{end}}
                 </div>
+            </div>
 
+            <hr>
+            <div class="container pt-5 pb-4 pl-2">
+                <h3>Logs:</h3>  
+            </div>
+            <div style="height:800px;width:550px;border:1px solid #ccc;overflow:auto;">
+                {{range .LogEntries}}
+                    <p>{{.}}</p>
+                {{end}}            
+            </div>        
+        </div>
+    </div>
 
-                <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
-                <script src="/static/js/bootstrap.min.js"></script>
+    <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
 
-                <script>
-                    $(document).ready(function () {
-                        document.getElementById("btnBack").href = "/advanced";
-                        document.getElementById("navDeviceName").href = "/advanced";
-                    });
-                </script>
+    <script>
+        $(document).ready(function () {
+            document.getElementById("btnBack").href = "/advanced";
+            document.getElementById("navDeviceName").href = "/advanced";
+        });
+    </script>
 
 
 

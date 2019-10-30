@@ -21,16 +21,50 @@ package managementinterface
 import (
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/TheCacophonyProject/audiobait/audiofilelibrary"
 	"github.com/TheCacophonyProject/audiobait/playlist"
 	goconfig "github.com/TheCacophonyProject/go-config"
 )
+
+// Return recent log entries from the audiobait process
+func getAudiobaitLogEntries() []string {
+
+	logEntries := make([]string, 0)
+	out, err := exec.Command("/bin/journalctl", "--no-pager", "-u", "audiobait", "--since", "yesterday", "-n", "100").Output()
+	// out, err := exec.Command("/bin/journalctl --no-pager -u audiobait --since yesterday").Output()
+	if err != nil {
+		log.Println("Could not get audiobait logging info:", err)
+		logEntries = append(logEntries, "Could not get audiobait logging info.")
+		return logEntries
+	}
+
+	lines := strings.Split(string(out), "\n")
+	if len(lines) <= 1 {
+		// Didn't get any useful output.
+		log.Println("Could not get audiobait logging info:", err)
+		logEntries = append(logEntries, "Could not get audiobait logging info.")
+		return logEntries
+	}
+
+	// Separate log entries. The first line contains a sort of header that we don't want.
+	for _, line := range lines[1:] {
+		logEntries = append(logEntries, line)
+	}
+
+	// Show the most recent first.
+	reverse(logEntries)
+
+	return logEntries
+
+}
 
 func isAudiobaitRunning() bool {
 
@@ -106,6 +140,7 @@ func AudiobaitHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Con
 	}
 	type audiobaitResponse struct {
 		Running      bool
+		LogEntries   []string
 		Schedule     soundDisplaySchedule
 		ErrorMessage string
 	}
@@ -176,6 +211,9 @@ func AudiobaitHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Con
 		displaySchedule.Combos = append(displaySchedule.Combos, displayCombo)
 	}
 	resp.Schedule = displaySchedule
+
+	// Get the log entries that the audiobait program has output recently.
+	resp.LogEntries = getAudiobaitLogEntries()
 
 	tmpl.ExecuteTemplate(w, "audiobait.html", resp)
 
