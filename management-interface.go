@@ -686,6 +686,10 @@ func CameraSnapshot(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "/var/spool/cptv/still.png")
 }
 
+func TimeHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl.ExecuteTemplate(w, "clock.html", nil)
+}
+
 // Rename page to change device name and group
 func Rename(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "rename.html", nil)

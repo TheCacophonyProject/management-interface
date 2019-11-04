@@ -6,96 +6,53 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <style>
+      .monospace {
+      	font-family: monospace;
+      }
+    </style>
 </head>
 
 <body>
     {{template "navbar"}}
 
     <div class="container">
-        {{if ne .ErrorMessage ""}}
-        <div class="alert alert-danger">
-            {{.ErrorMessage}}
-        </div>
-        {{end}}
-
-        {{if ne .Message ""}}
-        <div class="alert alert-success">
-            {{.Message}}
-        </div>
-        {{end}}
-
         <div class="container pt-5 pl-0">
             <h2>Clock<br></h2>
         </div>
         <hr>
 
-        <!-- This next line sets up a form that does a POST request and disables the Update button -->
-        <!-- so that it can not be clicked again until the server responds. -->
-        <form action="/clock" method="POST" onsubmit="updateButton.disabled = true; return true;">
-            <div class="form-row">
-            <div class="form-group col-md-6">
-              <label for="rtcdate">Hardware Clock Date</label>
-              <input type="date" class="form-control" name="rtcdate" value="{{.RTCDate}}" disabled>
-            </div>
-          </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">RTC date (UTC):</p>
+          <p id=rtc-date-utc class="monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">RTC date (local):</p>
+          <p id=rtc-date-local class="monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">System date:</p>
+          <p id=system-date class="monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">RTC Battery:</p>
+          <p id=rtc-battery></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">RTC Integrity:</p>
+          <p id=rtc-integrity></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">NTP Synced:</p>
+          <p id=ntp-synced></p>
+        </div>
 
-          <div class="form-row">
-            <div class="form-group col-md-6">
-              <label for="rtctime">Hardware Clock Time</label>
-              <input type="time" class="form-control" name="rtctime" value="{{.RTCTime}}" disabled>
-            </div>
-          </div>
+        <button onclick=setTime() class="btn btn-primary">Set Time</button>
 
-          <div class="form-row">
-            <div class="form-group col-md-6 pt-4">
-              <label for="systemdate">System Date</label>
-              <input type="date" class="form-control" name="systemdate" value="{{.SystemDate}}" disabled>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group col-md-6 ">
-              <label for="systemtime">System Time</label>
-              <input type="time" class="form-control" name="systemtime" value="{{.SystemTime}}" disabled>
-            </div>
-          </div>
-
-
-          <div class="form-row">
-            <div class="form-group col-md-6">
-              <button id="updateButton" type="submit" name="updateButton" onclick="getTime()" class="btn btn-primary" enabled>Update Time</button>
-            </div>
-          </div>
-
-          <input id=currenttime type="text" class="form-control" name="currenttime" hidden>
-          <input id=timezone type="text" class="form-control" name="timezone" hidden>
-
-        </form>
-        
     </div>
-
-    <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
-    <script src="/static/js/bootstrap.min.js"></script>
-
-    <script>
-      $(document).ready(function(){
-          document.getElementById("btnBack").href="/advanced";
-          document.getElementById("navDeviceName").href="/advanced";
-      });
-
-      function getTime() {
-
-        // Populate a hidden field so that the server can access it.
-        var d = new Date();
-        $('#currenttime').val(d.toISOString());
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        $('#timezone').val(tz);
-        console.log(tz);
-        
-      }
-    </script>
-
-
 </body>
-
+<script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+<script src="/static/js/bootstrap.min.js"></script>
+<script src="/static/js/api-utils.js"></script>
+<script src="/static/js/clock.js"></script>
 </html>
