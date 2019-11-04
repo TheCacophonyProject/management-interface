@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net/http"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/TheCacophonyProject/rtc-utils/rtc"
@@ -34,7 +35,8 @@ const (
 )
 
 type clockInfo struct {
-	RTCTime       string
+	RTCTimeUTC    string
+	RTCTimeLocal  string
 	SystemTime    string
 	LowRTCBattery bool
 	RTCIntegrity  bool
@@ -47,7 +49,7 @@ func (api *ManagementAPI) GetClock(w http.ResponseWriter, r *http.Request) {
 		serverError(&w, err)
 		return
 	}
-	systemTime, err := time.Parse(timeFormat, string(out[:len(out)-1]))
+	systemTime, err := time.Parse(timeFormat, strings.TrimSpace(string(out)))
 	if err != nil {
 		serverError(&w, err)
 		return
@@ -64,7 +66,8 @@ func (api *ManagementAPI) GetClock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	b, err := json.Marshal(&clockInfo{
-		RTCTime:       rtcState.Time.UTC().Format(timeFormat),
+		RTCTimeUTC:    rtcState.Time.UTC().Format(timeFormat),
+		RTCTimeLocal:  rtcState.Time.Local().Format(timeFormat),
 		SystemTime:    systemTime.Format(timeFormat),
 		LowRTCBattery: rtcState.LowBattery,
 		RTCIntegrity:  rtcState.ClockIntegrity,

@@ -7,7 +7,8 @@ async function getState() {
   try {
     var response = await apiGetJSON('/api/clock');
     console.log(response)
-    $("#rtc-date").html(response.RTCTime)
+    $("#rtc-date-utc").html(response.RTCTimeUTC)
+    $("#rtc-date-local").html(response.RTCTimeLocal)
     $("#system-date").html(response.SystemTime)
     if (response.LowRTCBattery) {
       $("#rtc-battery").html("Low/Empty. Replace soon.")
