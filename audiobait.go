@@ -38,8 +38,7 @@ import (
 func getAudiobaitLogEntries() []string {
 
 	logEntries := make([]string, 0)
-	out, err := exec.Command("/bin/journalctl", "--no-pager", "-u", "audiobait", "--since", "yesterday", "-n", "100").Output()
-	// out, err := exec.Command("/bin/journalctl --no-pager -u audiobait --since yesterday").Output()
+	out, err := exec.Command("/bin/journalctl", "--no-pager", "-u", "audiobait", "-n", "100").Output()
 	if err != nil {
 		log.Println("Could not get audiobait logging info:", err)
 		logEntries = append(logEntries, "Could not get audiobait logging info.")
@@ -52,11 +51,22 @@ func getAudiobaitLogEntries() []string {
 		log.Println("Could not get audiobait logging info:", err)
 		logEntries = append(logEntries, "Could not get audiobait logging info.")
 		return logEntries
+	} else if len(lines) >= 2 && strings.Contains(strings.ToUpper(lines[1]), "NO ENTRIES") {
+		// There are no Audiobait log entries to show.
+		logEntries = append(logEntries, "There are no Audiobait log entries.")
+		return logEntries
 	}
+	// log.Println("Debug:")
+	// for _, line := range lines[1:] {
+	// 	log.Println("Line:", line)
+	// }
+	// log.Println("End Debug:")
 
 	// Separate log entries. The first line contains a sort of header that we don't want.
 	for _, line := range lines[1:] {
-		logEntries = append(logEntries, line)
+		if len(line) > 0 {
+			logEntries = append(logEntries, line)
+		}
 	}
 
 	// Show the most recent first.
@@ -94,6 +104,33 @@ type scheduleResponse struct {
 	Schedule playlist.Schedule
 }
 
+// These next 4 structs are used to put the audiobait data into a format that
+// makes it easy to display
+type soundDisplayInfo struct {
+	Sound  string
+	Volume int
+	Wait   int
+}
+type soundDisplayCombo struct {
+	From      string
+	Every     int
+	Until     string
+	SoundInfo []soundDisplayInfo
+}
+type soundDisplaySchedule struct {
+	Description   string
+	ControlNights int
+	PlayNights    int
+	StartDay      int
+	Combos        []soundDisplayCombo
+}
+type audiobaitResponse struct {
+	Running      bool
+	Schedule     soundDisplaySchedule
+	Message      string
+	ErrorMessage string
+}
+
 func loadScheduleFromDisk(audioDirectory string) (*playlist.Schedule, error) {
 	filename := filepath.Join(audioDirectory, scheduleFilename)
 	jsonData, err := ioutil.ReadFile(filename)
@@ -108,61 +145,27 @@ func loadScheduleFromDisk(audioDirectory string) (*playlist.Schedule, error) {
 	return &sr.Schedule, nil
 }
 
-// AudiobaitHandlerGen is a wrapper for the AudiobaitHandler function.
-func AudiobaitHandlerGen(conf *goconfig.Config) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		AudiobaitHandler(w, r, conf)
+func restartAudiobaitService() bool {
+	_, err := exec.Command("systemctl", "restart", "audiobait").Output()
+	if err != nil {
+		return false
 	}
+	return true
 }
 
-// AudiobaitHandler shows the status and details of audiobait being played on the device.
-func AudiobaitHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config) {
-
-	// These next 4 structs are used to put the audiobait data into a format that
-	// makes it easy to display
-	type soundDisplayInfo struct {
-		Sound  string
-		Volume int
-		Wait   int
-	}
-	type soundDisplayCombo struct {
-		From      string
-		Every     int
-		Until     string
-		SoundInfo []soundDisplayInfo
-	}
-	type soundDisplaySchedule struct {
-		Description   string
-		ControlNights int
-		PlayNights    int
-		StartDay      int
-		Combos        []soundDisplayCombo
-	}
-	type audiobaitResponse struct {
-		Running      bool
-		LogEntries   []string
-		Schedule     soundDisplaySchedule
-		ErrorMessage string
-	}
-
-	// Creat our response
-	resp := audiobaitResponse{
-		Running: isAudiobaitRunning(),
-	}
+func getScheduleData(resp *audiobaitResponse, conf *goconfig.Config) soundDisplaySchedule {
 
 	// Get the audiobait schedule from disk.
 	audio := goconfig.DefaultAudio()
 	if err := conf.Unmarshal(goconfig.AudioKey, &audio); err != nil {
 		resp.ErrorMessage = errorMessage(err)
-		tmpl.ExecuteTemplate(w, "audiobait.html", resp)
-		return
+		return soundDisplaySchedule{}
 	}
 
 	schedule, err := loadScheduleFromDisk(audio.Dir)
 	if err != nil {
 		resp.ErrorMessage = errorMessage(err)
-		tmpl.ExecuteTemplate(w, "audiobait.html", resp)
-		return
+		return soundDisplaySchedule{}
 	}
 
 	// Put the schedule data into a format which makes rendering on html page easy.
@@ -210,11 +213,66 @@ func AudiobaitHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Con
 		}
 		displaySchedule.Combos = append(displaySchedule.Combos, displayCombo)
 	}
-	resp.Schedule = displaySchedule
+
+	return displaySchedule
+
+}
+
+// AudiobaitHandlerGen is a wrapper for the AudiobaitHandler function.
+func AudiobaitHandlerGen(conf *goconfig.Config) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		AudiobaitHandler(w, r, conf)
+	}
+}
+
+// AudiobaitHandler shows the status and details of audiobait being played on the device.
+func AudiobaitHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config) {
+
+	// Creat our response
+	resp := &audiobaitResponse{}
+
+	switch r.Method {
+
+	case "POST":
+
+		// Restart the audiobait service
+		if restartAudiobaitService() {
+			resp.Running = true
+			resp.Message = "Audiobait service successfully restarted."
+		} else {
+			resp.ErrorMessage = "Could not restart audiobait service."
+		}
+
+	case "GET", "":
+
+		resp.Running = isAudiobaitRunning()
+
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+
+	// Get the schedule data
+	resp.Schedule = getScheduleData(resp, conf)
+	tmpl.ExecuteTemplate(w, "audiobait.html", *resp)
+
+}
+
+// AudiobaitLogEntriesHandler returns recent log entries for the audiobait process
+func AudiobaitLogEntriesHandler(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	response := make(map[string]string)
 
 	// Get the log entries that the audiobait program has output recently.
-	resp.LogEntries = getAudiobaitLogEntries()
+	logEntries := getAudiobaitLogEntries()
+	w.WriteHeader(http.StatusOK)
 
-	tmpl.ExecuteTemplate(w, "audiobait.html", resp)
+	outputText := ""
+	for _, line := range logEntries {
+		outputText += line + "\n"
+	}
+	response["result"] = strings.TrimSpace(outputText)
+
+	json.NewEncoder(w).Encode(response)
 
 }

@@ -18,106 +18,151 @@
         </div>
         {{end}}
 
+        {{if ne .Message ""}}
+        <div class="alert alert-success">
+            {{.Message}}
+        </div>
+        {{end}}
+
         <div class="container pt-5 pl-0">
             <h2>Audiobait<br></h2>
         </div>
         <hr>
 
-        <div class="container pt-5 pb-4 pl-2">
-            <h3>Status:</h3>
+        <div class="container pt-2 pb-3 pl-2">
 
-            <div class="row">
-                <div class="col-xs-6">
-                    <div class="card mt-2 ml-2">
-                        <div class="card-body">
-                            <h5 class="card-text">
-                                <strong>Audiobait is {{if not .Running}} not {{end}}running.</strong>
-                            </h5>
-                        </div>
+            <form action="/audiobait" method="POST" onsubmit="resetButton.disabled = true; return true;">
+                <div class="row">
+                    <div class="col-md-10">
+                        {{if .Running}}
+                            <div class="alert alert-success">
+                                Audiobait is running.
+                            </div>
+                        {{else}}
+                            <div class="alert alert-danger">
+                                Audiobait is not running
+                            </div>
+                        {{end}}
+                    </div>
+                    <div class="col-md-2">
+                        <button id="resetButton" type="submit" name="resetButton" onclick="getTime()" style="Height:50px;display:inline-block" class="btn btn-primary align-middle" enabled>Reset</button>
                     </div>
                 </div>
-            </div>
-
+            </form>
 
 
             <div class="container pt-5 pb-4 pl-2">
-                <h3>Schedule:</h3>
 
-                <div class="row">
-                    <div class="col">
-                        <div class="card mt-2">
-                            <div class="card-body">
-                                <h5 class="card-title">
-                                    <strong>{{.Schedule.Description}}</strong>
-                                </h5>
-                                <h5 class="card-text">
-                                    Play sounds for {{.Schedule.PlayNights}} nights then have
-                                    {{.Schedule.ControlNights}} nights
-                                    without sound (as a control) starting on day {{.Schedule.StartDay}}
-                                </h5>
-                            </div>
-                        </div>
-                    </div>
-                    {{range .Schedule.Combos}}
-                    <hr width="95%">
-                    <div class="container">
-                        <div class="row">
-                            <div class="col">
-                                <div class="card border-0 mt-2">
-                                    <div class="card-body">
-                                        <h5 class="card-title">
-                                            <strong>Timing</strong>
-                                        </h5>
-                                        <h5 class="card-text">
-                                            Play every {{.Every}} mins
-                                        </h5>
-                                        <h5 class="card-text">
-                                            From time {{.From}}
-                                        </h5>
-                                        <h5 class="card-text">
-                                            Until {{.Until}}
-                                        </h5>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col">
-                                <div class="card mt-2">
-                                    <div class="card-body">
-                                        <h5 class="card-title">
-                                            <strong>Sounds</strong>
-                                        </h5>
-                                        {{range .SoundInfo}}
-                                        <h5 class="card-text">
-                                            Play sound: {{.Sound}}
-                                        </h5>
-                                        <h5 class="card-text">
-                                            at volume: {{.Volume}}
-                                        </h5>
-                                        {{if ne .Wait 0}}
-                                        <h5 class="card-text">
-                                            then wait: {{.Wait}} mins
-                                        </h5>
-                                        {{end}}
-                                        {{end}}
-                                    </div>
+                <h3>Schedule</h3>
+
+                {{if gt (len .Schedule.Combos) 0}}
+                    <div class="row">
+                        <div class="col">
+                            <div class="card mt-2">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <strong>{{.Schedule.Description}}</strong>
+                                    </h5>
+                                    <h5 class="card-text">
+                                        Play sounds for {{.Schedule.PlayNights}} nights then have
+                                        {{.Schedule.ControlNights}} nights
+                                        without sound (as a control) starting on day {{.Schedule.StartDay}}
+                                    </h5>
                                 </div>
                             </div>
                         </div>
+                        {{range .Schedule.Combos}}
+                        <hr width="95%">
+                        <div class="container">
+                            <div class="row">
+                                <div class="col">
+                                    <div class="card border-0 mt-2">
+                                        <div class="card-body">
+                                            <h5 class="card-title">
+                                                <strong>Timing</strong>
+                                            </h5>
+                                            <h5 class="card-text">
+                                                Play every {{.Every}} mins
+                                            </h5>
+                                            <h5 class="card-text">
+                                                From time {{.From}}
+                                            </h5>
+                                            <h5 class="card-text">
+                                                Until {{.Until}}
+                                            </h5>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="card mt-2">
+                                        <div class="card-body">
+                                            <h5 class="card-title">
+                                                <strong>Sounds</strong>
+                                            </h5>
+                                            {{range .SoundInfo}}
+                                                <h5 class="card-text">
+                                                    Play sound: {{.Sound}}
+                                                </h5>
+                                                <h5 class="card-text">
+                                                    at volume: {{.Volume}}
+                                                </h5>
+                                                {{if ne .Wait 0}}
+                                                <h5 class="card-text">
+                                                    then wait: {{.Wait}} mins
+                                                </h5>
+                                                {{end}}
+                                            {{end}}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {{end}}
                     </div>
-                    {{end}}
-                </div>
+                {{else}}
+                    <strong><h5>Schedule does not contain any sounds to be played.</h5></strong>
+                {{end}}
             </div>
 
             <hr>
-            <div class="container pt-5 pb-4 pl-2">
-                <h3>Logs:</h3>  
-            </div>
-            <div style="height:800px;width:550px;border:1px solid #ccc;overflow:auto;">
-                {{range .LogEntries}}
-                    <p>{{.}}</p>
-                {{end}}            
-            </div>        
+
+
+            <button id="showLogEntries" type="button" data-toggle="modal" data-target="#logEntriesModal" class="btn btn-primary">Show Recent Log Entries</button>
+
+
         </div>
+
+
+          <!-- Modal -->
+        <div class="modal" id="logEntriesModal" role="dialog">
+            <div class="modal-dialog modal-xl">
+            
+                <div class="modal-content">
+
+                    <div class="modal-header">
+                        <h4 class="modal-title">Recent Log Entries</h4>
+                        <button type="button" id="crossCloseButton" class="close" data-dismiss="modal">&times;</button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="row justify-content-center">
+                            <div id="loadingSpinner" class="spinner-border text-primary" style="width: 3rem; height: 3rem;" class="text-center"></div>
+                        </div>
+                        <div style="display:inline-block; height:500px;border:1px solid #ccc;overflow:auto; white-space: pre-wrap;">
+                            <p id="outputText"></p>
+                        </div>        
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" id="closeButton" class="btn btn-primary" data-dismiss="modal">Close</button>
+                    </div>
+
+                </div>
+              
+            </div>
+        </div>
+
+
     </div>
 
     <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
@@ -130,8 +175,48 @@
         });
     </script>
 
+    <script>
 
+        function loadLogEntries(modal) {
 
+            // Clear output text
+            modal.find('p#outputText').prop("textContent", "")
+
+            // Disable load button while waiting for response
+            var button = document.getElementById("showLogEntries");
+            button.disabled = true;
+            // Also make it so the modal can't be closed while the test is running.
+            modal.find('button#closeButton').prop("disabled", true)
+            modal.find('button#crossCloseButton').prop("disabled", true)
+
+            // Show spinner
+            modal.find('div#loadingSpinner').prop("hidden", false)
+
+            fetch(
+                "/audiobait-log-entries", {method: "GET"}
+            ).then(function(response) {
+                return response.json();
+            }).then(function(json) {
+
+                // Hide spinner
+                modal.find('div#loadingSpinner').prop("hidden", true)
+
+                // Show output text.
+                modal.find('p#outputText').prop("textContent", json["result"])
+
+                // Enable buttons again.
+                button.disabled = false;
+                modal.find('button#closeButton').prop("disabled", false)
+                modal.find('button#crossCloseButton').prop("disabled", false)
+
+            });
+        }
+
+        $('#logEntriesModal').on('show.bs.modal', function (event) {
+        loadLogEntries($(this));
+        })
+
+    </script>
 
 </body>
 
