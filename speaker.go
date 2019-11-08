@@ -61,7 +61,7 @@ func playTestAudio() ([]byte, error) {
 	if wav == nil {
 		return nil, errors.New("unable to load test audio")
 	}
-	cmd := exec.Command("play", "-t", "wav", "--norm", "-q", "-")
+	cmd := exec.Command("play", "-t", "wav", "--norm=-3", "-q", "-")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("unable to play audio: %v", err)

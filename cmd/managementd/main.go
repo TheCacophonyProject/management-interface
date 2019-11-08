@@ -67,7 +67,7 @@ func main() {
 	router.HandleFunc("/speaker/status", managementinterface.SpeakerStatusHandler).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
 	router.HandleFunc("/location", managementinterface.GenLocationHandler(config.config)).Methods("GET") // Form to view and/or set location manually.
-	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET", "POST")                  // Form to view and/or adjust time settings.
+	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET")                          // Form to view and/or adjust time settings.
 	router.HandleFunc("/about", managementinterface.AboutHandlerGen(config.config)).Methods("GET")
 	router.HandleFunc("/audiobait", managementinterface.AudiobaitHandlerGen(config.config)).Methods("GET", "POST")
 	router.HandleFunc("/audiobait-log-entries", managementinterface.AudiobaitLogEntriesHandler).Methods("GET")
@@ -93,8 +93,9 @@ func main() {
 	apiRouter.HandleFunc("/reboot", apiObj.Reboot).Methods("POST")
 	apiRouter.HandleFunc("/config", apiObj.GetConfig).Methods("GET")
 	apiRouter.HandleFunc("/clear-config-section", apiObj.ClearConfigSection).Methods("POST")
-	apiRouter.HandleFunc("/location", apiObj.SetLocation).Methods("POST")              // Set location via a POST request.
-	apiRouter.HandleFunc("/clock", managementinterface.APITimeHandler).Methods("POST") // Set times via a POST request.
+	apiRouter.HandleFunc("/location", apiObj.SetLocation).Methods("POST") // Set location via a POST request.
+	apiRouter.HandleFunc("/clock", apiObj.GetClock).Methods("GET")
+	apiRouter.HandleFunc("/clock", apiObj.PostClock).Methods("POST")
 	apiRouter.Use(basicAuth)
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
