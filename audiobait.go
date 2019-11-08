@@ -23,9 +23,9 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -35,32 +35,24 @@ import (
 )
 
 // Return recent log entries from the audiobait process
-func getAudiobaitLogEntries() []string {
+func getAudiobaitLogEntries() string {
 
 	logEntries := make([]string, 0)
 	out, err := exec.Command("/bin/journalctl", "--no-pager", "-u", "audiobait", "-n", "100").Output()
 	if err != nil {
 		log.Println("Could not get audiobait logging info:", err)
-		logEntries = append(logEntries, "Could not get audiobait logging info.")
-		return logEntries
+		return "Could not get audiobait logging info."
 	}
 
 	lines := strings.Split(string(out), "\n")
 	if len(lines) <= 1 {
 		// Didn't get any useful output.
 		log.Println("Could not get audiobait logging info:", err)
-		logEntries = append(logEntries, "Could not get audiobait logging info.")
-		return logEntries
+		return "Could not get audiobait logging info."
 	} else if len(lines) >= 2 && strings.Contains(strings.ToUpper(lines[1]), "NO ENTRIES") {
 		// There are no Audiobait log entries to show.
-		logEntries = append(logEntries, "There are no Audiobait log entries.")
-		return logEntries
+		return "There are no Audiobait log entries."
 	}
-	// log.Println("Debug:")
-	// for _, line := range lines[1:] {
-	// 	log.Println("Line:", line)
-	// }
-	// log.Println("End Debug:")
 
 	// Separate log entries. The first line contains a sort of header that we don't want.
 	for _, line := range lines[1:] {
@@ -72,22 +64,32 @@ func getAudiobaitLogEntries() []string {
 	// Show the most recent first.
 	reverse(logEntries)
 
-	return logEntries
+	// Now combine back into 1 string.
+	outputText := ""
+	for _, line := range logEntries {
+		outputText += line + "\n"
+	}
+
+	return outputText
 
 }
 
 func isAudiobaitRunning() bool {
 
-	if runtime.GOOS == "windows" {
-		return false
-	}
-
-	// Run pgrep command to try and find the audiobait process.
-	out, err := exec.Command("pgrep", "audiobait").Output()
+	// Run systemctl commands to see if the audiobait process is running.
+	out, err := exec.Command("/bin/systemctl", "is-active", "audiobait").Output()
 	if err != nil {
 		return false
 	}
-	if out != nil {
+	active := strings.ToUpper(strings.TrimSpace(string(out))) == "ACTIVE"
+
+	out, err = exec.Command("/bin/systemctl", "is-enabled", "audiobait").Output()
+	if err != nil {
+		return false
+	}
+	enabled := strings.ToUpper(strings.TrimSpace(string(out))) == "ENABLED"
+
+	if active && enabled {
 		return true
 	}
 	return false
@@ -96,10 +98,9 @@ func isAudiobaitRunning() bool {
 
 // Return the time part of the time.Time struct as a string.
 func extractTimeOfDayAsString(t playlist.TimeOfDay) string {
-	return t.Format("15:04PM")
+	return t.Format("03:04PM")
 }
 
-// DNB TODO: Do we need this struct?
 type scheduleResponse struct {
 	Schedule playlist.Schedule
 }
@@ -119,6 +120,7 @@ type soundDisplayCombo struct {
 }
 type soundDisplaySchedule struct {
 	Description   string
+	Timestamp     string
 	ControlNights int
 	PlayNights    int
 	StartDay      int
@@ -174,6 +176,15 @@ func getScheduleData(resp *audiobaitResponse, conf *goconfig.Config) soundDispla
 		ControlNights: schedule.ControlNights,
 		PlayNights:    schedule.PlayNights,
 		StartDay:      schedule.StartDay,
+	}
+
+	// Get the timestamp for the schedule so the user can see when the schedule was last downloaded.
+	filename := filepath.Join(audio.Dir, scheduleFilename)
+	file, err := os.Stat(filename)
+	if err != nil {
+		displaySchedule.Timestamp = "Unknown."
+	} else {
+		displaySchedule.Timestamp = file.ModTime().Format("15:04PM, Monday January 2 2006")
 	}
 
 	// The schedule file provides us with audio file IDs.  To get the file names, we
@@ -261,17 +272,12 @@ func AudiobaitHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Con
 func AudiobaitLogEntriesHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
 	response := make(map[string]string)
 
 	// Get the log entries that the audiobait program has output recently.
 	logEntries := getAudiobaitLogEntries()
-	w.WriteHeader(http.StatusOK)
-
-	outputText := ""
-	for _, line := range logEntries {
-		outputText += line + "\n"
-	}
-	response["result"] = strings.TrimSpace(outputText)
+	response["result"] = strings.TrimSpace(logEntries)
 
 	json.NewEncoder(w).Encode(response)
 

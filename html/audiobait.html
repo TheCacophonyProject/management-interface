@@ -5,8 +5,10 @@
     <title>Audiobait</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/audiobait.css">
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
 </head>
+
 
 <body>
     {{template "navbar"}}
@@ -25,7 +27,7 @@
         {{end}}
 
         <div class="container pt-5 pl-0">
-            <h2>Audiobait<br></h2>
+            <h2>Audiobait Schedule<br></h2>
         </div>
         <hr>
 
@@ -33,7 +35,7 @@
 
             <form action="/audiobait" method="POST" onsubmit="resetButton.disabled = true; return true;">
                 <div class="row">
-                    <div class="col-md-10">
+                    <div class="col-8">
                         {{if .Running}}
                             <div class="alert alert-success">
                                 Audiobait is running.
@@ -44,7 +46,7 @@
                             </div>
                         {{end}}
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-2">
                         <button id="resetButton" type="submit" name="resetButton" onclick="getTime()" style="Height:50px;display:inline-block" class="btn btn-primary align-middle" enabled>Reset</button>
                     </div>
                 </div>
@@ -64,6 +66,9 @@
                                         <strong>{{.Schedule.Description}}</strong>
                                     </h5>
                                     <h5 class="card-text">
+                                        Last updated: {{.Schedule.Timestamp}}
+                                        <br>
+                                        <br>
                                         Play sounds for {{.Schedule.PlayNights}} nights then have
                                         {{.Schedule.ControlNights}} nights
                                         without sound (as a control) starting on day {{.Schedule.StartDay}}
@@ -148,9 +153,9 @@
                         <div class="row justify-content-center">
                             <div id="loadingSpinner" class="spinner-border text-primary" style="width: 3rem; height: 3rem;" class="text-center"></div>
                         </div>
-                        <div style="display:inline-block; height:500px;border:1px solid #ccc;overflow:auto; white-space: pre-wrap;">
+                        <div class="logs">
                             <p id="outputText"></p>
-                        </div>        
+                        </div>
                     </div>
 
                     <div class="modal-footer">
@@ -168,12 +173,6 @@
     <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
     <script src="/static/js/bootstrap.min.js"></script>
 
-    <script>
-        $(document).ready(function () {
-            document.getElementById("btnBack").href = "/advanced";
-            document.getElementById("navDeviceName").href = "/advanced";
-        });
-    </script>
 
     <script>
 

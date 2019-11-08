@@ -1,0 +1,11 @@
+
+    div.logs {
+    height:500px;
+    width:100%;
+    border:1px 
+    solid #ccc;
+    overflow-x:scroll;
+    overflow-y:scroll; 
+    white-space: pre; 
+    font-family: 'Courier New', Courier, monospace;
+    }
