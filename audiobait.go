@@ -98,7 +98,7 @@ func isAudiobaitRunning() bool {
 
 // Return the time part of the time.Time struct as a string.
 func extractTimeOfDayAsString(t playlist.TimeOfDay) string {
-	return t.Format("03:04PM")
+	return t.Format("3:04PM")
 }
 
 type scheduleResponse struct {
@@ -184,7 +184,7 @@ func getScheduleData(resp *audiobaitResponse, conf *goconfig.Config) soundDispla
 	if err != nil {
 		displaySchedule.Timestamp = "Unknown."
 	} else {
-		displaySchedule.Timestamp = file.ModTime().Format("15:04PM, Monday January 2 2006")
+		displaySchedule.Timestamp = file.ModTime().Format("3:04PM, Monday January 2 2006")
 	}
 
 	// The schedule file provides us with audio file IDs.  To get the file names, we
