@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Audiobait</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/audiobait.css">
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+</head>
+
+
+<body>
+    {{template "navbar"}}
+
+    <div class="container">
+        {{if ne .ErrorMessage ""}}
+        <div class="alert alert-danger">
+            {{.ErrorMessage}}
+        </div>
+        {{end}}
+
+        {{if ne .Message ""}}
+        <div class="alert alert-success">
+            {{.Message}}
+        </div>
+        {{end}}
+
+        <div class="container pt-5 pl-0">
+            <h2>Audio Bait Schedule<br></h2>
+        </div>
+        <hr>
+
+        <div class="container pt-2 pb-3 pl-2">
+
+            <form action="/audiobait" method="POST" onsubmit="resetButton.disabled = true; return true;">
+                <div class="row">
+                    <div class="col-6">
+                        {{if .Running}}
+                        <div class="alert alert-success">
+                            Audio bait service is running.
+                        </div>
+                        {{else}}
+                        <div class="alert alert-danger">
+                            Audio bait service is not running
+                        </div>
+                        {{end}}
+                    </div>
+                    <div class="col-3">
+                        <button id="resetButton" type="submit" name="resetButton" onclick="getTime()"
+                            style="Height:50px" class="btn btn-primary" enabled>Reset</button>
+                    </div>
+                    <div class="col-3">
+                        <button id="showLogEntries" type="button" data-toggle="modal" data-target="#logEntriesModal"
+                            style="Height:50px" class="btn btn-primary">Recent Logs</button>
+                    </div>
+                </div>
+            </form>
+
+
+            <div class="container pt-5 pb-4 pl-2">
+
+                <h3>Schedule</h3>
+
+                {{if gt (len .Schedule.Combos) 0}}
+                <div class="row">
+                    <div class="col">
+                        <div class="card mt-2">
+                            <div class="card-header">
+                                <div class="row">
+                                    <div class="col-7">
+                                        <h4><strong>{{.Schedule.Description}}</strong></h4>
+                                    </div>
+                                    <div class="col-5">
+                                        <button id="refreshButton" class="btn btn-primary pr-3" onClick="window.location.reload(true);">Refresh</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card-body">
+                                <h5 class="card-text">
+                                    Last updated: {{.Schedule.Timestamp}}
+                                    <br>
+                                    <br>
+                                    Play sounds for {{.Schedule.PlayNights}} nights then have
+                                    {{.Schedule.ControlNights}} nights
+                                    without sound (as a control) starting on day {{.Schedule.StartDay}}
+                                </h5>
+                            </div>
+                        </div>
+                    </div>
+                    {{range .Schedule.Combos}}
+                    <hr width="95%">
+                    <div class="container">
+                        <div class="row">
+                            <div class="col">
+                                <div class="card border-0 mt-2">
+                                    <div class="card-body">
+                                        <h5 class="card-title">
+                                            <strong>Timing</strong>
+                                        </h5>
+                                        <h5 class="card-text">
+                                            Play every {{.Every}} mins
+                                        </h5>
+                                        <h5 class="card-text">
+                                            From time {{.From}}
+                                        </h5>
+                                        <h5 class="card-text">
+                                            Until {{.Until}}
+                                        </h5>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="card mt-2">
+                                    <div class="card-body">
+                                        <h5 class="card-title">
+                                            <strong>Sounds</strong>
+                                        </h5>
+                                        {{range .SoundInfo}}
+                                        <h5 class="card-text">
+                                            Play sound: {{.Sound}}
+                                        </h5>
+                                        <h5 class="card-text">
+                                            at volume: {{.Volume}}
+                                        </h5>
+                                        {{if ne .Wait 0}}
+                                        <h5 class="card-text">
+                                            then wait: {{.Wait}} mins
+                                        </h5>
+                                        {{end}}
+                                        {{end}}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+                {{else}}
+                <strong>
+                    <h5>Schedule does not contain any sounds to be played.</h5>
+                </strong>
+                {{end}}
+            </div>
+
+            <hr>
+
+
+
+
+        </div>
+
+
+        <!-- Modal -->
+        <div class="modal" id="logEntriesModal" role="dialog">
+            <div class="modal-dialog modal-xl">
+
+                <div class="modal-content">
+
+                    <div class="modal-header">
+                        <h4 class="modal-title">Recent Log Entries</h4>
+                        <button type="button" id="crossCloseButton" class="close" data-dismiss="modal">&times;</button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="row justify-content-center">
+                            <div id="loadingSpinner" class="spinner-border text-primary"
+                                style="width: 3rem; height: 3rem;" class="text-center"></div>
+                        </div>
+                        <div class="logs">
+                            <p id="outputText"></p>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" id="closeButton" class="btn btn-primary"
+                            data-dismiss="modal">Close</button>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+
+
+    </div>
+
+    <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+
+
+    <script>
+
+        function loadLogEntries(modal) {
+
+            // Clear output text
+            modal.find('p#outputText').prop("textContent", "")
+
+            // Disable load button while waiting for response
+            var button = document.getElementById("showLogEntries");
+            button.disabled = true;
+            // Also make it so the modal can't be closed while the test is running.
+            modal.find('button#closeButton').prop("disabled", true)
+            modal.find('button#crossCloseButton').prop("disabled", true)
+
+            // Show spinner
+            modal.find('div#loadingSpinner').prop("hidden", false)
+
+            fetch(
+                "/audiobait-log-entries", { method: "GET" }
+            ).then(function (response) {
+                return response.json();
+            }).then(function (json) {
+
+                // Hide spinner
+                modal.find('div#loadingSpinner').prop("hidden", true)
+
+                // Show output text.
+                modal.find('p#outputText').prop("textContent", json["result"])
+
+                // Enable buttons again.
+                button.disabled = false;
+                modal.find('button#closeButton').prop("disabled", false)
+                modal.find('button#crossCloseButton').prop("disabled", false)
+
+            });
+        }
+
+        $('#logEntriesModal').on('show.bs.modal', function (event) {
+            loadLogEntries($(this));
+        })
+
+    </script>
+
+</body>
+
+</html>

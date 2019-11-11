@@ -43,6 +43,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
+const scheduleFilename = "schedule.json"
+
 // The file system location of this execuable.
 var executablePath = ""
 
@@ -590,6 +592,7 @@ func getInstalledPackages() (string, error) {
 
 }
 
+// AboutHandlerGen is a wrapper for the AboutHandler function.
 func AboutHandlerGen(conf *goconfig.Config) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		AboutHandler(w, r, conf)
