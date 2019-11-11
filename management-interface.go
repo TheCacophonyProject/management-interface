@@ -62,7 +62,6 @@ func init() {
 	deviceName := getDeviceName()
 	tmpl = template.New("")
 	tmpl.Funcs(template.FuncMap{"DeviceName": func() string { return deviceName }})
-	// tmpl.Funcs(template.FuncMap{"DeviceName": func() string { return deviceName }, "TimeOfDayToString": func(theTime playlist.TimeOfDay) string { return "7:30" }})
 	for _, name := range templateBox.List() {
 		t := tmpl.New(name)
 		template.Must(t.Parse(templateBox.String(name)))

@@ -38,20 +38,20 @@ import (
 func getAudiobaitLogEntries() string {
 
 	logEntries := make([]string, 0)
-	out, err := exec.Command("/bin/journalctl", "--no-pager", "-u", "audiobait", "-n", "100").Output()
+	out, err := exec.Command("/bin/journalctl", "--no-pager", "-u", "audiobait", "-n", "100", "--reverse").Output()
 	if err != nil {
-		log.Println("Could not get audiobait logging info:", err)
-		return "Could not get audiobait logging info."
+		log.Println("Could not get audio bait logging info:", err)
+		return "Could not get audio bait logging info."
 	}
 
 	lines := strings.Split(string(out), "\n")
 	if len(lines) <= 1 {
 		// Didn't get any useful output.
-		log.Println("Could not get audiobait logging info:", err)
-		return "Could not get audiobait logging info."
+		log.Println("Could not get audio bait logging info:", err)
+		return "Could not get audio bait logging info."
 	} else if len(lines) >= 2 && strings.Contains(strings.ToUpper(lines[1]), "NO ENTRIES") {
-		// There are no Audiobait log entries to show.
-		return "There are no Audiobait log entries."
+		// There are no audio bait log entries to show.
+		return "There are no audio bait log entries."
 	}
 
 	// Separate log entries. The first line contains a sort of header that we don't want.
@@ -60,9 +60,6 @@ func getAudiobaitLogEntries() string {
 			logEntries = append(logEntries, line)
 		}
 	}
-
-	// Show the most recent first.
-	reverse(logEntries)
 
 	// Now combine back into 1 string.
 	outputText := ""
@@ -251,7 +248,7 @@ func AudiobaitHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Con
 			resp.Running = true
 			resp.Message = "Audiobait service successfully restarted."
 		} else {
-			resp.ErrorMessage = "Could not restart audiobait service."
+			resp.ErrorMessage = "Could not restart audio bait service."
 		}
 
 	case "GET", "":
