@@ -38,7 +38,7 @@ import (
 func getAudiobaitLogEntries() string {
 
 	logEntries := make([]string, 0)
-	out, err := exec.Command("/bin/journalctl", "--no-pager", "-u", "audiobait", "-n", "100", "--reverse").Output()
+	out, err := exec.Command("/bin/journalctl", "-u", "audiobait", "--no-pager", "-n", "100").Output()
 	if err != nil {
 		log.Println("Could not get audio bait logging info:", err)
 		return "Could not get audio bait logging info."
@@ -60,6 +60,10 @@ func getAudiobaitLogEntries() string {
 			logEntries = append(logEntries, line)
 		}
 	}
+
+	// Show newest log entries first.  Note that the --reverse option for the journalctl command above does
+	// not seem to work with the -u option.  So doing it here.
+	reverse(logEntries)
 
 	// Now combine back into 1 string.
 	outputText := ""
