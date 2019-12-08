@@ -42,23 +42,35 @@ const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
+	apiVersion          = 1
 )
 
 type ManagementAPI struct {
-	cptvDir string
-	config  *goconfig.Config
+	cptvDir    string
+	config     *goconfig.Config
+	appVersion string
 }
 
-func NewAPI(config *goconfig.Config) (*ManagementAPI, error) {
+func NewAPI(config *goconfig.Config, appVersion string) (*ManagementAPI, error) {
 	thermalRecorder := goconfig.DefaultThermalRecorder()
 	if err := config.Unmarshal(goconfig.ThermalRecorderKey, &thermalRecorder); err != nil {
 		return nil, err
 	}
 
 	return &ManagementAPI{
-		cptvDir: thermalRecorder.OutputDir,
-		config:  config,
+		cptvDir:    thermalRecorder.OutputDir,
+		config:     config,
+		appVersion: appVersion,
 	}, nil
+}
+
+func (api *ManagementAPI) GetVersion(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"apiVersion": apiVersion,
+		"appVersion": api.appVersion,
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(data)
 }
 
 // GetDeviceInfo returns information about this device

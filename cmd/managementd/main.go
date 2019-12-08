@@ -77,7 +77,7 @@ func main() {
 	router.HandleFunc("/rename", managementinterface.Rename).Methods("GET")
 
 	// API
-	apiObj, err := api.NewAPI(config.config)
+	apiObj, err := api.NewAPI(config.config, version)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -96,6 +96,7 @@ func main() {
 	apiRouter.HandleFunc("/location", apiObj.SetLocation).Methods("POST") // Set location via a POST request.
 	apiRouter.HandleFunc("/clock", apiObj.GetClock).Methods("GET")
 	apiRouter.HandleFunc("/clock", apiObj.PostClock).Methods("POST")
+	apiRouter.HandleFunc("/version", apiObj.GetVersion).Methods("GET")
 	apiRouter.Use(basicAuth)
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
