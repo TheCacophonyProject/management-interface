@@ -125,18 +125,26 @@ func getRaspberryPiSerialNumber() string {
 
 // Return the salt minion ID for the device.
 func getSaltMinionID() string {
+	return strings.TrimSpace(readFile("/etc/salt/minion_id"))
+}
 
+// Return the time of the last salt update.
+func getLastSaltUpdate() string {
+	return strings.TrimSpace(readFile("/etc/cacophony/last-salt-update"))
+}
+
+// Return context from file returning an empty string if on windows or if read fails
+func readFile(file string) string {
 	if runtime.GOOS == "windows" {
 		return ""
 	}
 
 	// The /etc/salt/minion_id file contains the ID.
-	out, err := ioutil.ReadFile("/etc/salt/minion_id")
+	out, err := ioutil.ReadFile(file)
 	if err != nil {
 		return ""
 	}
-
-	return strings.TrimSpace(string(out))
+	return string(out)
 }
 
 // Get the directory of where this executable was started.
@@ -607,6 +615,7 @@ func AboutHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config)
 		SaltMinionID            string
 		Group                   string
 		DeviceID                int
+		LastSaltUpdate          string
 		PackageDataRows         [][]string
 		ErrorMessage            string
 	}
@@ -626,6 +635,7 @@ func AboutHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config)
 		SaltMinionID:            getSaltMinionID(),
 		Group:                   device.Group,
 		DeviceID:                device.ID,
+		LastSaltUpdate:          getLastSaltUpdate(),
 	}
 
 	// Get installed packages.
