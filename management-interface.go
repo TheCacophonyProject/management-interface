@@ -36,6 +36,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	goconfig "github.com/TheCacophonyProject/go-config"
 
@@ -130,7 +131,15 @@ func getSaltMinionID() string {
 
 // Return the time of the last salt update.
 func getLastSaltUpdate() string {
-	return strings.TrimSpace(readFile("/etc/cacophony/last-salt-update"))
+	timeStr := strings.TrimSpace(readFile("/etc/cacophony/last-salt-update"))
+	if timeStr == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, timeStr)
+	if err != nil {
+		return ""
+	}
+	return t.Format("2006-01-02 15:04:05")
 }
 
 // Return context from file returning an empty string if on windows or if read fails
