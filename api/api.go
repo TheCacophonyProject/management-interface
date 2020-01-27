@@ -21,6 +21,7 @@ package api
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -42,7 +43,7 @@ const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
-	apiVersion          = 1
+	apiVersion          = 2
 )
 
 type ManagementAPI struct {
@@ -386,4 +387,111 @@ func getRecordingPath(cptv, dir string) string {
 		}
 	}
 	return ""
+}
+
+func (api *ManagementAPI) GetEvents(w http.ResponseWriter, r *http.Request) {
+	log.Println("getting event keys")
+	keys, err := getEventKeys()
+	if err != nil {
+		serverError(&w, err)
+	}
+	json.NewEncoder(w).Encode(keys)
+}
+
+func (api *ManagementAPI) GetEvent(w http.ResponseWriter, r *http.Request) {
+	keyStr := mux.Vars(r)["key"]
+	eventKey, err := strconv.ParseUint(keyStr, 10, 64)
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+	log.Printf("getting event %v", eventKey)
+	event, err := getEvent(eventKey)
+	if err != nil {
+		isKey, err := isEventKey(eventKey)
+		if err != nil {
+			serverError(&w, err)
+			return
+		}
+		if isKey {
+			serverError(&w, errors.New("error getting event"))
+			return
+		}
+		badRequest(&w, fmt.Errorf("no event with key '%v' found", eventKey))
+		return
+	}
+	json.NewEncoder(w).Encode(event)
+}
+
+func (api *ManagementAPI) DeleteEvent(w http.ResponseWriter, r *http.Request) {
+	keyStr := mux.Vars(r)["key"]
+	eventKey, err := strconv.ParseUint(keyStr, 10, 64)
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+	log.Printf("deleting event %v", eventKey)
+	if err := deleteEvent(eventKey); err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.Write([]byte("deleted event"))
+}
+
+func isEventKey(key uint64) (bool, error) {
+	keys, err := getEventKeys()
+	if err != nil {
+		return false, err
+	}
+	for _, k := range keys {
+		if k == key {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func getEventKeys() ([]uint64, error) {
+	data, err := eventsDbusCall("org.cacophony.Events.GetKeys")
+	if err != nil {
+		return nil, err
+	}
+	if len(data) != 1 {
+		return nil, errors.New("error getting event keys")
+	}
+	eventKeys, ok := data[0].([]uint64)
+	if !ok {
+		return nil, errors.New("error reading event keys")
+	}
+	return eventKeys, nil
+}
+
+func getEvent(key uint64) (string, error) {
+	data, err := eventsDbusCall("org.cacophony.Events.Get", key)
+	if err != nil {
+		return "", err
+	}
+	if len(data) != 1 {
+		return "", errors.New("error getting event")
+	}
+	event, ok := data[0].(string)
+	if !ok {
+		return "", errors.New("error reading event")
+	}
+	return event, nil
+}
+
+func deleteEvent(key uint64) error {
+	_, err := eventsDbusCall("org.cacophony.Events.Delete", key)
+	return err
+}
+
+func eventsDbusCall(method string, params ...interface{}) ([]interface{}, error) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		return nil, err
+	}
+	obj := conn.Object("org.cacophony.Events", "/org/cacophony/Events")
+	call := obj.Call(method, 0, params...)
+	return call.Body, call.Err
 }
