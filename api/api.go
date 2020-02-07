@@ -401,12 +401,10 @@ func (api *ManagementAPI) GetEventKeys(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *ManagementAPI) GetEvents(w http.ResponseWriter, r *http.Request) {
-	log.Println("getting list of events")
-	r.ParseForm()
-	keysStr := r.Form.Get("keys")
-	var keys []uint64
-	if err := json.Unmarshal([]byte(keysStr), &keys); err != nil {
-		badRequest(&w, fmt.Errorf("failed to parse keys '%s' as a list of uint64: %v", keysStr, err))
+	log.Println("getting events")
+	keys, err := getListOfEvents(r)
+	if err != nil {
+		badRequest(&w, err)
 		return
 	}
 	log.Printf("getting %d events", len(keys))
@@ -427,6 +425,22 @@ func (api *ManagementAPI) GetEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(events)
+}
+
+func (api *ManagementAPI) DeleteEvents(w http.ResponseWriter, r *http.Request) {
+	log.Println("deleting events")
+	keys, err := getListOfEvents(r)
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+	log.Printf("deleting %d events", len(keys))
+	for _, key := range keys {
+		if err := eventclient.DeleteEvent(key); err != nil {
+			serverError(&w, err)
+			return
+		}
+	}
 }
 
 func (api *ManagementAPI) GetEvent(w http.ResponseWriter, r *http.Request) {
@@ -480,4 +494,14 @@ func isEventKey(key uint64) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func getListOfEvents(r *http.Request) ([]uint64, error) {
+	r.ParseForm()
+	keysStr := r.Form.Get("keys")
+	var keys []uint64
+	if err := json.Unmarshal([]byte(keysStr), &keys); err != nil {
+		return nil, fmt.Errorf("failed to parse keys '%s' as a list of uint64: %v", keysStr, err)
+	}
+	return keys, nil
 }
