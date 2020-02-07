@@ -38,7 +38,7 @@ import (
 	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
 
-	"github.com/TheCacophonyProject/event-reporter/eventstore"
+	"github.com/TheCacophonyProject/event-reporter/eventclient"
 )
 
 const (
@@ -391,13 +391,42 @@ func getRecordingPath(cptv, dir string) string {
 	return ""
 }
 
-func (api *ManagementAPI) GetEvents(w http.ResponseWriter, r *http.Request) {
+func (api *ManagementAPI) GetEventKeys(w http.ResponseWriter, r *http.Request) {
 	log.Println("getting event keys")
-	keys, err := eventstore.GetEventKeys()
+	keys, err := eventclient.GetEventKeys()
 	if err != nil {
 		serverError(&w, err)
 	}
 	json.NewEncoder(w).Encode(keys)
+}
+
+func (api *ManagementAPI) GetEvents(w http.ResponseWriter, r *http.Request) {
+	log.Println("getting list of events")
+	r.ParseForm()
+	keysStr := r.Form.Get("keys")
+	var keys []uint64
+	if err := json.Unmarshal([]byte(keysStr), &keys); err != nil {
+		badRequest(&w, fmt.Errorf("failed to parse keys '%s' as a list of uint64: %v", keysStr, err))
+		return
+	}
+	log.Printf("getting %d events", len(keys))
+	events := map[uint64]interface{}{}
+	for _, key := range keys {
+		event, err := eventclient.GetEvent(key)
+		if err != nil {
+			events[key] = map[string]interface{}{
+				"success": false,
+				"error":   fmt.Sprintf("error getting event '%d': %v", key, err),
+			}
+		} else {
+			events[key] = map[string]interface{}{
+				"succes": true,
+				"event":  event,
+			}
+		}
+	}
+
+	json.NewEncoder(w).Encode(events)
 }
 
 func (api *ManagementAPI) GetEvent(w http.ResponseWriter, r *http.Request) {
@@ -408,7 +437,7 @@ func (api *ManagementAPI) GetEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("getting event %v", eventKey)
-	event, err := eventstore.GetEvent(eventKey)
+	event, err := eventclient.GetEvent(eventKey)
 	if err != nil {
 		isKey, err := isEventKey(eventKey)
 		if err != nil {
@@ -433,7 +462,7 @@ func (api *ManagementAPI) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("deleting event %v", eventKey)
-	if err := eventstore.DeleteEvent(eventKey); err != nil {
+	if err := eventclient.DeleteEvent(eventKey); err != nil {
 		serverError(&w, err)
 		return
 	}
@@ -441,7 +470,7 @@ func (api *ManagementAPI) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 func isEventKey(key uint64) (bool, error) {
-	keys, err := eventstore.GetEventKeys()
+	keys, err := eventclient.GetEventKeys()
 	if err != nil {
 		return false, err
 	}
