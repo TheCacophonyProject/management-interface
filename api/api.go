@@ -419,8 +419,8 @@ func (api *ManagementAPI) GetEvents(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			events[key] = map[string]interface{}{
-				"succes": true,
-				"event":  event,
+				"success": true,
+				"event":   event,
 			}
 		}
 	}
