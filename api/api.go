@@ -21,7 +21,6 @@ package api
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -391,6 +390,7 @@ func getRecordingPath(cptv, dir string) string {
 	return ""
 }
 
+// GetEventKeys will return an array of the event keys on the device
 func (api *ManagementAPI) GetEventKeys(w http.ResponseWriter, r *http.Request) {
 	log.Println("getting event keys")
 	keys, err := eventclient.GetEventKeys()
@@ -400,6 +400,7 @@ func (api *ManagementAPI) GetEventKeys(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(keys)
 }
 
+// GetEvents takes an array of keys ([]uint64) and will return a JSON of the results.
 func (api *ManagementAPI) GetEvents(w http.ResponseWriter, r *http.Request) {
 	log.Println("getting events")
 	keys, err := getListOfEvents(r)
@@ -427,6 +428,7 @@ func (api *ManagementAPI) GetEvents(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(events)
 }
 
+// DeleteEvent takes an array of event keys ([]uint64) and will delete all given events.
 func (api *ManagementAPI) DeleteEvents(w http.ResponseWriter, r *http.Request) {
 	log.Println("deleting events")
 	keys, err := getListOfEvents(r)
@@ -441,46 +443,6 @@ func (api *ManagementAPI) DeleteEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-}
-
-func (api *ManagementAPI) GetEvent(w http.ResponseWriter, r *http.Request) {
-	keyStr := mux.Vars(r)["key"]
-	eventKey, err := strconv.ParseUint(keyStr, 10, 64)
-	if err != nil {
-		badRequest(&w, err)
-		return
-	}
-	log.Printf("getting event %v", eventKey)
-	event, err := eventclient.GetEvent(eventKey)
-	if err != nil {
-		isKey, err := isEventKey(eventKey)
-		if err != nil {
-			serverError(&w, err)
-			return
-		}
-		if isKey {
-			serverError(&w, errors.New("error getting event"))
-			return
-		}
-		badRequest(&w, fmt.Errorf("no event with key '%v' found", eventKey))
-		return
-	}
-	json.NewEncoder(w).Encode(event)
-}
-
-func (api *ManagementAPI) DeleteEvent(w http.ResponseWriter, r *http.Request) {
-	keyStr := mux.Vars(r)["key"]
-	eventKey, err := strconv.ParseUint(keyStr, 10, 64)
-	if err != nil {
-		badRequest(&w, err)
-		return
-	}
-	log.Printf("deleting event %v", eventKey)
-	if err := eventclient.DeleteEvent(eventKey); err != nil {
-		serverError(&w, err)
-		return
-	}
-	w.Write([]byte("deleted event"))
 }
 
 func isEventKey(key uint64) (bool, error) {

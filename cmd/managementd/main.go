@@ -100,8 +100,6 @@ func main() {
 	apiRouter.HandleFunc("/event-keys", apiObj.GetEventKeys).Methods("GET")
 	apiRouter.HandleFunc("/events", apiObj.GetEvents).Methods("GET")
 	apiRouter.HandleFunc("/events", apiObj.DeleteEvents).Methods("DELETE")
-	apiRouter.HandleFunc("/event/{key}", apiObj.GetEvent).Methods("GET")
-	apiRouter.HandleFunc("/event/{key}", apiObj.DeleteEvent).Methods("DELETE")
 	apiRouter.Use(basicAuth)
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
