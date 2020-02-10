@@ -36,13 +36,15 @@ import (
 	signalstrength "github.com/TheCacophonyProject/management-interface/signal-strength"
 	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
+
+	"github.com/TheCacophonyProject/event-reporter/eventclient"
 )
 
 const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
-	apiVersion          = 1
+	apiVersion          = 2
 )
 
 type ManagementAPI struct {
@@ -386,4 +388,82 @@ func getRecordingPath(cptv, dir string) string {
 		}
 	}
 	return ""
+}
+
+// GetEventKeys will return an array of the event keys on the device
+func (api *ManagementAPI) GetEventKeys(w http.ResponseWriter, r *http.Request) {
+	log.Println("getting event keys")
+	keys, err := eventclient.GetEventKeys()
+	if err != nil {
+		serverError(&w, err)
+	}
+	json.NewEncoder(w).Encode(keys)
+}
+
+// GetEvents takes an array of keys ([]uint64) and will return a JSON of the results.
+func (api *ManagementAPI) GetEvents(w http.ResponseWriter, r *http.Request) {
+	log.Println("getting events")
+	keys, err := getListOfEvents(r)
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+	log.Printf("getting %d events", len(keys))
+	events := map[uint64]interface{}{}
+	for _, key := range keys {
+		event, err := eventclient.GetEvent(key)
+		if err != nil {
+			events[key] = map[string]interface{}{
+				"success": false,
+				"error":   fmt.Sprintf("error getting event '%d': %v", key, err),
+			}
+		} else {
+			events[key] = map[string]interface{}{
+				"success": true,
+				"event":   event,
+			}
+		}
+	}
+
+	json.NewEncoder(w).Encode(events)
+}
+
+// DeleteEvent takes an array of event keys ([]uint64) and will delete all given events.
+func (api *ManagementAPI) DeleteEvents(w http.ResponseWriter, r *http.Request) {
+	log.Println("deleting events")
+	keys, err := getListOfEvents(r)
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+	log.Printf("deleting %d events", len(keys))
+	for _, key := range keys {
+		if err := eventclient.DeleteEvent(key); err != nil {
+			serverError(&w, err)
+			return
+		}
+	}
+}
+
+func isEventKey(key uint64) (bool, error) {
+	keys, err := eventclient.GetEventKeys()
+	if err != nil {
+		return false, err
+	}
+	for _, k := range keys {
+		if k == key {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func getListOfEvents(r *http.Request) ([]uint64, error) {
+	r.ParseForm()
+	keysStr := r.Form.Get("keys")
+	var keys []uint64
+	if err := json.Unmarshal([]byte(keysStr), &keys); err != nil {
+		return nil, fmt.Errorf("failed to parse keys '%s' as a list of uint64: %v", keysStr, err)
+	}
+	return keys, nil
 }

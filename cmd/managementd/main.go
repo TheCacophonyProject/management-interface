@@ -97,6 +97,9 @@ func main() {
 	apiRouter.HandleFunc("/clock", apiObj.GetClock).Methods("GET")
 	apiRouter.HandleFunc("/clock", apiObj.PostClock).Methods("POST")
 	apiRouter.HandleFunc("/version", apiObj.GetVersion).Methods("GET")
+	apiRouter.HandleFunc("/event-keys", apiObj.GetEventKeys).Methods("GET")
+	apiRouter.HandleFunc("/events", apiObj.GetEvents).Methods("GET")
+	apiRouter.HandleFunc("/events", apiObj.DeleteEvents).Methods("DELETE")
 	apiRouter.Use(basicAuth)
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
