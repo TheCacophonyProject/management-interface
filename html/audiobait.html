@@ -73,7 +73,7 @@
                         {{end}}
                     </div>
                     <div class="col-3">
-                        <button id="resetButton" type="submit" name="resetButton" onclick="getTime()"
+                        <button id="resetButton" type="submit" name="resetButton"
                             style="Height:50px" class="btn btn-primary" enabled>Reset</button>
                     </div>
                     <div class="col-3">
@@ -144,17 +144,18 @@
                                             <strong>Sounds</strong>
                                         </h5>
                                         {{range .SoundInfo}}
-                                        <h5 class="card-text">
-                                            Play sound: {{.Sound}}
-                                        </h5>
-                                        <h5 class="card-text">
-                                            at volume: {{.Volume}}
-                                        </h5>
-                                        {{if ne .Wait 0}}
-                                        <h5 class="card-text">
-                                            then wait: {{.Wait}} mins
-                                        </h5>
-                                        {{end}}
+                                            <h5 class="card-text">
+                                                Play sound: {{.Sound}}
+                                            </h5>
+                                            <h5 class="card-text">
+                                                at volume: {{.Volume}}
+                                            </h5>
+                                            <button id="test-{{.Sound}}" type="button" data-sound="{{.Sound}}" data-volume="{{.Volume}}" class="btn btn-primary mb-4">Play</button>
+                                            {{if ne .Wait 0}}
+                                                <h5 class="card-text">
+                                                    then wait: {{.Wait}} mins
+                                                </h5>
+                                            {{end}}
                                         {{end}}
                                     </div>
                                 </div>
@@ -256,6 +257,24 @@
         $('#logEntriesModal').on('show.bs.modal', function (event) {
             loadLogEntries($(this));
         })
+
+        $(document).ready(function() {
+            $( "button[id^='test-']" ).on('click tap', function (e) {
+                var fileName = $(this).data("sound");
+                var volume = $(this).data("volume");
+                soundTest(fileName, volume)
+            });   
+        });
+
+
+        // Play a sound at the set volume.
+        function soundTest(fileName, volume) {
+            console.log(fileName, volume);
+            fetch(
+              "/speaker/test-sound/" + fileName +  "/" + volume,
+              {method: "GET"}
+            )
+        }
 
 
         function speakerTest() {

@@ -65,6 +65,7 @@ func main() {
 	router.HandleFunc("/interface-status/{name:[a-zA-Z0-9-* ]+}", managementinterface.CheckInterfaceHandler).Methods("GET")
 	router.HandleFunc("/speaker", managementinterface.SpeakerTestHandler).Methods("GET")
 	router.HandleFunc("/speaker/status", managementinterface.SpeakerStatusHandler).Methods("GET")
+	router.HandleFunc("/speaker/test-sound/{fileName}/{volume}", managementinterface.SpeakerTestSoundHandlerGen(config.config)).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
 	router.HandleFunc("/location", managementinterface.GenLocationHandler(config.config)).Methods("GET") // Form to view and/or set location manually.
 	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET")                          // Form to view and/or adjust time settings.
