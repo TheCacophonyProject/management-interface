@@ -109,9 +109,10 @@ type scheduleResponse struct {
 // These next 4 structs are used to put the audiobait data into a format that
 // makes it easy to display
 type soundDisplayInfo struct {
-	Sound  string
-	Volume int
-	Wait   int
+	SoundFileDisplayText string // 2 fields are needed because the sound ID can sometimes be set to "same" if the same sound is to be played as before.
+	SoundFileName        string
+	Volume               int
+	Wait                 int
 }
 type soundDisplayCombo struct {
 	From      string
@@ -204,8 +205,8 @@ func getScheduleData(resp *audiobaitResponse, conf *goconfig.Config) soundDispla
 		}
 		for j := 0; j < len(combo.Sounds); j++ {
 			displayInfo := soundDisplayInfo{
-				Sound:  combo.Sounds[j], // Set to the ID from the schedule intially
-				Volume: combo.Volumes[j],
+				SoundFileDisplayText: combo.Sounds[j], // Set to the ID (type == string) from the schedule intially.  This can be the text "same" if the same 2 sounds follow eachother.
+				Volume:               combo.Volumes[j],
 			}
 			// Try and get file name off of disk.
 			if audioLibraryLoaded {
@@ -214,9 +215,18 @@ func getScheduleData(resp *audiobaitResponse, conf *goconfig.Config) soundDispla
 					fileName, exists := audioLibrary.GetFileNameOnDisk(ID)
 					if exists {
 						// We have the file name so display this on the html page.
-						displayInfo.Sound = fileName
+						displayInfo.SoundFileDisplayText = fileName
+						// And store it in this field so we have it when we want to play the file.
+						displayInfo.SoundFileName = fileName
+					}
+				} else {
+					if j > 0 && strings.ToUpper(combo.Sounds[j]) == "SAME" {
+						// This is the case where we need to play the same sound again.
+						displayInfo.SoundFileDisplayText = "Same"
+						displayInfo.SoundFileName = displayCombo.SoundInfo[j-1].SoundFileName
 					}
 				}
+
 			}
 			if j < len(combo.Sounds)-1 {
 				displayInfo.Wait = combo.Waits[j+1] / 60

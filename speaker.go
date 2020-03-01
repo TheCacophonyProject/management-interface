@@ -100,7 +100,6 @@ func SpeakerTestSoundHandler(w http.ResponseWriter, r *http.Request, conf *gocon
 	fileName := mux.Vars(r)["fileName"]
 	log.Println("Playing sound", fileName)
 	volume, _ := strconv.Atoi(mux.Vars(r)["volume"])
-	// volume := mux.Vars(r)["volume"]
 	log.Println("At volume", volume)
 
 	// Get audiobait directory
@@ -109,15 +108,18 @@ func SpeakerTestSoundHandler(w http.ResponseWriter, r *http.Request, conf *gocon
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Printf("audio output failed: %v", err)
 		response["result"] = fmt.Sprintf("Error: %v.", err.Error())
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Play the sound.
+	if output, err := playAudioBaitSound(audio, fileName, volume); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("audio output failed: %v", err)
+		response["result"] = fmt.Sprintf("Error: %v. Output:\n%s", err.Error(), string(output))
 	} else {
-		if output, err := playAudioBaitSound(audio, fileName, volume); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			log.Printf("audio output failed: %v", err)
-			response["result"] = fmt.Sprintf("Error: %v. Output:\n%s", err.Error(), string(output))
-		} else {
-			w.WriteHeader(http.StatusOK)
-			response["result"] = string(output)
-		}
+		w.WriteHeader(http.StatusOK)
+		response["result"] = string(output)
 	}
 
 	// Encode data to be sent back to html.
