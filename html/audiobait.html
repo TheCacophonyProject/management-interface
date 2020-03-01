@@ -29,28 +29,15 @@
         <div class="container pt-5 pl-0">
             <div class="row">
 
-                <div class="col-4">
+                <div class="col-9">
                     <h2>Audio Bait Schedule</h2>
                 </div>
 
-                <div class="col-4">
-                    <div class="card">
-                        <div class="card-body">
-                            <button id="speaker-test-button" type="button" onclick="speakerTest()" class="btn btn-primary mb-4">Speaker Test</button>
-                            <p style="white-space: pre-wrap;" id="speaker-test-statustext"></p>
-                        </div>
-                    </div>
+                <div class="col-3">
+                    <button id="speaker-test-button" type="button" data-toggle="modal" data-target="#soundModal" data-backdrop="static"
+                        data-sound="test.wav" data-volume = "8" class="btn btn-primary mb-4">Speaker Test</button>
                 </div>
 
-                <div class="col-4">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title"><strong>Output</strong></h5>
-                            <h4 id="speaker-test-indicator">&#x003F;</h4>
-                            <p style="white-space: pre-wrap;" id="speaker-test-outputext"></p>
-                        </div>
-                    </div>
-                </div>
 
             </div>
 
@@ -150,7 +137,9 @@
                                             <h5 class="card-text">
                                                 at volume: {{.Volume}}
                                             </h5>
-                                            <button id="test-{{.SoundFileName}}" type="button" data-toggle="modal" data-target="#soundModal" data-backdrop="static" data-sound="{{.SoundFileName}}" data-volume="{{.Volume}}" class="btn btn-primary mb-4">Play</button>
+                                            <button id="test-{{.SoundFileName}}" type="button" data-toggle="modal" data-target="#soundModal" 
+                                                    data-backdrop="static" data-sound="{{.SoundFileName}}" data-volume="{{.Volume}}" 
+                                                    class="btn btn-primary mb-4">Play</button>
                                             {{if ne .Wait 0}}
                                                 <h5 class="card-text">
                                                     then wait: {{.Wait}} mins
@@ -289,13 +278,7 @@
             loadLogEntries($(this));
         })
 
-        // $(document).ready(function() {
-        //     $( "button[id^='test-']" ).on('click tap', function (e) {
-        //         var fileName = $(this).data("sound");
-        //         var volume = $(this).data("volume");
-        //         soundTest(fileName, volume);
-        //     });   
-        // });
+
 
 
         $('#soundModal').on('show.bs.modal', function (event) {
@@ -318,7 +301,7 @@
             modal.find('button#crossCloseButton').prop("disabled", true);
 
             fetch(
-              "/speaker/test-sound/" + fileName +  "/" + volume,
+              "/audiobait-test-sound/" + fileName +  "/" + volume,
               {method: "GET"}
 
             ).then(function(response) {
@@ -338,38 +321,6 @@
               modal.find('button#closeButton').prop("disabled", false);
               modal.find('button#crossCloseButton').prop("disabled", false);
 
-            });
-          }
-
-        function speakerTest() {
-            // Set status indicator
-            var statusIndicator = document.getElementById("speaker-test-indicator");
-            statusIndicator.textContent = "...";
-            // Clear output text
-            var statusText = document.getElementById("speaker-test-statustext");
-            statusText.textContent = "Sound file is now playing.";
-            var outputText = document.getElementById("speaker-test-outputext");
-            outputText.textContent = "";
-            // Disable test button while waiting for response
-            var button = document.getElementById("speaker-test-button");
-            button.disabled = true;
-            fetch(
-              "/speaker/status",
-              {method: "GET"}
-            ).then(function(response) {
-                statusText.textContent = "";
-                button.disabled = false;
-                if (response.ok) {
-                    // Check mark
-                    statusIndicator.innerHTML = "&#x2714;";
-                }
-                else {
-                    // Cross mark
-                    statusIndicator.innerHTML = "&#x2717;";
-                }
-                return response.json();
-            }).then(function(json) {
-              outputText.textContent = json["result"];
             });
           }
 

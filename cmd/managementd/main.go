@@ -63,15 +63,13 @@ func main() {
 	router.HandleFunc("/wifi-networks", managementinterface.WifiNetworkHandler).Methods("GET", "POST")
 	router.HandleFunc("/network", managementinterface.NetworkHandler).Methods("GET")
 	router.HandleFunc("/interface-status/{name:[a-zA-Z0-9-* ]+}", managementinterface.CheckInterfaceHandler).Methods("GET")
-	router.HandleFunc("/speaker", managementinterface.SpeakerTestHandler).Methods("GET")
-	router.HandleFunc("/speaker/status", managementinterface.SpeakerStatusHandler).Methods("GET")
-	router.HandleFunc("/speaker/test-sound/{fileName}/{volume}", managementinterface.SpeakerTestSoundHandlerGen(config.config)).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
 	router.HandleFunc("/location", managementinterface.GenLocationHandler(config.config)).Methods("GET") // Form to view and/or set location manually.
 	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET")                          // Form to view and/or adjust time settings.
 	router.HandleFunc("/about", managementinterface.AboutHandlerGen(config.config)).Methods("GET")
 	router.HandleFunc("/audiobait", managementinterface.AudiobaitHandlerGen(config.config)).Methods("GET", "POST")
 	router.HandleFunc("/audiobait-log-entries", managementinterface.AudiobaitLogEntriesHandler).Methods("GET")
+	router.HandleFunc("/audiobait-test-sound/{fileName}/{volume}", managementinterface.AudiobaitSoundsHandlerGen(config.config)).Methods("GET")
 	router.HandleFunc("/advanced", managementinterface.AdvancedMenuHandler).Methods("GET")
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
 	router.HandleFunc("/camera/snapshot", managementinterface.CameraSnapshot).Methods("GET")
