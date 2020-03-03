@@ -1,9 +1,12 @@
 "use strict";
 window.onload = function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  timeout = urlParams.get('timeout') != "off";
   updateSnapshotLoop()
 };
 
 var snapshotCount = 0;
+var timeout = true;
 
 function restartCameraViewing() {
   document.getElementById("snapshot-stopped").style.display = 'none';
@@ -21,7 +24,7 @@ function updateSnapshotLoop() {
       let snapshot = document.getElementById("snapshot-image")
       snapshot.src = "/camera/snapshot?"+ new Date().getTime();
       snapshotCount++;
-      if (snapshotCount < 200) {
+      if (snapshotCount < 200 || !timeout) {
         setTimeout(updateSnapshotLoop, 500);
       } else {
         stopSnapshots('Timeout for camera viewing.');
