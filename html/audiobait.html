@@ -27,7 +27,20 @@
         {{end}}
 
         <div class="container pt-5 pl-0">
-            <h2>Audio Bait Schedule<br></h2>
+            <div class="row">
+
+                <div class="col-9">
+                    <h2>Audio Bait Schedule</h2>
+                </div>
+
+                <div class="col-3">
+                    <button id="speaker-test-button" type="button" data-toggle="modal" data-target="#soundModal" data-backdrop="static"
+                        data-sound="test.wav" data-volume = "8" class="btn btn-primary mb-4">Speaker Test</button>
+                </div>
+
+
+            </div>
+
         </div>
         <hr>
 
@@ -47,11 +60,11 @@
                         {{end}}
                     </div>
                     <div class="col-3">
-                        <button id="resetButton" type="submit" name="resetButton" onclick="getTime()"
+                        <button id="resetButton" type="submit" name="resetButton"
                             style="Height:50px" class="btn btn-primary" enabled>Reset</button>
                     </div>
                     <div class="col-3">
-                        <button id="showLogEntries" type="button" data-toggle="modal" data-target="#logEntriesModal"
+                        <button id="showLogEntries" type="button" data-toggle="modal" data-target="#logEntriesModal" data-backdrop="static" 
                             style="Height:50px" class="btn btn-primary">Recent Logs</button>
                     </div>
                 </div>
@@ -118,17 +131,20 @@
                                             <strong>Sounds</strong>
                                         </h5>
                                         {{range .SoundInfo}}
-                                        <h5 class="card-text">
-                                            Play sound: {{.Sound}}
-                                        </h5>
-                                        <h5 class="card-text">
-                                            at volume: {{.Volume}}
-                                        </h5>
-                                        {{if ne .Wait 0}}
-                                        <h5 class="card-text">
-                                            then wait: {{.Wait}} mins
-                                        </h5>
-                                        {{end}}
+                                            <h5 class="card-text">
+                                                Play sound: {{.SoundFileDisplayText}}
+                                            </h5>
+                                            <h5 class="card-text">
+                                                at volume: {{.Volume}}
+                                            </h5>
+                                            <button id="test-{{.SoundFileName}}" type="button" data-toggle="modal" data-target="#soundModal" 
+                                                    data-backdrop="static" data-sound="{{.SoundFileName}}" data-volume="{{.Volume}}" 
+                                                    class="btn btn-primary mb-4">Play</button>
+                                            {{if ne .Wait 0}}
+                                                <h5 class="card-text">
+                                                    then wait: {{.Wait}} mins
+                                                </h5>
+                                            {{end}}
                                         {{end}}
                                     </div>
                                 </div>
@@ -152,7 +168,7 @@
         </div>
 
 
-        <!-- Modal -->
+        <!-- Log Entries Modal -->
         <div class="modal" id="logEntriesModal" role="dialog">
             <div class="modal-dialog modal-xl">
 
@@ -182,6 +198,46 @@
 
             </div>
         </div>
+
+
+        <!-- Sound Modal -->
+        <div class="modal" id="soundModal" role="dialog">
+            <div class="modal-dialog" role="document">
+            
+                <div class="modal-content">
+                    <div class="modal-header">
+                    <h4 class="modal-title">Playback</h4>
+                    <button type="button" id="crossCloseButton" class="close" data-dismiss="modal">&times;</button>
+                    </div>
+
+                    <div class="modal-body">
+
+                        <div class="row">
+                            <p class="col-md-3 mr-2 text-right">Sound file:</p>
+                            <p id="fileNameText"></p>
+                        </div>
+                        <div class="row">
+                            <p class="col-md-3 mr-2 text-right">Volume:</p>
+                            <p id="volumeText"></p>
+                        </div>
+                        <div class="row justify-content-center">
+                            <h4 id="statusIndicator"></h4>
+                        </div>
+                        <div class="row justify-content-center">
+                            <p id="outputText" style="white-space: pre-wrap;" class="mx-4 px-4"></p>
+                        </div>
+                    </div>
+
+
+                    <div class="modal-footer">
+                        <button type="button" id="playAgainButton" onclick = "soundTest()"class="btn btn-primary">Play Again</button>
+                        <button type="button" id="closeButton" class="btn btn-primary" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+
 
 
     </div>
@@ -231,7 +287,65 @@
             loadLogEntries($(this));
         })
 
-    </script>
+
+
+        // Globals.
+        var fileName;
+        var volume; 
+        var modal;
+
+
+        $('#soundModal').on('show.bs.modal', function (event) {
+            var button = $(event.relatedTarget); // Button that triggered the modal
+            fileName = button.data('sound'); // Extract info from data-* attributes
+            volume = button.data('volume'); 
+            modal = $(this);
+            soundTest();
+          })
+
+
+
+        // Play a sound at the set volume.
+        function soundTest() {
+
+            // Clear status and put in info for user
+            modal.find('p#fileNameText').prop("textContent", fileName)
+            modal.find('p#volumeText').prop("textContent", volume)
+            modal.find('p#outputText').prop("textContent", "Sound file is now playing...");
+            modal.find('h4#statusIndicator').text("")
+
+            // Disable buttons.
+            modal.find('button#closeButton').prop("disabled", true);
+            modal.find('button#crossCloseButton').prop("disabled", true);
+            modal.find('button#playAgainButton').prop("disabled", true);
+
+            fetch(
+              "/audiobait-test-sound/" + fileName +  "/" + volume,
+              {method: "GET"}
+
+            ).then(function(response) {
+                // Show a symbol indicating whether the test was successfull or not.
+                if (response.ok) {
+                    modal.find('h4#statusIndicator').html("&#x2714;");// Check mark
+                }
+                else {
+                    modal.find('h4#statusIndicator').html("&#x2717;");// Cross mark
+                }
+              return response.json();
+
+            }).then(function(json) {
+              // Show output text.
+              modal.find('p#outputText').prop("textContent", json["result"]);
+              
+              // Enable buttons again.
+              modal.find('button#closeButton').prop("disabled", false);
+              modal.find('button#crossCloseButton').prop("disabled", false);
+              modal.find('button#playAgainButton').prop("disabled", false);
+
+            });
+          }
+
+      </script>
 
 </body>
 

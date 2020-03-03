@@ -19,7 +19,10 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package managementinterface
 
 import (
+	"bufio"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -32,7 +35,11 @@ import (
 	"github.com/TheCacophonyProject/audiobait/audiofilelibrary"
 	"github.com/TheCacophonyProject/audiobait/playlist"
 	goconfig "github.com/TheCacophonyProject/go-config"
+	"github.com/gobuffalo/packr"
+	"github.com/gorilla/mux"
 )
+
+var audioBox = packr.NewBox("./audio")
 
 // Return recent log entries from the audiobait process
 func getAudiobaitLogEntries() string {
@@ -109,9 +116,10 @@ type scheduleResponse struct {
 // These next 4 structs are used to put the audiobait data into a format that
 // makes it easy to display
 type soundDisplayInfo struct {
-	Sound  string
-	Volume int
-	Wait   int
+	SoundFileDisplayText string // 2 fields are needed because the sound ID can sometimes be set to "same" if the same sound is to be played as before.
+	SoundFileName        string
+	Volume               int
+	Wait                 int
 }
 type soundDisplayCombo struct {
 	From      string
@@ -204,8 +212,8 @@ func getScheduleData(resp *audiobaitResponse, conf *goconfig.Config) soundDispla
 		}
 		for j := 0; j < len(combo.Sounds); j++ {
 			displayInfo := soundDisplayInfo{
-				Sound:  combo.Sounds[j], // Set to the ID from the schedule intially
-				Volume: combo.Volumes[j],
+				SoundFileDisplayText: combo.Sounds[j], // Set to the ID (type == string) from the schedule intially.  This can be the text "same" if the same 2 sounds follow eachother.
+				Volume:               combo.Volumes[j],
 			}
 			// Try and get file name off of disk.
 			if audioLibraryLoaded {
@@ -214,9 +222,18 @@ func getScheduleData(resp *audiobaitResponse, conf *goconfig.Config) soundDispla
 					fileName, exists := audioLibrary.GetFileNameOnDisk(ID)
 					if exists {
 						// We have the file name so display this on the html page.
-						displayInfo.Sound = fileName
+						displayInfo.SoundFileDisplayText = fileName
+						// And store it in this field so we have it when we want to play the file.
+						displayInfo.SoundFileName = fileName
+					}
+				} else {
+					if j > 0 && strings.ToUpper(combo.Sounds[j]) == "SAME" {
+						// This is the case where we need to play the same sound again.
+						displayInfo.SoundFileDisplayText = "Same"
+						displayInfo.SoundFileName = displayCombo.SoundInfo[j-1].SoundFileName
 					}
 				}
+
 			}
 			if j < len(combo.Sounds)-1 {
 				displayInfo.Wait = combo.Waits[j+1] / 60
@@ -282,4 +299,110 @@ func AudiobaitLogEntriesHandler(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(response)
 
+}
+
+// AudiobaitSoundsHandlerGen is a wrapper for the AudiobaitSoundsHandler function.
+func AudiobaitSoundsHandlerGen(conf *goconfig.Config) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		AudiobaitSoundsHandler(w, r, conf)
+	}
+}
+
+// AudiobaitSoundsHandler attempts to play a sound on connected speaker(s) at the volume set in the schedule.
+func AudiobaitSoundsHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config) {
+
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	response := make(map[string]string)
+
+	// Extract sound file name
+	fileName := mux.Vars(r)["fileName"]
+	volume, _ := strconv.Atoi(mux.Vars(r)["volume"])
+
+	// Get audiobait directory
+	audio := goconfig.DefaultAudio()
+	if err := conf.Unmarshal(goconfig.AudioKey, &audio); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("audio output failed: %v", err)
+		response["result"] = fmt.Sprintf("Error: %v.", err.Error())
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Play the sound.
+	if output, err := playAudioBaitSound(audio, fileName, volume); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("audio output failed: %v", err)
+		response["result"] = fmt.Sprintf("Error: %v. Output:\n%s", err.Error(), string(output))
+	} else {
+		w.WriteHeader(http.StatusOK)
+		response["result"] = string(output)
+	}
+
+	// Encode data to be sent back to html.
+	json.NewEncoder(w).Encode(response)
+}
+
+// Play the specified sound on the speaker.
+func playAudioBaitSound(audio goconfig.Audio, fileName string, volume int) ([]byte, error) {
+
+	var cmd *exec.Cmd
+	var soundFile []byte
+
+	// Set volume
+	err := setVolume(volume, audio)
+	if err != nil {
+		return nil, fmt.Errorf("unable to set the volume: %v", err)
+	}
+
+	// Either we're playing the default test sound, or a sound from the schedule.
+	if fileName == "test.wav" {
+		soundFile = audioBox.Bytes("test.wav")
+		if soundFile == nil {
+			return nil, errors.New("unable to load test audio")
+		}
+		cmd = exec.Command("play", "-t", "wav", "--norm=-3", "-q", "-")
+	} else {
+		// It's a sound specified in the schedule. Load the file from the audiobait directory.
+		soundFile, err = ioutil.ReadFile(filepath.Join(audio.Dir, fileName))
+		if soundFile == nil || err != nil {
+			return nil, errors.New("unable to load audio bait sound file: " + fileName)
+		}
+		// Get the file type e.g. .wav, .mp3 etc.
+		fileType := filepath.Ext(fileName)
+		if fileType == "" {
+			fileType = "wav"
+		}
+		cmd = exec.Command("play", "-t", fileType, "--norm=-3", "-q", "-")
+	}
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("unable to play audio: %v", err)
+	}
+
+	go func() {
+		defer stdin.Close()
+		w := bufio.NewWriter(stdin)
+		if _, err := w.Write(soundFile); err != nil {
+			log.Printf("unable to pass audio: %v", err)
+		}
+	}()
+
+	return cmd.CombinedOutput()
+}
+
+// Set the volume on the sound card.
+func setVolume(volume int, audio goconfig.Audio) error {
+	cmd := exec.Command(
+		"amixer",
+		"-c", fmt.Sprint(audio.Card),
+		"sset",
+		audio.VolumeControl,
+		fmt.Sprintf("%d%%", volume*10),
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("volume set failed: %v\noutput:\n%s", err, out)
+	}
+	return nil
 }
