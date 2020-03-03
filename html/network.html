@@ -139,13 +139,13 @@
               var state = json["status"];
               if (state === "down") {
                 // Cross mark
-                modal.find('h4#statusIndicator').html("<h4>&#x2717;</h4>")
+                modal.find('h4#statusIndicator').html("&#x2717;")
               } else if (state === "up") {
                 // Check mark
-                modal.find('h4#statusIndicator').html("<h4>&#x2714;</h4>")
+                modal.find('h4#statusIndicator').html("&#x2714;")
               } else {
                 // Question mark
-                modal.find('h4#statusIndicator').html("<h4>&#x003F;</h4>")
+                modal.find('h4#statusIndicator').html("&#x003F;")
               }
 
               // Enable buttons again.

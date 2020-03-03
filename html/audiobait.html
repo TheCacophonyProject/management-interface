@@ -204,30 +204,39 @@
         <div class="modal" id="soundModal" role="dialog">
             <div class="modal-dialog" role="document">
             
-              <div class="modal-content">
-                <div class="modal-header">
-                  <h4 class="modal-title">Output</h4>
-                  <button type="button" id="crossCloseButton" class="close" data-dismiss="modal">&times;</button>
+                <div class="modal-content">
+                    <div class="modal-header">
+                    <h4 class="modal-title">Playback</h4>
+                    <button type="button" id="crossCloseButton" class="close" data-dismiss="modal">&times;</button>
+                    </div>
+
+                    <div class="modal-body">
+
+                        <div class="row">
+                            <p class="col-md-3 mr-2 text-right">Sound file:</p>
+                            <p id="fileNameText"></p>
+                        </div>
+                        <div class="row">
+                            <p class="col-md-3 mr-2 text-right">Volume:</p>
+                            <p id="volumeText"></p>
+                        </div>
+                        <div class="row justify-content-center">
+                            <h4 id="statusIndicator"></h4>
+                        </div>
+                        <div class="row justify-content-center">
+                            <p id="outputText" style="white-space: pre-wrap;" class="mx-4 px-4"></p>
+                        </div>
+                    </div>
+
+
+                    <div class="modal-footer">
+                        <button type="button" id="playAgainButton" onclick = "soundTest()"class="btn btn-primary">Play Again</button>
+                        <button type="button" id="closeButton" class="btn btn-primary" data-dismiss="modal">Close</button>
+                    </div>
                 </div>
-
-                <div class="modal-body">
-
-                  <div class="row justify-content-center">
-                      <h4 id="statusIndicator"></h4>
-                  </div>
-                  <div class="row justify-content-center">
-                      <p id="outputText" style="white-space: pre-wrap;" class="mx-3 px-3"></p>
-                  </div>
-
-                </div>
-
-                <div class="modal-footer">
-                  <button type="button" id="closeButton" class="btn btn-primary" data-dismiss="modal">Close</button>
-                </div>
-              </div>
-              
+                
             </div>
-          </div>
+        </div>
 
 
 
@@ -280,25 +289,35 @@
 
 
 
+        // Globals.
+        var fileName;
+        var volume; 
+        var modal;
+
 
         $('#soundModal').on('show.bs.modal', function (event) {
             var button = $(event.relatedTarget); // Button that triggered the modal
-            var fileName = button.data('sound'); // Extract info from data-* attributes
-            var volume = button.data('volume'); 
-            soundTest(fileName, volume, $(this));
+            fileName = button.data('sound'); // Extract info from data-* attributes
+            volume = button.data('volume'); 
+            modal = $(this);
+            soundTest();
           })
 
 
 
         // Play a sound at the set volume.
-        function soundTest(fileName, volume, modal) {
+        function soundTest() {
 
-            // Clear output text
-            modal.find('h4#statusIndicator').html("<h4></h4>");
-            modal.find('p#outputText').prop("textContent", "Sound file is now playing.");
-            // Make it so the modal can't be closed while the test is running.
+            // Clear status and put in info for user
+            modal.find('p#fileNameText').prop("textContent", fileName)
+            modal.find('p#volumeText').prop("textContent", volume)
+            modal.find('p#outputText').prop("textContent", "Sound file is now playing...");
+            modal.find('h4#statusIndicator').text("")
+
+            // Disable buttons.
             modal.find('button#closeButton').prop("disabled", true);
             modal.find('button#crossCloseButton').prop("disabled", true);
+            modal.find('button#playAgainButton').prop("disabled", true);
 
             fetch(
               "/audiobait-test-sound/" + fileName +  "/" + volume,
@@ -307,19 +326,21 @@
             ).then(function(response) {
                 // Show a symbol indicating whether the test was successfull or not.
                 if (response.ok) {
-                    modal.find('h4#statusIndicator').html("<h4>&#x2714;</h4>");// Check mark
+                    modal.find('h4#statusIndicator').html("&#x2714;");// Check mark
                 }
                 else {
-                    modal.find('h4#statusIndicator').html("<h4>&#x2717;</h4>");// Cross mark
+                    modal.find('h4#statusIndicator').html("&#x2717;");// Cross mark
                 }
               return response.json();
 
             }).then(function(json) {
               // Show output text.
               modal.find('p#outputText').prop("textContent", json["result"]);
+              
               // Enable buttons again.
               modal.find('button#closeButton').prop("disabled", false);
               modal.find('button#crossCloseButton').prop("disabled", false);
+              modal.find('button#playAgainButton').prop("disabled", false);
 
             });
           }
