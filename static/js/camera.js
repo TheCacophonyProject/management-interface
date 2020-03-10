@@ -1,12 +1,12 @@
 "use strict";
 window.onload = function() {
   const urlParams = new URLSearchParams(window.location.search);
-  timeout = urlParams.get('timeout') != "off";
+  timeoutDisabled = urlParams.get('timeout') == "off";
   updateSnapshotLoop()
 };
 
 var snapshotCount = 0;
-var timeout = true;
+var timeoutDisabled = false;
 
 function restartCameraViewing() {
   document.getElementById("snapshot-stopped").style.display = 'none';
@@ -24,7 +24,7 @@ function updateSnapshotLoop() {
       let snapshot = document.getElementById("snapshot-image")
       snapshot.src = "/camera/snapshot?"+ new Date().getTime();
       snapshotCount++;
-      if (snapshotCount < 200 || !timeout) {
+      if (snapshotCount < 200 || timeoutDisabled) {
         setTimeout(updateSnapshotLoop, 500);
       } else {
         stopSnapshots('Timeout for camera viewing.');
