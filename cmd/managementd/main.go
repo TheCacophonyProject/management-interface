@@ -73,6 +73,7 @@ func main() {
 	router.HandleFunc("/advanced", managementinterface.AdvancedMenuHandler).Methods("GET")
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
 	router.HandleFunc("/camera/snapshot", managementinterface.CameraSnapshot).Methods("GET")
+	router.HandleFunc("/camera/snapshot-raw", managementinterface.CameraRawSnapshot).Methods("GET")
 	router.HandleFunc("/rename", managementinterface.Rename).Methods("GET")
 
 	// API
@@ -87,6 +88,7 @@ func main() {
 	apiRouter.HandleFunc("/recording/{id}", apiObj.GetRecording).Methods("GET")
 	apiRouter.HandleFunc("/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
 	apiRouter.HandleFunc("/camera/snapshot", apiObj.TakeSnapshot).Methods("PUT")
+	apiRouter.HandleFunc("/camera/snapshot-raw", apiObj.TakeRawSnapshot).Methods("PUT")
 	apiRouter.HandleFunc("/signal-strength", apiObj.GetSignalStrength).Methods("GET")
 	apiRouter.HandleFunc("/reregister", apiObj.Reregister).Methods("POST")
 	apiRouter.HandleFunc("/reboot", apiObj.Reboot).Methods("POST")

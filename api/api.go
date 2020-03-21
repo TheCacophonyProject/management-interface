@@ -79,7 +79,7 @@ func (api *ManagementAPI) GetVersion(w http.ResponseWriter, r *http.Request) {
 func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) {
 	var device goconfig.Device
 	if err := api.config.Unmarshal(goconfig.DeviceKey, &device); err != nil {
-		log.Printf("/device-info failed: %v", err)
+		log.Printf("/device-info failed %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "failed to read device config\n")
 		return
@@ -178,6 +178,21 @@ func (api *ManagementAPI) TakeSnapshot(w http.ResponseWriter, r *http.Request) {
 	}
 	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
 	err = recorder.Call("org.cacophony.thermalrecorder.TakeSnapshot", 0).Err
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+// TakeRawSnapshot will request a new raw snapshot to be taken by thermal-recorder
+func (api *ManagementAPI) TakeRawSnapshot(w http.ResponseWriter, r *http.Request) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
+	err = recorder.Call("org.cacophony.thermalrecorder.TakeRawSnapshot", 0).Err
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
