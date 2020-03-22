@@ -75,6 +75,7 @@ func main() {
 	router.HandleFunc("/camera/snapshot", managementinterface.CameraSnapshot).Methods("GET")
 	router.HandleFunc("/camera/snapshot-raw", managementinterface.CameraRawSnapshot).Methods("GET")
 	router.HandleFunc("/rename", managementinterface.Rename).Methods("GET")
+	router.HandleFunc("/fever", managementinterface.Fever).Methods("GET")
 
 	// API
 	apiObj, err := api.NewAPI(config.config, version)
