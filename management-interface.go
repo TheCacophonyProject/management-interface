@@ -721,3 +721,8 @@ func TimeHandler(w http.ResponseWriter, r *http.Request) {
 func Rename(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "rename.html", nil)
 }
+
+// Rename page to change device name and group
+func Fever(w http.ResponseWriter, r *http.Request) {
+	tmpl.ExecuteTemplate(w, "fever.html", nil)
+}
