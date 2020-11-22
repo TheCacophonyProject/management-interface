@@ -37,7 +37,7 @@ nfpms:
   maintainer: Cacophony Developers <coredev@cacophony.org.nz>
   description: Management interface for Cacophonators
   license: GPL v3.0
-  name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}"
+  file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}"
   formats:
     - deb
   bindir: /usr/bin
