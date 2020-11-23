@@ -21,6 +21,7 @@ package api
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -29,10 +30,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	goapi "github.com/TheCacophonyProject/go-api"
 	goconfig "github.com/TheCacophonyProject/go-config"
+	"github.com/TheCacophonyProject/lepton3"
 	signalstrength "github.com/TheCacophonyProject/management-interface/signal-strength"
 	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
@@ -227,6 +230,33 @@ func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// SetConfig is a way of writing new config to the device
+func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
+	errs := []string{}
+	section := r.FormValue("section")
+	if section == "" {
+		errs = append(errs, "no 'section' field given")
+	}
+	key := r.FormValue("key")
+	if key == "" {
+		errs = append(errs, "no 'key' field given")
+	}
+	value := r.FormValue("value")
+	if value == "" {
+		errs = append(errs, "no 'value' field given")
+	}
+	if len(errs) != 0 {
+		badRequest(&w, errors.New(strings.Join(errs, "\n")))
+		return
+	}
+
+	if err := api.config.SetField(section, key, value, false); err != nil {
+		badRequest(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 // GetConfig will return the config settings and the defaults
 func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 	if err := api.config.Update(); err != nil {
@@ -257,7 +287,7 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 		goconfig.ModemdKey:           goconfig.DefaultModemd(),
 		goconfig.PortsKey:            goconfig.DefaultPorts(),
 		goconfig.TestHostsKey:        goconfig.DefaultTestHosts(),
-		goconfig.ThermalMotionKey:    goconfig.DefaultThermalMotion(),
+		goconfig.ThermalMotionKey:    goconfig.DefaultThermalMotion(lepton3.Model35), //TODO don't assume that model 3.5 is being used
 		goconfig.ThermalRecorderKey:  goconfig.DefaultThermalRecorder(),
 		goconfig.ThermalThrottlerKey: goconfig.DefaultThermalThrottler(),
 		goconfig.WindowsKey:          goconfig.DefaultWindows(),

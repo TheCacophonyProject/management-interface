@@ -91,6 +91,7 @@ func main() {
 	apiRouter.HandleFunc("/reregister", apiObj.Reregister).Methods("POST")
 	apiRouter.HandleFunc("/reboot", apiObj.Reboot).Methods("POST")
 	apiRouter.HandleFunc("/config", apiObj.GetConfig).Methods("GET")
+	apiRouter.HandleFunc("/config", apiObj.SetConfig).Methods("POST")
 	apiRouter.HandleFunc("/clear-config-section", apiObj.ClearConfigSection).Methods("POST")
 	apiRouter.HandleFunc("/location", apiObj.SetLocation).Methods("POST") // Set location via a POST request.
 	apiRouter.HandleFunc("/clock", apiObj.GetClock).Methods("GET")
