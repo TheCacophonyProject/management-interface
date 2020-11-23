@@ -44,6 +44,8 @@ nfpms:
   files:
     "_release/managementd-avahi.service": "/etc/avahi/services/managementd.service"
     "_release/managementd.service": "/etc/systemd/system/managementd.service"
+  scripts:
+      postinstall: "_release/postinstall.sh"
 
 checksum:
   name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
