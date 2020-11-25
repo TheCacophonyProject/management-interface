@@ -6,7 +6,7 @@ require (
 	github.com/TheCacophonyProject/audiobait v0.0.0-20191024224540-9caccf222bd2
 	github.com/TheCacophonyProject/event-reporter v1.3.2-0.20200210010421-ca3fcb76a231
 	github.com/TheCacophonyProject/go-api v0.0.0-20190923033957-174cea2ac81c
-	github.com/TheCacophonyProject/go-config v1.6.0
+	github.com/TheCacophonyProject/go-config v1.6.2
 	github.com/TheCacophonyProject/lepton3 v0.0.0-20200909032119-e2b2b778a8ee
 	github.com/TheCacophonyProject/rtc-utils v1.2.0
 	github.com/gobuffalo/packr v1.30.1

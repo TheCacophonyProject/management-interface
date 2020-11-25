@@ -716,3 +716,8 @@ func TimeHandler(w http.ResponseWriter, r *http.Request) {
 func Rename(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "rename.html", nil)
 }
+
+// Config page to change devices config
+func Config(w http.ResponseWriter, r *http.Request) {
+	tmpl.ExecuteTemplate(w, "config.html", nil)
+}
