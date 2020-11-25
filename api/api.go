@@ -45,7 +45,7 @@ const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
-	apiVersion          = 2
+	apiVersion          = 3
 )
 
 type ManagementAPI struct {
