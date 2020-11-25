@@ -33,6 +33,7 @@ import (
 
 	goapi "github.com/TheCacophonyProject/go-api"
 	goconfig "github.com/TheCacophonyProject/go-config"
+	"github.com/TheCacophonyProject/lepton3"
 	signalstrength "github.com/TheCacophonyProject/management-interface/signal-strength"
 	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
@@ -44,7 +45,7 @@ const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
-	apiVersion          = 2
+	apiVersion          = 3
 )
 
 type ManagementAPI struct {
@@ -227,27 +228,27 @@ func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// GetConfig will return the config settings and the defaults
-func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
-	if err := api.config.Update(); err != nil {
-		serverError(&w, err)
+// SetConfig is a way of writing new config to the device. It can only update one seciton at a time
+func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
+	section := r.FormValue("section")
+	newConfigRaw := r.FormValue("config")
+	newConfig := map[string]interface{}{}
+	if err := json.Unmarshal([]byte(newConfigRaw), &newConfig); err != nil {
+		badRequest(&w, err)
 		return
 	}
+	if err := api.config.SetFromMap(section, newConfig, false); err != nil {
+		badRequest(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
 
-	configSections := []string{
-		goconfig.AudioKey,
-		goconfig.BatteryKey,
-		goconfig.DeviceKey,
-		goconfig.GPIOKey,
-		goconfig.LeptonKey,
-		goconfig.LocationKey,
-		goconfig.ModemdKey,
-		goconfig.PortsKey,
-		goconfig.TestHostsKey,
-		goconfig.ThermalMotionKey,
-		goconfig.ThermalRecorderKey,
-		goconfig.ThermalThrottlerKey,
-		goconfig.WindowsKey,
+// GetConfig will return the config settings and the defaults
+func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
+	if err := api.config.Reload(); err != nil {
+		serverError(&w, err)
+		return
 	}
 
 	configDefaults := map[string]interface{}{
@@ -257,20 +258,34 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 		goconfig.ModemdKey:           goconfig.DefaultModemd(),
 		goconfig.PortsKey:            goconfig.DefaultPorts(),
 		goconfig.TestHostsKey:        goconfig.DefaultTestHosts(),
-		goconfig.ThermalMotionKey:    goconfig.DefaultThermalMotion(),
+		goconfig.ThermalMotionKey:    goconfig.DefaultThermalMotion(lepton3.Model35), //TODO don't assume that model 3.5 is being used
 		goconfig.ThermalRecorderKey:  goconfig.DefaultThermalRecorder(),
 		goconfig.ThermalThrottlerKey: goconfig.DefaultThermalThrottler(),
 		goconfig.WindowsKey:          goconfig.DefaultWindows(),
 	}
 
-	configMap := map[string]interface{}{}
+	configValues := map[string]interface{}{
+		goconfig.AudioKey:            &goconfig.Audio{},
+		goconfig.GPIOKey:             &goconfig.GPIO{},
+		goconfig.LeptonKey:           &goconfig.Lepton{},
+		goconfig.ModemdKey:           &goconfig.Modemd{},
+		goconfig.PortsKey:            &goconfig.Ports{},
+		goconfig.TestHostsKey:        &goconfig.TestHosts{},
+		goconfig.ThermalMotionKey:    &goconfig.ThermalMotion{},
+		goconfig.ThermalRecorderKey:  &goconfig.ThermalRecorder{},
+		goconfig.ThermalThrottlerKey: &goconfig.ThermalThrottler{},
+		goconfig.WindowsKey:          &goconfig.Windows{},
+	}
 
-	for _, section := range configSections {
-		configMap[section] = api.config.Get(section)
+	for section, sectionStruct := range configValues {
+		if err := api.config.Unmarshal(section, sectionStruct); err != nil {
+			serverError(&w, err)
+			return
+		}
 	}
 
 	valuesAndDefaults := map[string]interface{}{
-		"values":   configMap,
+		"values":   configValues,
 		"defaults": configDefaults,
 	}
 

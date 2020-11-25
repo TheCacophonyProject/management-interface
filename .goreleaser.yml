@@ -37,13 +37,15 @@ nfpms:
   maintainer: Cacophony Developers <coredev@cacophony.org.nz>
   description: Management interface for Cacophonators
   license: GPL v3.0
-  name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}"
+  file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}"
   formats:
     - deb
   bindir: /usr/bin
   files:
     "_release/managementd-avahi.service": "/etc/avahi/services/managementd.service"
     "_release/managementd.service": "/etc/systemd/system/managementd.service"
+  scripts:
+      postinstall: "_release/postinstall.sh"
 
 checksum:
   name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
