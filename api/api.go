@@ -460,6 +460,22 @@ func (api *ManagementAPI) DeleteEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// CheckSaltConnection will try to ping the salt server and return the response
+func (api *ManagementAPI) CheckSaltConnection(w http.ResponseWriter, r *http.Request) {
+	log.Println("pinging salt server")
+	out, err := exec.Command("salt-call", "test.ping").Output()
+
+	output := map[string]interface{}{
+		"output":  string(out),
+		"success": true,
+	}
+	if err != nil {
+		output["error"] = err.Error()
+		output["success"] = false
+	}
+	json.NewEncoder(w).Encode(output)
+}
+
 func isEventKey(key uint64) (bool, error) {
 	keys, err := eventclient.GetEventKeys()
 	if err != nil {
