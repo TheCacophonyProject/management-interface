@@ -101,6 +101,7 @@ func main() {
 	apiRouter.HandleFunc("/event-keys", apiObj.GetEventKeys).Methods("GET")
 	apiRouter.HandleFunc("/events", apiObj.GetEvents).Methods("GET")
 	apiRouter.HandleFunc("/events", apiObj.DeleteEvents).Methods("DELETE")
+	apiRouter.HandleFunc("/check-salt-connection", apiObj.CheckSaltConnection).Methods("GET")
 	apiRouter.Use(basicAuth)
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
