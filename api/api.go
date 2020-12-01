@@ -45,13 +45,16 @@ const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
-	apiVersion          = 4
+	apiVersion          = 5
 )
 
 type ManagementAPI struct {
-	cptvDir    string
-	config     *goconfig.Config
-	appVersion string
+	cptvDir           string
+	config            *goconfig.Config
+	appVersion        string
+	saltUpdateRunning bool
+	saltUpdateOutput  string
+	saltUpdateSuccess bool
 }
 
 func NewAPI(config *goconfig.Config, appVersion string) (*ManagementAPI, error) {
@@ -474,6 +477,32 @@ func (api *ManagementAPI) CheckSaltConnection(w http.ResponseWriter, r *http.Req
 		output["success"] = false
 	}
 	json.NewEncoder(w).Encode(output)
+}
+
+// StartSaltUpdate will start a salt update process if not alreay running
+func (api *ManagementAPI) StartSaltUpdate(w http.ResponseWriter, r *http.Request) {
+	if api.saltUpdateRunning {
+		w.Write([]byte("already runing salt update"))
+		return
+	}
+	go func(api *ManagementAPI) {
+		log.Println("starting salt update")
+		api.saltUpdateRunning = true
+		out, err := exec.Command("salt-call", "test.ping").Output()
+		api.saltUpdateRunning = false
+		api.saltUpdateSuccess = err == nil
+		api.saltUpdateOutput = string(out)
+	}(api)
+}
+
+//GetSaltUpdateState will get the salt udpate status
+func (api *ManagementAPI) GetSaltUpdateState(w http.ResponseWriter, r *http.Request) {
+	out := map[string]interface{}{
+		"running": api.saltUpdateRunning,
+		"success": api.saltUpdateSuccess,
+		"output":  api.saltUpdateOutput,
+	}
+	json.NewEncoder(w).Encode(out)
 }
 
 func isEventKey(key uint64) (bool, error) {
