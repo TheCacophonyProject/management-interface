@@ -51,12 +51,9 @@ const (
 )
 
 type ManagementAPI struct {
-	cptvDir           string
-	config            *goconfig.Config
-	appVersion        string
-	saltUpdateRunning bool
-	saltUpdateOutput  string
-	saltUpdateSuccess bool
+	cptvDir    string
+	config     *goconfig.Config
+	appVersion string
 }
 
 func NewAPI(config *goconfig.Config, appVersion string) (*ManagementAPI, error) {
@@ -479,7 +476,11 @@ func (api *ManagementAPI) CheckSaltConnection(w http.ResponseWriter, r *http.Req
 
 // StartSaltUpdate will start a salt update process if not already running
 func (api *ManagementAPI) StartSaltUpdate(w http.ResponseWriter, r *http.Request) {
-	if api.saltUpdateRunning {
+	state, err := saltrequester.State()
+	if err != nil {
+		serverError(&w, errors.New("failed to check salt state"))
+	}
+	if state.RunningUpdate {
 		w.Write([]byte("already runing salt update"))
 		return
 	}
