@@ -77,6 +77,8 @@ function checkSaltUpdateState() {
         console.log(response)
     }
     xmlHttp.onerror = async function() {
+        $("#salt-update-button").attr('disabled', false);
+        $("#salt-update-button").html("Run Salt Update...");
         console.log("error with running salt update");
     }
     xmlHttp.send(null)
