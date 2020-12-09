@@ -30,8 +30,6 @@ github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incom
 github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incompatible/go.mod h1:K1wa07sGXKzV0G9p+4R069mZk4GOpqKW8GU6/k+BrIo=
 github.com/TheCacophonyProject/rtc-utils v1.2.0 h1:570sPJE/s0b21NrP9VVeSI/gBh/dLK+G5Ne/ZFwkNv0=
 github.com/TheCacophonyProject/rtc-utils v1.2.0/go.mod h1:uV1SIy93TLZrrBcqDczUNFUz2G/Pk6pZNUdTRglmANU=
-github.com/TheCacophonyProject/salt-updater v0.1.0 h1:nbLbe0Mo+jswhVhA9HFXZXsncV4NAdgj9E6/9HABl7s=
-github.com/TheCacophonyProject/salt-updater v0.1.0/go.mod h1:YcCatDoTPn/5MA1/W7IWjvcSGSEpzFadQ2Wk7Y+e428=
 github.com/TheCacophonyProject/salt-updater v0.2.0 h1:AfojZKJpiCFZYSlR/ZIuCOuRDgr6Kn6xyIMO3GGiX8I=
 github.com/TheCacophonyProject/salt-updater v0.2.0/go.mod h1:YcCatDoTPn/5MA1/W7IWjvcSGSEpzFadQ2Wk7Y+e428=
 github.com/TheCacophonyProject/window v0.0.0-20190821235241-ab92c2ee24b6 h1:aLER2Au+/pJe9FzTW7lmQJIOLO8bgio5i/Uzx/EGEmE=
