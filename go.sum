@@ -30,6 +30,8 @@ github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incom
 github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incompatible/go.mod h1:K1wa07sGXKzV0G9p+4R069mZk4GOpqKW8GU6/k+BrIo=
 github.com/TheCacophonyProject/rtc-utils v1.2.0 h1:570sPJE/s0b21NrP9VVeSI/gBh/dLK+G5Ne/ZFwkNv0=
 github.com/TheCacophonyProject/rtc-utils v1.2.0/go.mod h1:uV1SIy93TLZrrBcqDczUNFUz2G/Pk6pZNUdTRglmANU=
+github.com/TheCacophonyProject/salt-updater v0.2.0 h1:AfojZKJpiCFZYSlR/ZIuCOuRDgr6Kn6xyIMO3GGiX8I=
+github.com/TheCacophonyProject/salt-updater v0.2.0/go.mod h1:YcCatDoTPn/5MA1/W7IWjvcSGSEpzFadQ2Wk7Y+e428=
 github.com/TheCacophonyProject/window v0.0.0-20190821235241-ab92c2ee24b6 h1:aLER2Au+/pJe9FzTW7lmQJIOLO8bgio5i/Uzx/EGEmE=
 github.com/TheCacophonyProject/window v0.0.0-20190821235241-ab92c2ee24b6/go.mod h1:Vww417iimOb0s46Ndsm8U/vYtwc0dZUet4uW8QzBo4M=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
@@ -39,6 +41,7 @@ github.com/alexflint/go-arg v1.0.0/go.mod h1:Cto8k5VtkP4pp0EXiWD4ZJMFOOinZ38ggVc
 github.com/alexflint/go-arg v1.1.0 h1:92ADei0d3TP0mGBdJ/FNcF54X6uFY7BQfhqkrQt3CCE=
 github.com/alexflint/go-arg v1.1.0/go.mod h1:3Rj4baqzWaGGmZA2+bVTV8zQOZEjBQAPBnL5xLT+ftY=
 github.com/alexflint/go-arg v1.2.0/go.mod h1:3Rj4baqzWaGGmZA2+bVTV8zQOZEjBQAPBnL5xLT+ftY=
+github.com/alexflint/go-arg v1.3.0/go.mod h1:9iRbDxne7LcR/GSvEr7ma++GLpdIU1zrghf2y2768kM=
 github.com/alexflint/go-scalar v1.0.0/go.mod h1:GpHzbCOZXEKMEcygYQ5n/aa4Aq84zbxjy3MxYW0gjYw=
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=

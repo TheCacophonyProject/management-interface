@@ -21,6 +21,7 @@ package api
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -35,6 +36,7 @@ import (
 	goconfig "github.com/TheCacophonyProject/go-config"
 	"github.com/TheCacophonyProject/lepton3"
 	signalstrength "github.com/TheCacophonyProject/management-interface/signal-strength"
+	saltrequester "github.com/TheCacophonyProject/salt-updater"
 	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
 
@@ -45,7 +47,7 @@ const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
-	apiVersion          = 4
+	apiVersion          = 5
 )
 
 type ManagementAPI struct {
@@ -463,17 +465,40 @@ func (api *ManagementAPI) DeleteEvents(w http.ResponseWriter, r *http.Request) {
 // CheckSaltConnection will try to ping the salt server and return the response
 func (api *ManagementAPI) CheckSaltConnection(w http.ResponseWriter, r *http.Request) {
 	log.Println("pinging salt server")
-	out, err := exec.Command("salt-call", "test.ping").Output()
-
-	output := map[string]interface{}{
-		"output":  string(out),
-		"success": true,
-	}
+	state, err := saltrequester.RunPingSync()
 	if err != nil {
-		output["error"] = err.Error()
-		output["success"] = false
+		log.Printf("error running salt sync ping: %v", err)
+		serverError(&w, errors.New("failed to make ping call to salt server"))
+		return
 	}
-	json.NewEncoder(w).Encode(output)
+	json.NewEncoder(w).Encode(state)
+}
+
+// StartSaltUpdate will start a salt update process if not already running
+func (api *ManagementAPI) StartSaltUpdate(w http.ResponseWriter, r *http.Request) {
+	state, err := saltrequester.State()
+	if err != nil {
+		serverError(&w, errors.New("failed to check salt state"))
+	}
+	if state.RunningUpdate {
+		w.Write([]byte("already runing salt update"))
+		return
+	}
+	if err := saltrequester.RunUpdate(); err != nil {
+		log.Printf("error calling a salt update: %v", err)
+		serverError(&w, errors.New("failed to call a salt update"))
+	}
+}
+
+//GetSaltUpdateState will get the salt update status
+func (api *ManagementAPI) GetSaltUpdateState(w http.ResponseWriter, r *http.Request) {
+	state, err := saltrequester.State()
+	if err != nil {
+		log.Printf("error getting salt state: %v", err)
+		serverError(&w, errors.New("failed to get salt state"))
+		return
+	}
+	json.NewEncoder(w).Encode(state)
 }
 
 func isEventKey(key uint64) (bool, error) {
