@@ -625,6 +625,7 @@ func AboutHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config)
 		Group                   string
 		DeviceID                int
 		LastSaltUpdate          string
+		SaltNodegroup           string
 		PackageDataRows         [][]string
 		ErrorMessage            string
 	}
@@ -645,6 +646,7 @@ func AboutHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config)
 		Group:                   device.Group,
 		DeviceID:                device.ID,
 		LastSaltUpdate:          getLastSaltUpdate(),
+		SaltNodegroup:           readFile("/etc/cacophony/salt-nodegroup"),
 	}
 
 	// Get installed packages.
