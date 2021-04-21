@@ -26,10 +26,12 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	goapi "github.com/TheCacophonyProject/go-api"
@@ -47,7 +49,7 @@ const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
-	apiVersion          = 5
+	apiVersion          = 6
 )
 
 type ManagementAPI struct {
@@ -187,7 +189,7 @@ func (api *ManagementAPI) TakeSnapshot(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Reregister can change the devices name and gruop
+// Reregister can change the devices name and group
 func (api *ManagementAPI) Reregister(w http.ResponseWriter, r *http.Request) {
 	group := r.FormValue("group")
 	name := r.FormValue("name")
@@ -216,7 +218,6 @@ func (api *ManagementAPI) Reregister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	return
 }
 
 // Reboot will reboot the device after a delay so a response can be sent back
@@ -230,7 +231,7 @@ func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// SetConfig is a way of writing new config to the device. It can only update one seciton at a time
+// SetConfig is a way of writing new config to the device. It can only update one section at a time
 func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 	section := r.FormValue("section")
 	newConfigRaw := r.FormValue("config")
@@ -501,6 +502,29 @@ func (api *ManagementAPI) GetSaltUpdateState(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(state)
 }
 
+func (api *ManagementAPI) GetServiceLogs(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		parseFormErrorResponse(&w, err)
+		return
+	}
+	service := r.Form.Get("service")
+	if service == "" {
+		parseFormErrorResponse(&w, errors.New("service field was empty"))
+		return
+	}
+	lines, err := parseIntFromForm("lines", r.Form)
+	if err != nil {
+		parseFormErrorResponse(&w, err)
+		return
+	}
+	logs, err := getServiceLogs(service, lines)
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(logs)
+}
+
 func isEventKey(key uint64) (bool, error) {
 	keys, err := eventclient.GetEventKeys()
 	if err != nil {
@@ -522,4 +546,37 @@ func getListOfEvents(r *http.Request) ([]uint64, error) {
 		return nil, fmt.Errorf("failed to parse keys '%s' as a list of uint64: %v", keysStr, err)
 	}
 	return keys, nil
+}
+
+func parseIntFromForm(field string, form url.Values) (int, error) {
+	intStr := form.Get(field)
+	if intStr == "" {
+		return 0, fmt.Errorf("didn't find a value for '%s'", field)
+	}
+	i, err := strconv.Atoi(intStr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse '%s' from field '%s' to an int: %v", intStr, field, err)
+	}
+	return i, nil
+}
+
+func parseFormErrorResponse(w *http.ResponseWriter, err error) {
+	(*w).WriteHeader(http.StatusBadRequest)
+	io.WriteString((*w), fmt.Sprintf("failed to parse form: %v", err))
+}
+
+func getServiceLogs(service string, lines int) ([]string, error) {
+	out, err := exec.Command(
+		"/bin/journalctl",
+		"-u", service,
+		"--no-pager",
+		"-n", "10").Output()
+	if err != nil {
+		return nil, err
+	}
+	logLines := strings.Split(string(out), "\n")
+	if logLines[len(logLines)-1] == "" { // sometimes the last line is an empty string
+		return logLines[:len(logLines)-1], nil
+	}
+	return logLines, nil
 }

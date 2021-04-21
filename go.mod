@@ -1,6 +1,6 @@
 module github.com/TheCacophonyProject/management-interface
 
-go 1.12
+go 1.15
 
 require (
 	github.com/TheCacophonyProject/audiobait v0.0.0-20191024224540-9caccf222bd2
@@ -18,3 +18,5 @@ require (
 )
 
 replace periph.io/x/periph => github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incompatible
+
+replace github.com/TheCacophonyProject/audiobait => /home/cam/cac/go/audiobait
