@@ -363,16 +363,6 @@ func serverError(w *http.ResponseWriter, err error) {
 	(*w).WriteHeader(http.StatusInternalServerError)
 }
 
-func (api *ManagementAPI) writeConfig(newConfig map[string]interface{}) error {
-	log.Printf("writing to config: %s", newConfig)
-	for k, v := range newConfig {
-		if err := api.config.Set(k, v); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func getCptvNames(dir string) []string {
 	matches, _ := filepath.Glob(filepath.Join(dir, cptvGlob))
 	failedUploadMatches, _ := filepath.Glob(filepath.Join(dir, failedUploadsFolder, cptvGlob))
@@ -523,19 +513,6 @@ func (api *ManagementAPI) GetServiceLogs(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	json.NewEncoder(w).Encode(logs)
-}
-
-func isEventKey(key uint64) (bool, error) {
-	keys, err := eventclient.GetEventKeys()
-	if err != nil {
-		return false, err
-	}
-	for _, k := range keys {
-		if k == key {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 func getListOfEvents(r *http.Request) ([]uint64, error) {
