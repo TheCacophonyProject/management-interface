@@ -72,6 +72,7 @@ func main() {
 	router.HandleFunc("/camera/snapshot", managementinterface.CameraSnapshot).Methods("GET")
 	router.HandleFunc("/rename", managementinterface.Rename).Methods("GET")
 	router.HandleFunc("/config", managementinterface.Config).Methods("GET")
+	router.HandleFunc("/audiobait", managementinterface.Audiobait).Methods("GET")
 
 	// API
 	apiObj, err := api.NewAPI(config.config, version)
@@ -105,6 +106,8 @@ func main() {
 	apiRouter.HandleFunc("/play-test-sound", apiObj.PlayTestSound).Methods("POST")
 	apiRouter.HandleFunc("/play-audiobait-sound", apiObj.PlayAudiobaitSound).Methods("POST")
 	apiRouter.HandleFunc("/logs", apiObj.GetServiceLogs).Methods("GET")
+	apiRouter.HandleFunc("/service", apiObj.GetServiceStatus).Methods("GET")
+	apiRouter.HandleFunc("/service-restart", apiObj.RestartService).Methods("POST")
 	apiRouter.Use(basicAuth)
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)

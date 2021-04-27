@@ -515,6 +515,81 @@ func (api *ManagementAPI) GetServiceLogs(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(logs)
 }
 
+func (api *ManagementAPI) GetServiceStatus(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		parseFormErrorResponse(&w, err)
+		return
+	}
+	service := r.Form.Get("service")
+	if service == "" {
+		parseFormErrorResponse(&w, errors.New("service field was empty"))
+		return
+	}
+	serviceStatus, err := getServiceStatus(service)
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(serviceStatus)
+}
+
+func (api *ManagementAPI) RestartService(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		parseFormErrorResponse(&w, err)
+		return
+	}
+	service := r.Form.Get("service")
+	if service == "" {
+		parseFormErrorResponse(&w, errors.New("service field was empty"))
+		return
+	}
+	_, err := exec.Command("systemctl", "restart", service).Output()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+}
+
+type serviceStatus struct {
+	Enabled  bool
+	Active   bool
+	Duration int
+}
+
+func getServiceStatus(service string) (*serviceStatus, error) {
+	status := &serviceStatus{}
+	enabledOut, _ := exec.Command("systemctl", "is-enabled", service).Output()
+	status.Enabled = strings.TrimSpace(string(enabledOut)) == "enabled"
+	activeOut, _ := exec.Command("systemctl", "is-active", service).Output()
+	status.Active = strings.TrimSpace(string(activeOut)) == "active"
+	if !status.Active {
+		return status, nil
+	}
+
+	pidofOut, err := exec.Command("pidof", service).Output()
+	if err != nil {
+		return nil, err
+	}
+	pidOfStr := strings.TrimSpace(string(pidofOut))
+	_, err = strconv.Atoi(pidOfStr)
+	if err != nil {
+		return nil, err
+	}
+	eTimeOut, err := exec.Command("ps", "-p", pidOfStr, "-o", "etimes").Output()
+	if err != nil {
+		return nil, err
+	}
+	eTimeStr := strings.TrimSpace(string(eTimeOut))
+	eTimeStr = strings.TrimPrefix(eTimeStr, "ELAPSED")
+	eTimeStr = strings.TrimSpace(eTimeStr)
+	eTime, err := strconv.Atoi(eTimeStr)
+	if err != nil {
+		return nil, err
+	}
+	status.Duration = eTime
+	return status, nil
+}
+
 func getListOfEvents(r *http.Request) ([]uint64, error) {
 	r.ParseForm()
 	keysStr := r.Form.Get("keys")
@@ -547,7 +622,7 @@ func getServiceLogs(service string, lines int) ([]string, error) {
 		"/bin/journalctl",
 		"-u", service,
 		"--no-pager",
-		"-n", "10").Output()
+		"-n", fmt.Sprint(lines)).Output()
 	if err != nil {
 		return nil, err
 	}

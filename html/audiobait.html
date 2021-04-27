@@ -28,53 +28,40 @@
 
         <div class="container pt-5 pl-0">
             <div class="row">
-
                 <div class="col-9">
                     <h2>Audio Bait Schedule</h2>
                 </div>
-
                 <div class="col-3">
-                    <button id="speaker-test-button" type="button" data-toggle="modal" data-target="#soundModal" data-backdrop="static"
-                        data-sound="test.wav" data-volume = "8" class="btn btn-primary mb-4">Speaker Test</button>
+                    <button id="speaker-test-button" onclick="playTestSound(this)" class="btn btn-primary mb-4">Speaker Test</button>
                 </div>
-
-
             </div>
-
         </div>
         <hr>
 
         <div class="container pt-2 pb-3 pl-2">
 
-            <form action="/audiobait" method="POST" onsubmit="resetButton.disabled = true; return true;">
-                <div class="row">
-                    <div class="col-6">
-                        {{if .Running}}
-                        <div class="alert alert-success">
-                            Audio bait service is running.
-                        </div>
-                        {{else}}
-                        <div class="alert alert-danger">
-                            Audio bait service is not running
-                        </div>
-                        {{end}}
+            <div class="row">
+                <div class="col-6">
+                    <div id="running" style="display: none;" class="alert alert-success">
+                        Audio bait service is running.
                     </div>
-                    <div class="col-3">
-                        <button id="resetButton" type="submit" name="resetButton"
-                            style="Height:50px" class="btn btn-primary" enabled>Reset</button>
-                    </div>
-                    <div class="col-3">
-                        <button id="showLogEntries" type="button" data-toggle="modal" data-target="#logEntriesModal" data-backdrop="static" 
-                            style="Height:50px" class="btn btn-primary">Recent Logs</button>
+                    <div id="not-running" style="display: none;" class="alert alert-danger">
+                        Audio bait service is not running
                     </div>
                 </div>
-            </form>
-
+                <div class="col-3">
+                    <button id="resetButton" style="Height:50px" class="btn btn-primary" onclick="resetAudiobait(this)">Reset</button>
+                </div>
+                <div class="col-3">
+                    <button id="showLogEntries" type="button" data-toggle="modal" data-target="#logEntriesModal" data-backdrop="static" 
+                        style="Height:50px" class="btn btn-primary">Recent Logs</button>
+                </div>
+            </div>
+        
 
             <div class="container pt-5 pb-4 pl-2">
 
                 <h3>Schedule</h3>
-
                 {{if gt (len .Schedule.Combos) 0}}
                 <div class="row">
                     <div class="col">
@@ -92,8 +79,6 @@
 
                             <div class="card-body">
                                 <h5 class="card-text">
-                                    Last updated: {{.Schedule.Timestamp}}
-                                    <br>
                                     <br>
                                     Play sounds for {{.Schedule.PlayNights}} nights then have
                                     {{.Schedule.ControlNights}} nights
@@ -137,12 +122,11 @@
                                             <h5 class="card-text">
                                                 at volume: {{.Volume}}
                                             </h5>
-                                            <button id="test-{{.SoundFileName}}" type="button" data-toggle="modal" data-target="#soundModal" 
-                                                    data-backdrop="static" data-sound="{{.SoundFileName}}" data-volume="{{.Volume}}" 
-                                                    class="btn btn-primary mb-4">Play</button>
-                                            {{if ne .Wait 0}}
+                                            <button type="button" 
+                                                    class="btn btn-primary mb-4" onclick="playSound(this, {{.ID}}, {{.Volume}})">Play</button>
+                                            {{if ne .Waits 0}}
                                                 <h5 class="card-text">
-                                                    then wait: {{.Wait}} mins
+                                                    then wait: {{.Waits}} mins
                                                 </h5>
                                             {{end}}
                                         {{end}}
@@ -244,109 +228,8 @@
 
     <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
     <script src="/static/js/bootstrap.min.js"></script>
-
-
-    <script>
-
-        function loadLogEntries(modal) {
-
-            // Clear output text
-            modal.find('p#outputText').prop("textContent", "")
-
-            // Disable load button while waiting for response
-            var button = document.getElementById("showLogEntries");
-            button.disabled = true;
-            // Also make it so the modal can't be closed while the test is running.
-            modal.find('button#closeButton').prop("disabled", true)
-            modal.find('button#crossCloseButton').prop("disabled", true)
-
-            // Show spinner
-            modal.find('div#loadingSpinner').prop("hidden", false)
-
-            fetch(
-                "/audiobait-log-entries", { method: "GET" }
-            ).then(function (response) {
-                return response.json();
-            }).then(function (json) {
-
-                // Hide spinner
-                modal.find('div#loadingSpinner').prop("hidden", true)
-
-                // Show output text.
-                modal.find('p#outputText').prop("textContent", json["result"])
-
-                // Enable buttons again.
-                button.disabled = false;
-                modal.find('button#closeButton').prop("disabled", false)
-                modal.find('button#crossCloseButton').prop("disabled", false)
-
-            });
-        }
-
-        $('#logEntriesModal').on('show.bs.modal', function (event) {
-            loadLogEntries($(this));
-        })
-
-
-
-        // Globals.
-        var fileName;
-        var volume; 
-        var modal;
-
-
-        $('#soundModal').on('show.bs.modal', function (event) {
-            var button = $(event.relatedTarget); // Button that triggered the modal
-            fileName = button.data('sound'); // Extract info from data-* attributes
-            volume = button.data('volume'); 
-            modal = $(this);
-            soundTest();
-          })
-
-
-
-        // Play a sound at the set volume.
-        function soundTest() {
-
-            // Clear status and put in info for user
-            modal.find('p#fileNameText').prop("textContent", fileName)
-            modal.find('p#volumeText').prop("textContent", volume)
-            modal.find('p#outputText').prop("textContent", "Sound file is now playing...");
-            modal.find('h4#statusIndicator').text("")
-
-            // Disable buttons.
-            modal.find('button#closeButton').prop("disabled", true);
-            modal.find('button#crossCloseButton').prop("disabled", true);
-            modal.find('button#playAgainButton').prop("disabled", true);
-
-            fetch(
-              "/audiobait-test-sound/" + fileName +  "/" + volume,
-              {method: "GET"}
-
-            ).then(function(response) {
-                // Show a symbol indicating whether the test was successfull or not.
-                if (response.ok) {
-                    modal.find('h4#statusIndicator').html("&#x2714;");// Check mark
-                }
-                else {
-                    modal.find('h4#statusIndicator').html("&#x2717;");// Cross mark
-                }
-              return response.json();
-
-            }).then(function(json) {
-              // Show output text.
-              modal.find('p#outputText').prop("textContent", json["result"]);
-              
-              // Enable buttons again.
-              modal.find('button#closeButton').prop("disabled", false);
-              modal.find('button#crossCloseButton').prop("disabled", false);
-              modal.find('button#playAgainButton').prop("disabled", false);
-
-            });
-          }
-
-      </script>
-
+    <script src="/static/js/audiobait.js"></script>
+    <script src="/static/js/api-utils.js"></script>
 </body>
 
 </html>

@@ -38,6 +38,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TheCacophonyProject/audiobait/audiofilelibrary"
+	"github.com/TheCacophonyProject/audiobait/playlist"
+	"github.com/TheCacophonyProject/go-config"
 	goconfig "github.com/TheCacophonyProject/go-config"
 
 	"github.com/gobuffalo/packr"
@@ -722,4 +725,98 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 // Config page to change devices config
 func Config(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "config.html", nil)
+}
+
+type audiobaitResponse struct {
+	Running      bool
+	Schedule     schedule
+	Message      string
+	ErrorMessage string
+}
+
+type schedule struct {
+	Combos        []combo
+	PlayNights    int
+	ControlNights int
+	StartDay      int
+	Description   string
+}
+
+type combo struct {
+	Every     int //Minutes
+	From      string
+	Until     string
+	SoundInfo []soundInfo
+}
+
+type soundInfo struct {
+	SoundFileName        string
+	Volume               int
+	SoundFileDisplayText string
+	Waits                int
+	ID                   int
+}
+
+func Audiobait(w http.ResponseWriter, r *http.Request) {
+	// TODO Rather than generating the HTML like this it should probably use the
+	// audiobait APIs that are now available...
+	playSchedule, err := playlist.LoadScheduleFromDisk(config.DefaultAudio().Dir)
+	if err != nil {
+		log.Println(err)
+		tmpl.ExecuteTemplate(w, "audiobait.html", audiobaitResponse{
+			ErrorMessage: err.Error(),
+		})
+		return
+	}
+	library, err := audiofilelibrary.OpenLibrary(config.DefaultAudio().Dir)
+	if err != nil {
+		log.Println(err)
+		tmpl.ExecuteTemplate(w, "audiobait.html", audiobaitResponse{
+			ErrorMessage: err.Error(),
+		})
+		return
+	}
+	combos := make([]combo, len(playSchedule.Combos))
+	for i, c := range playSchedule.Combos {
+
+		soundInfos := make([]soundInfo, len(c.Sounds))
+		for i, sound := range c.Sounds {
+			si := soundInfo{
+				Volume: c.Volumes[i],
+				Waits:  c.Waits[i] / 60,
+			}
+
+			if sound == "random" || sound == "same" {
+				si.SoundFileDisplayText = sound
+			} else {
+				soundId, err := strconv.Atoi(sound)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				si.ID = soundId
+				si.SoundFileDisplayText = library.FilesByID[soundId]
+				si.SoundFileName = library.FilesByID[soundId]
+			}
+
+			soundInfos[i] = si
+		}
+		combos[i] = combo{
+			Every:     c.Every / 60,
+			From:      c.From.Format("15:04"),
+			Until:     c.Until.Format("15:04"),
+			SoundInfo: soundInfos,
+		}
+	}
+	ar := &audiobaitResponse{
+		Schedule: schedule{
+			ControlNights: playSchedule.ControlNights,
+			Combos:        combos,
+			PlayNights:    playSchedule.PlayNights,
+			StartDay:      playSchedule.StartDay,
+			Description:   playSchedule.Description,
+		},
+		Running: true,
+	}
+	tmpl.ExecuteTemplate(w, "audiobait.html", ar)
 }

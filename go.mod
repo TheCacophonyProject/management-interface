@@ -15,6 +15,8 @@ require (
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v1.6.2
 	github.com/nathan-osman/go-sunrise v0.0.0-20201029015502-9a83cd1a5746 // indirect
+	github.com/stretchr/testify v1.4.0
+	google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8
 )
 
 replace periph.io/x/periph => github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incompatible
