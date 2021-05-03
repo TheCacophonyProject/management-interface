@@ -122,8 +122,10 @@
                                             <h5 class="card-text">
                                                 at volume: {{.Volume}}
                                             </h5>
+                                            {{if ne .ID 0}}
                                             <button type="button" 
                                                     class="btn btn-primary mb-4" onclick="playSound(this, {{.ID}}, {{.Volume}})">Play</button>
+                                            {{end}}
                                             {{if ne .Waits 0}}
                                                 <h5 class="card-text">
                                                     then wait: {{.Waits}} mins
@@ -146,8 +148,18 @@
 
             <hr>
 
-
-
+            <div class="row">
+                <div class="col-6">
+                    <label for="test-audio-select">Test sound:</label>
+                    <select id="test-audio-select"></select>
+                    <label for="volume">Volume: </label>
+                    <input type="range" min="1" max="10" value="5" class="slider" id="volume">
+                    <label id="volume-text"> 5 </label>
+                </div>
+                <div class="col-3">
+                    <button class="btn btn-primary mb-4" onclick="testAudio(this)">Test</button>
+                </div>
+            </div>
 
         </div>
 

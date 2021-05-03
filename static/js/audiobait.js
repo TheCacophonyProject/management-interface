@@ -2,6 +2,23 @@ authHeaders = new Headers()
 authHeaders.append("Authorization", "Basic YWRtaW46ZmVhdGhlcnM=")
 
 window.onload = async function() {
+    // Load audio sounds
+    document.getElementById("volume").oninput = function() {
+        document.getElementById("volume-text").innerHTML = this.value
+    }
+    res = await fetch("/api/audiobait", {method: "GET", headers: authHeaders})
+    if (res.ok) {
+        resJson = await res.json()
+        filesById = resJson.library.FilesByID
+        audioSelect = document.getElementById("test-audio-select")
+        for (var id in filesById) {
+            option = document.createElement("option");
+            option.text = filesById[id]
+            option.value = id
+            audioSelect.add(option)
+        }
+    }
+
     res = await fetch("/api/service?service=audiobait", {method: "GET", headers: authHeaders})
     resJson = await res.json()
     if (resJson.Active) {
@@ -91,6 +108,12 @@ function loadLogEntries(modal) {
         modal.find('button#crossCloseButton').prop("disabled", false)
 
     });
+}
+
+function testAudio(element) {
+    volume = document.getElementById("volume").value
+    id = document.getElementById("test-audio-select").value
+    playSound(element, id, volume)
 }
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
