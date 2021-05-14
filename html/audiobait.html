@@ -116,6 +116,11 @@
                                             <strong>Sounds</strong>
                                         </h5>
                                         {{range .SoundInfo}}
+                                            {{if ne .Waits 0}}
+                                                <h5 class="card-text">
+                                                    then wait: {{.Waits}} mins
+                                                </h5>
+                                            {{end}}
                                             <h5 class="card-text">
                                                 Play sound: {{.SoundFileDisplayText}}
                                             </h5>
@@ -125,11 +130,6 @@
                                             {{if ne .ID 0}}
                                             <button type="button" 
                                                     class="btn btn-primary mb-4" onclick="playSound(this, {{.ID}}, {{.Volume}})">Play</button>
-                                            {{end}}
-                                            {{if ne .Waits 0}}
-                                                <h5 class="card-text">
-                                                    then wait: {{.Waits}} mins
-                                                </h5>
                                             {{end}}
                                         {{end}}
                                     </div>
