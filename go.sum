@@ -5,9 +5,6 @@ github.com/Masterminds/glide v0.13.2/go.mod h1:STyF5vcenH/rUqTEv+/hBXlSTo7KYwg2o
 github.com/Masterminds/semver v1.4.2/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
 github.com/Masterminds/vcs v1.13.0/go.mod h1:N09YCmOQr6RLxC6UNHzuVwAdodYbbnycGHSmwVJjcKA=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
-github.com/TheCacophonyProject/audiobait v0.0.0-20191024224540-9caccf222bd2 h1:dHZ7p4lH2h9iZCsc7G1XWqtD45u1rqLFhqWaq5Nn5yA=
-github.com/TheCacophonyProject/audiobait v0.0.0-20191024224540-9caccf222bd2/go.mod h1:KcPVht0B6bHFmU5k0zGEtFH+RbrGo5JnpIMo8UiR3C4=
-github.com/TheCacophonyProject/audiobait v1.5.0 h1:B52v1Q/Wk0Fn6Ef8sv0xK0FV8qfuhgLVhJGByLffgmg=
 github.com/TheCacophonyProject/audiobait/v3 v3.0.1 h1:7MGtBVqwuxLs4Tuw3VUQy1z/vcSumoht6bOr06i6tsY=
 github.com/TheCacophonyProject/audiobait/v3 v3.0.1/go.mod h1:EDM0fyF6oHPUmtOfY4QsLmOL4mfpLOtsngaQfHbttKk=
 github.com/TheCacophonyProject/event-reporter v1.3.2-0.20200210010421-ca3fcb76a231 h1:nLqfSx3zDBzghlP/S8X2j/WRtW0e3BZvSkMm1J/Fa8U=
