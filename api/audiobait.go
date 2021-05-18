@@ -25,9 +25,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/TheCacophonyProject/audiobait/audiobaitclient"
-	"github.com/TheCacophonyProject/audiobait/audiofilelibrary"
-	"github.com/TheCacophonyProject/audiobait/playlist"
+	"github.com/TheCacophonyProject/audiobait/v3/audiobaitclient"
+	"github.com/TheCacophonyProject/audiobait/v3/audiofilelibrary"
+	"github.com/TheCacophonyProject/audiobait/v3/playlist"
 	"github.com/TheCacophonyProject/go-config"
 )
 
