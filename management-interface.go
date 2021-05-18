@@ -31,23 +31,19 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/TheCacophonyProject/audiobait/v3/audiofilelibrary"
+	"github.com/TheCacophonyProject/audiobait/v3/playlist"
 	goconfig "github.com/TheCacophonyProject/go-config"
 
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
 )
-
-const scheduleFilename = "schedule.json"
-
-// The file system location of this execuable.
-var executablePath = ""
 
 // Using a packr box means the html files are bundled up in the binary application.
 var templateBox = packr.NewBox("./html")
@@ -67,9 +63,6 @@ func init() {
 		t := tmpl.New(name)
 		template.Must(t.Parse(templateBox.String(name)))
 	}
-
-	executablePath = getExecutablePath()
-
 }
 
 // NetworkConfig is a struct to store our network configuration values in.
@@ -82,7 +75,7 @@ type NetworkConfig struct {
 func getDeviceName() string {
 	name, err := os.Hostname()
 	if err != nil {
-		log.Printf(err.Error())
+		log.Println(err.Error())
 		return "Unknown"
 	}
 	// Make sure we handle the case when name could be something like: 'host.corp.com'
@@ -156,16 +149,6 @@ func readFile(file string) string {
 	return string(out)
 }
 
-// Get the directory of where this executable was started.
-func getExecutablePath() string {
-	ex, err := os.Executable()
-	if err != nil {
-		log.Printf(err.Error())
-		return ""
-	}
-	return filepath.Dir(ex)
-}
-
 // Return info on the disk space available, disk space used etc.
 func getDiskSpace() (string, error) {
 	var out []byte
@@ -179,7 +162,7 @@ func getDiskSpace() (string, error) {
 	}
 
 	if err != nil {
-		log.Printf(err.Error())
+		log.Println(err.Error())
 		return err.Error(), err
 	}
 	return string(out), nil
@@ -199,7 +182,7 @@ func getMemoryStats() (string, error) {
 	}
 
 	if err != nil {
-		log.Printf(err.Error())
+		log.Println(err.Error())
 		return err.Error(), err
 	}
 	return string(out), nil
@@ -355,6 +338,9 @@ func getNetworkSSID(networkID string) (string, error) {
 func deleteNetwork(id string) error {
 	//check if is bushnet
 	ssid, err := getNetworkSSID(id)
+	if err != nil {
+		return err
+	}
 	if strings.ToLower(ssid) == "\"bushnet\"" {
 		return errors.New("error bushnet cannot be deleted")
 	}
@@ -722,4 +708,105 @@ func Rename(w http.ResponseWriter, r *http.Request) {
 // Config page to change devices config
 func Config(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "config.html", nil)
+}
+
+type audiobaitResponse struct {
+	Running      bool
+	Schedule     schedule
+	Message      string
+	ErrorMessage string
+}
+
+type schedule struct {
+	Combos        []combo
+	PlayNights    int
+	ControlNights int
+	StartDay      int
+	Description   string
+}
+
+type combo struct {
+	Every     int //Minutes
+	From      string
+	Until     string
+	SoundInfo []soundInfo
+}
+
+type soundInfo struct {
+	SoundFileName        string
+	Volume               int
+	SoundFileDisplayText string
+	Waits                int
+	ID                   int
+}
+
+func Audiobait(w http.ResponseWriter, r *http.Request) {
+	// TODO Rather than generating the HTML like this it should probably use the
+	// audiobait APIs that are now available...
+	playSchedule, err := playlist.LoadScheduleFromDisk(goconfig.DefaultAudio().Dir)
+	if err != nil {
+		log.Println(err)
+		tmpl.ExecuteTemplate(w, "audiobait.html", audiobaitResponse{
+			ErrorMessage: err.Error(),
+		})
+		return
+	}
+	library, err := audiofilelibrary.OpenLibrary(goconfig.DefaultAudio().Dir)
+	if err != nil {
+		log.Println(err)
+		tmpl.ExecuteTemplate(w, "audiobait.html", audiobaitResponse{
+			ErrorMessage: err.Error(),
+		})
+		return
+	}
+	combos := make([]combo, len(playSchedule.Combos))
+	for i, c := range playSchedule.Combos {
+
+		soundInfos := make([]soundInfo, len(c.Sounds))
+		for i, sound := range c.Sounds {
+			si := soundInfo{
+				Volume: c.Volumes[i],
+				Waits:  c.Waits[i] / 60,
+			}
+
+			if sound == "random" || sound == "same" {
+				si.SoundFileDisplayText = sound
+			} else {
+				soundId, err := strconv.Atoi(sound)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				si.ID = soundId
+				si.SoundFileDisplayText = library.FilesByID[soundId]
+				si.SoundFileName = library.FilesByID[soundId]
+			}
+
+			soundInfos[i] = si
+		}
+		combos[i] = combo{
+			Every:     c.Every / 60,
+			From:      c.From.Format("15:04"),
+			Until:     c.Until.Format("15:04"),
+			SoundInfo: soundInfos,
+		}
+	}
+	ar := &audiobaitResponse{
+		Schedule: schedule{
+			ControlNights: playSchedule.ControlNights,
+			Combos:        combos,
+			PlayNights:    playSchedule.PlayNights,
+			StartDay:      playSchedule.StartDay,
+			Description:   playSchedule.Description,
+		},
+		Running: true,
+	}
+	tmpl.ExecuteTemplate(w, "audiobait.html", ar)
+}
+
+func errorMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }

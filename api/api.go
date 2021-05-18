@@ -26,10 +26,12 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	goapi "github.com/TheCacophonyProject/go-api"
@@ -47,7 +49,7 @@ const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
-	apiVersion          = 5
+	apiVersion          = 6
 )
 
 type ManagementAPI struct {
@@ -187,7 +189,7 @@ func (api *ManagementAPI) TakeSnapshot(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Reregister can change the devices name and gruop
+// Reregister can change the devices name and group
 func (api *ManagementAPI) Reregister(w http.ResponseWriter, r *http.Request) {
 	group := r.FormValue("group")
 	name := r.FormValue("name")
@@ -216,7 +218,6 @@ func (api *ManagementAPI) Reregister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	return
 }
 
 // Reboot will reboot the device after a delay so a response can be sent back
@@ -230,7 +231,7 @@ func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// SetConfig is a way of writing new config to the device. It can only update one seciton at a time
+// SetConfig is a way of writing new config to the device. It can only update one section at a time
 func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 	section := r.FormValue("section")
 	newConfigRaw := r.FormValue("config")
@@ -362,16 +363,6 @@ func serverError(w *http.ResponseWriter, err error) {
 	(*w).WriteHeader(http.StatusInternalServerError)
 }
 
-func (api *ManagementAPI) writeConfig(newConfig map[string]interface{}) error {
-	log.Printf("writing to config: %s", newConfig)
-	for k, v := range newConfig {
-		if err := api.config.Set(k, v); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func getCptvNames(dir string) []string {
 	matches, _ := filepath.Glob(filepath.Join(dir, cptvGlob))
 	failedUploadMatches, _ := filepath.Glob(filepath.Join(dir, failedUploadsFolder, cptvGlob))
@@ -501,17 +492,102 @@ func (api *ManagementAPI) GetSaltUpdateState(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(state)
 }
 
-func isEventKey(key uint64) (bool, error) {
-	keys, err := eventclient.GetEventKeys()
+func (api *ManagementAPI) GetServiceLogs(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		parseFormErrorResponse(&w, err)
+		return
+	}
+	service := r.Form.Get("service")
+	if service == "" {
+		parseFormErrorResponse(&w, errors.New("service field was empty"))
+		return
+	}
+	lines, err := parseIntFromForm("lines", r.Form)
 	if err != nil {
-		return false, err
+		parseFormErrorResponse(&w, err)
+		return
 	}
-	for _, k := range keys {
-		if k == key {
-			return true, nil
-		}
+	logs, err := getServiceLogs(service, lines)
+	if err != nil {
+		serverError(&w, err)
+		return
 	}
-	return false, nil
+	json.NewEncoder(w).Encode(logs)
+}
+
+func (api *ManagementAPI) GetServiceStatus(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		parseFormErrorResponse(&w, err)
+		return
+	}
+	service := r.Form.Get("service")
+	if service == "" {
+		parseFormErrorResponse(&w, errors.New("service field was empty"))
+		return
+	}
+	serviceStatus, err := getServiceStatus(service)
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(serviceStatus)
+}
+
+func (api *ManagementAPI) RestartService(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		parseFormErrorResponse(&w, err)
+		return
+	}
+	service := r.Form.Get("service")
+	if service == "" {
+		parseFormErrorResponse(&w, errors.New("service field was empty"))
+		return
+	}
+	_, err := exec.Command("systemctl", "restart", service).Output()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+}
+
+type serviceStatus struct {
+	Enabled  bool
+	Active   bool
+	Duration int
+}
+
+func getServiceStatus(service string) (*serviceStatus, error) {
+	status := &serviceStatus{}
+	enabledOut, _ := exec.Command("systemctl", "is-enabled", service).Output()
+	status.Enabled = strings.TrimSpace(string(enabledOut)) == "enabled"
+	activeOut, _ := exec.Command("systemctl", "is-active", service).Output()
+	status.Active = strings.TrimSpace(string(activeOut)) == "active"
+	if !status.Active {
+		return status, nil
+	}
+
+	pidofOut, err := exec.Command("pidof", service).Output()
+	if err != nil {
+		return nil, err
+	}
+	pidOfStr := strings.TrimSpace(string(pidofOut))
+	_, err = strconv.Atoi(pidOfStr)
+	if err != nil {
+		return nil, err
+	}
+	eTimeOut, err := exec.Command("ps", "-p", pidOfStr, "-o", "etimes").Output()
+	if err != nil {
+		return nil, err
+	}
+	eTimeStr := strings.TrimSpace(string(eTimeOut))
+	eTimeStr = strings.TrimPrefix(eTimeStr, "ELAPSED")
+	eTimeStr = strings.TrimSpace(eTimeStr)
+	eTime, err := strconv.Atoi(eTimeStr)
+	if err != nil {
+		return nil, err
+	}
+	status.Duration = eTime
+	return status, nil
 }
 
 func getListOfEvents(r *http.Request) ([]uint64, error) {
@@ -522,4 +598,37 @@ func getListOfEvents(r *http.Request) ([]uint64, error) {
 		return nil, fmt.Errorf("failed to parse keys '%s' as a list of uint64: %v", keysStr, err)
 	}
 	return keys, nil
+}
+
+func parseIntFromForm(field string, form url.Values) (int, error) {
+	intStr := form.Get(field)
+	if intStr == "" {
+		return 0, fmt.Errorf("didn't find a value for '%s'", field)
+	}
+	i, err := strconv.Atoi(intStr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse '%s' from field '%s' to an int: %v", intStr, field, err)
+	}
+	return i, nil
+}
+
+func parseFormErrorResponse(w *http.ResponseWriter, err error) {
+	(*w).WriteHeader(http.StatusBadRequest)
+	io.WriteString((*w), fmt.Sprintf("failed to parse form: %v", err))
+}
+
+func getServiceLogs(service string, lines int) ([]string, error) {
+	out, err := exec.Command(
+		"/bin/journalctl",
+		"-u", service,
+		"--no-pager",
+		"-n", fmt.Sprint(lines)).Output()
+	if err != nil {
+		return nil, err
+	}
+	logLines := strings.Split(string(out), "\n")
+	if logLines[len(logLines)-1] == "" { // sometimes the last line is an empty string
+		return logLines[:len(logLines)-1], nil
+	}
+	return logLines, nil
 }

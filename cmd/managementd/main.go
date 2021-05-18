@@ -67,14 +67,12 @@ func main() {
 	router.HandleFunc("/location", managementinterface.GenLocationHandler(config.config)).Methods("GET") // Form to view and/or set location manually.
 	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET")                          // Form to view and/or adjust time settings.
 	router.HandleFunc("/about", managementinterface.AboutHandlerGen(config.config)).Methods("GET")
-	router.HandleFunc("/audiobait", managementinterface.AudiobaitHandlerGen(config.config)).Methods("GET", "POST")
-	router.HandleFunc("/audiobait-log-entries", managementinterface.AudiobaitLogEntriesHandler).Methods("GET")
-	router.HandleFunc("/audiobait-test-sound/{fileName}/{volume}", managementinterface.AudiobaitSoundsHandlerGen(config.config)).Methods("GET")
 	router.HandleFunc("/advanced", managementinterface.AdvancedMenuHandler).Methods("GET")
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
 	router.HandleFunc("/camera/snapshot", managementinterface.CameraSnapshot).Methods("GET")
 	router.HandleFunc("/rename", managementinterface.Rename).Methods("GET")
 	router.HandleFunc("/config", managementinterface.Config).Methods("GET")
+	router.HandleFunc("/audiobait", managementinterface.Audiobait).Methods("GET")
 
 	// API
 	apiObj, err := api.NewAPI(config.config, version)
@@ -104,6 +102,12 @@ func main() {
 	apiRouter.HandleFunc("/check-salt-connection", apiObj.CheckSaltConnection).Methods("GET")
 	apiRouter.HandleFunc("/salt-update", apiObj.StartSaltUpdate).Methods("POST")
 	apiRouter.HandleFunc("/salt-update", apiObj.GetSaltUpdateState).Methods("GET")
+	apiRouter.HandleFunc("/audiobait", apiObj.GetAudiobait).Methods("GET")
+	apiRouter.HandleFunc("/play-test-sound", apiObj.PlayTestSound).Methods("POST")
+	apiRouter.HandleFunc("/play-audiobait-sound", apiObj.PlayAudiobaitSound).Methods("POST")
+	apiRouter.HandleFunc("/logs", apiObj.GetServiceLogs).Methods("GET")
+	apiRouter.HandleFunc("/service", apiObj.GetServiceStatus).Methods("GET")
+	apiRouter.HandleFunc("/service-restart", apiObj.RestartService).Methods("POST")
 	apiRouter.Use(basicAuth)
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
