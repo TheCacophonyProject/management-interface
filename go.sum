@@ -12,6 +12,7 @@ github.com/TheCacophonyProject/audiobait/v3 v3.0.1 h1:7MGtBVqwuxLs4Tuw3VUQy1z/vc
 github.com/TheCacophonyProject/audiobait/v3 v3.0.1/go.mod h1:EDM0fyF6oHPUmtOfY4QsLmOL4mfpLOtsngaQfHbttKk=
 github.com/TheCacophonyProject/event-reporter v1.3.2-0.20200210010421-ca3fcb76a231 h1:nLqfSx3zDBzghlP/S8X2j/WRtW0e3BZvSkMm1J/Fa8U=
 github.com/TheCacophonyProject/event-reporter v1.3.2-0.20200210010421-ca3fcb76a231/go.mod h1:kei6S/4x+VHp5yiwYPqvcNnhuRpZ8iLsh95Sue6kPvc=
+github.com/TheCacophonyProject/event-reporter/v3 v3.2.1/go.mod h1:0ejh8kTFM9iC3/Q+etu7Hf4XivPu35PDH5oQ1XY3KNU=
 github.com/TheCacophonyProject/go-api v0.0.0-20190923033957-174cea2ac81c h1:oe4aAqyfuxwiVbgn2UpslZ6oUlJSNE0cU0TAR8G5k/c=
 github.com/TheCacophonyProject/go-api v0.0.0-20190923033957-174cea2ac81c/go.mod h1:FfMpa4cFhNXQ9tuKG18HO6yLExezcJhzjUjBOFocrQw=
 github.com/TheCacophonyProject/go-config v0.0.0-20190922224052-7c2a21bc6b88 h1:b3CpL57RUjdlgRmm54qNj37tLEwmJzNDvxOXX7GHYBw=
@@ -33,8 +34,8 @@ github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incom
 github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incompatible/go.mod h1:K1wa07sGXKzV0G9p+4R069mZk4GOpqKW8GU6/k+BrIo=
 github.com/TheCacophonyProject/rtc-utils v1.2.0 h1:570sPJE/s0b21NrP9VVeSI/gBh/dLK+G5Ne/ZFwkNv0=
 github.com/TheCacophonyProject/rtc-utils v1.2.0/go.mod h1:uV1SIy93TLZrrBcqDczUNFUz2G/Pk6pZNUdTRglmANU=
-github.com/TheCacophonyProject/salt-updater v0.2.0 h1:AfojZKJpiCFZYSlR/ZIuCOuRDgr6Kn6xyIMO3GGiX8I=
-github.com/TheCacophonyProject/salt-updater v0.2.0/go.mod h1:YcCatDoTPn/5MA1/W7IWjvcSGSEpzFadQ2Wk7Y+e428=
+github.com/TheCacophonyProject/salt-updater v0.3.0 h1:+osvpE4BzHadZETmmWDkS+CDhtdL2oGsqwLGLLnsdkc=
+github.com/TheCacophonyProject/salt-updater v0.3.0/go.mod h1:fVlMqJZpvT8HeT4GcmQlvMq8+AtvF4NZ/LuEVSoA5E8=
 github.com/TheCacophonyProject/window v0.0.0-20190821235241-ab92c2ee24b6 h1:aLER2Au+/pJe9FzTW7lmQJIOLO8bgio5i/Uzx/EGEmE=
 github.com/TheCacophonyProject/window v0.0.0-20190821235241-ab92c2ee24b6/go.mod h1:Vww417iimOb0s46Ndsm8U/vYtwc0dZUet4uW8QzBo4M=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
