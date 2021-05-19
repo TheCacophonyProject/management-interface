@@ -492,6 +492,35 @@ func (api *ManagementAPI) GetSaltUpdateState(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(state)
 }
 
+//GetSaltAutoUpdate will check if salt auto update is enabled
+func (api *ManagementAPI) GetSaltAutoUpdate(w http.ResponseWriter, r *http.Request) {
+	autoUpdate, err := saltrequester.IsAutoUpdateOn()
+	if err != nil {
+		log.Printf("error getting salt auto update state: %v", err)
+		serverError(&w, errors.New("failed to get salt auto update state"))
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{"autoUpdate": autoUpdate})
+}
+
+//PostSaltAutoUpdate will set if auto update is enabled or not
+func (api *ManagementAPI) PostSaltAutoUpdate(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		parseFormErrorResponse(&w, err)
+		return
+	}
+	autoUpdateStr := strings.ToLower(r.Form.Get("autoUpdate"))
+	if autoUpdateStr != "true" && autoUpdateStr != "false" {
+		parseFormErrorResponse(&w, errors.New("invalid value for autoUpdate"))
+		return
+	}
+	autoUpdate := strings.ToLower(autoUpdateStr) == "true"
+	if err := saltrequester.SetAutoUpdate(autoUpdate); err != nil {
+		log.Printf("error setting auto update: %v", err)
+		serverError(&w, errors.New("failed to set auto update"))
+	}
+}
+
 func (api *ManagementAPI) GetServiceLogs(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		parseFormErrorResponse(&w, err)
