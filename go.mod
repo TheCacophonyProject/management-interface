@@ -9,7 +9,7 @@ require (
 	github.com/TheCacophonyProject/go-config v1.6.2
 	github.com/TheCacophonyProject/lepton3 v0.0.0-20200909032119-e2b2b778a8ee
 	github.com/TheCacophonyProject/rtc-utils v1.2.0
-	github.com/TheCacophonyProject/salt-updater v0.3.0
+	github.com/TheCacophonyProject/salt-updater v0.4.0
 	github.com/gobuffalo/packr v1.30.1
 	github.com/godbus/dbus v4.1.0+incompatible
 	github.com/gorilla/context v1.1.1 // indirect

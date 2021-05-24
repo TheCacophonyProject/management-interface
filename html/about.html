@@ -68,7 +68,15 @@
         </div>
         <button id="check-salt-button" type="button" onclick="checkSaltConnection()" class="btn btn-primary">Check Salt Connection</button>
         <button id="salt-update-button" type="button" onclick="runSaltUpdate()" class="btn btn-primary">Run Salt Update</button>
-
+        <label>AutoUpdate:</label>
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+            <label class="btn btn-secondary" id="auto-update-on" onclick="setAutoUpdate(true);">
+                <input type="radio" name="auto-update"> ON
+            </label>
+            <label class="btn btn-secondary" id="auto-update-off" onclick="setAutoUpdate(false);">
+                <input type="radio" name="auto-update" > OFF
+            </label>
+        </div>
 
         <div class="container pt-5 pb-4 pl-0">
             <h3>Installed Packages<br></h3>

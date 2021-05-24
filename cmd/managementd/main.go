@@ -102,6 +102,8 @@ func main() {
 	apiRouter.HandleFunc("/check-salt-connection", apiObj.CheckSaltConnection).Methods("GET")
 	apiRouter.HandleFunc("/salt-update", apiObj.StartSaltUpdate).Methods("POST")
 	apiRouter.HandleFunc("/salt-update", apiObj.GetSaltUpdateState).Methods("GET")
+	apiRouter.HandleFunc("/auto-update", apiObj.GetSaltAutoUpdate).Methods("GET")
+	apiRouter.HandleFunc("/auto-update", apiObj.PostSaltAutoUpdate).Methods("POST")
 	apiRouter.HandleFunc("/audiobait", apiObj.GetAudiobait).Methods("GET")
 	apiRouter.HandleFunc("/play-test-sound", apiObj.PlayTestSound).Methods("POST")
 	apiRouter.HandleFunc("/play-audiobait-sound", apiObj.PlayAudiobaitSound).Methods("POST")
