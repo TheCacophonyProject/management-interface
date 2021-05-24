@@ -1,4 +1,38 @@
- function checkSaltConnection() {
+authHeaders = new Headers()
+authHeaders.append("Authorization", "Basic YWRtaW46ZmVhdGhlcnM=")
+
+window.onload = async function() {
+    readAutoUpdate()
+}
+
+async function setAutoUpdate(autoUpdate) {
+    console.log("set auto update", autoUpdate)
+    var res = await fetch("/api/auto-update", {
+        method: "POST",
+        headers: authHeaders,
+        body: new URLSearchParams({'autoUpdate': autoUpdate})
+    })
+    if (!res.ok) {
+        alert("failed to update auto update state")
+    }
+    await readAutoUpdate()
+}
+
+async function readAutoUpdate() {
+    var res = await fetch("/api/auto-update", {headers: authHeaders})
+    if (res.ok) {
+        resJson = await res.json()
+        if (resJson.autoUpdate == true) {
+            document.getElementById("auto-update-on").classList.add("active")
+            document.getElementById("auto-update-off").classList.remove("active")
+        } else {
+            document.getElementById("auto-update-on").classList.remove("active")
+            document.getElementById("auto-update-off").classList.add("active")
+        }
+    }
+}
+
+function checkSaltConnection() {
     $("#check-salt-button").attr('disabled', true);
     var xmlHttp = new XMLHttpRequest();
     xmlHttp.open("GET", "/api/check-salt-connection", true);
