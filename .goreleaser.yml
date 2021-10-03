@@ -41,9 +41,11 @@ nfpms:
   formats:
     - deb
   bindir: /usr/bin
-  files:
-    "_release/managementd-avahi.service": "/etc/avahi/services/managementd.service"
-    "_release/managementd.service": "/etc/systemd/system/managementd.service"
+  contents:
+    - src: _release/managementd-avahi.service
+      dst: /etc/avahi/services/managementd.service
+    - src: _release/managementd.service
+      dst: /etc/systemd/system/managementd.service
   scripts:
       postinstall: "_release/postinstall.sh"
 
