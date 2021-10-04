@@ -4,7 +4,7 @@ build-arm: install-packr
 
 .PHONY: install-packr
 install-packr:
-	go get -d github.com/gobuffalo/packr/packr
+	go install github.com/gobuffalo/packr/packr@v1.30.1
 
 .PHONY: build
 build: install-packr
