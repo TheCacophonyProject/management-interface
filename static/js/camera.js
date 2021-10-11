@@ -101,10 +101,8 @@ export class CameraConnection {
             skippedFramesServer: 0,
             skippedFramesClient: 0,
         },
-        pendingFrame: null,
         prevFrameNum: -1,
         heartbeatInterval: 0,
-        frames: [],
     };
     close() {
         clearInterval(this.state.heartbeatInterval);

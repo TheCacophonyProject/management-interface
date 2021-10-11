@@ -1,39 +1,9 @@
 
-export interface PartialFrameInfo {
-  Calibration: CalibrationInfo | null;
-  Telemetry: Telemetry;
-  AppVersion: string;
-  BinaryVersion: string;
-  Camera: CameraInfo;
-}
-
 export interface FrameInfo {
-  Calibration: CalibrationInfo;
   Telemetry: Telemetry;
   AppVersion: string;
   BinaryVersion: string;
   Camera: CameraInfo;
-}
-
-export interface CalibrationInfo {
-  ThermalRefTemp: number;
-  SnapshotTime: number;
-  TemperatureCelsius: number;
-  SnapshotValue: number;
-  ThresholdMinFever: number;
-  HeadTLX: number;
-  HeadTLY: number;
-  HeadBLX: number;
-  HeadBLY: number;
-  HeadTRX: number;
-  HeadTRY: number;
-  HeadBRX: number;
-  HeadBRY: number;
-  CalibrationBinaryVersion: string;
-  UuidOfUpdater: number;
-  UseNormalSound: boolean;
-  UseWarningSound: boolean;
-  UseErrorSound: boolean;
 }
 
 export interface Telemetry {
@@ -45,10 +15,6 @@ export interface Telemetry {
   LastFFCTempC: number;
   LastFFCTime: number;
 }
-export interface NetworkInterface {
-  Name: string;
-  IPAddresses: string[] | null;
-}
 
 export interface CameraInfo {
   Brand: string;
@@ -58,4 +24,23 @@ export interface CameraInfo {
   ResY: number;
   Firmware: string;
   CameraSerial: number;
+}
+
+
+export interface Frame {
+  frameInfo: FrameInfo;
+  frame: Uint16Array;
+}
+
+interface CameraStats {
+  skippedFramesServer: number;
+  skippedFramesClient: number;
+}
+
+interface CameraState {
+  socket: WebSocket | null;
+  UUID: number;
+  stats: CameraStats;
+  prevFrameNum: number;
+  heartbeatInterval: number;
 }

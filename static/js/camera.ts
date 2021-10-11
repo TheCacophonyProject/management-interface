@@ -1,4 +1,4 @@
-import { FrameInfo, PartialFrameInfo } from "../../api/types";
+import { FrameInfo,Frame } from "../../api/types";
 
 export const BlobReader = (function(): {
   arrayBuffer: (blob: Blob) => Promise<ArrayBuffer>;
@@ -25,18 +25,6 @@ export const BlobReader = (function(): {
     arrayBuffer
   };
 })();
-
-export interface Frame {
-  frameInfo: FrameInfo;
-  frame: Uint16Array;
-  bodyShape: Uint8Array;
-}
-
-export interface PartialFrame {
-  frameInfo: PartialFrameInfo;
-  frame: Uint16Array;
-}
-
 export enum CameraConnectionState {
   Connecting,
   Connected,
@@ -55,9 +43,7 @@ interface CameraState {
   UUID: number;
   stats: CameraStats;
   prevFrameNum: number;
-  frames: PartialFrame[];
   heartbeatInterval: number;
-  pendingFrame: number | null;
 }
 
 let snapshotCount = 0;
@@ -105,7 +91,7 @@ function stopSnapshots(message: string) {
 
 function onConnectionStateChange(connectionState: CameraConnectionState) {}
 
-async function processFrame(frame: PartialFrame) {
+async function processFrame(frame: Frame) {
   const canvas = document.getElementById("canvas") as HTMLCanvasElement;
   if (canvas == null) {
     return;
@@ -141,7 +127,7 @@ export class CameraConnection {
   constructor(
     public host: string,
     public port: string,
-    public onFrame: (frame: PartialFrame) => void,
+    public onFrame: (frame: Frame) => void,
     public onConnectionStateChange: (
       connectionState: CameraConnectionState
     ) => void
@@ -156,10 +142,8 @@ export class CameraConnection {
       skippedFramesServer: 0,
       skippedFramesClient: 0,
     },
-    pendingFrame: null,
     prevFrameNum: -1,
     heartbeatInterval: 0,
-    frames: [],
   };
   close() {
     clearInterval(this.state.heartbeatInterval);
@@ -226,7 +210,7 @@ export class CameraConnection {
     this.state.socket.addEventListener("message", async (event) => {
       if (event.data instanceof Blob) {
         this.onFrame(
-          (await this.parseFrame(event.data as Blob)) as PartialFrame
+          (await this.parseFrame(event.data as Blob)) as Frame
         );
       }else{
       console.log("got message", event.data)
@@ -240,7 +224,7 @@ export class CameraConnection {
   }
   async parseFrame(
     blob: Blob
-  ): Promise<{ frameInfo: PartialFrameInfo; frame: Uint16Array } | null> {
+  ): Promise<{ frameInfo: FrameInfo; frame: Uint16Array } | null> {
     // NOTE(jon): On iOS. it seems slow to do multiple fetches from the blob, so let's do it all at once.
     const data = await BlobReader.arrayBuffer(blob);
     const frameInfoLength = new Uint16Array(data.slice(0, 2))[0];
@@ -248,7 +232,7 @@ export class CameraConnection {
     try {
       const frameInfo = JSON.parse(
         String.fromCharCode(...new Uint8Array(data.slice(2, frameStartOffset)))
-      ) as PartialFrameInfo;
+      ) as FrameInfo;
       const frameNumber = frameInfo.Telemetry.FrameCount;
       if (frameNumber % 20 === 0) {
         performance.clearMarks();
