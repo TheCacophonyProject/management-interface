@@ -511,6 +511,27 @@ type wifiNetwork struct {
 	NetworkID int
 }
 
+func listAvailableWifiNetworkSSIDs() ([]string, error) {
+	cmd := "iw wlan0 scan | egrep 'SSID'"
+	out, err := exec.Command("bash", "-c", cmd).Output()
+	ssids := []string{}
+	if err != nil {
+		return ssids, fmt.Errorf("error listing available networks: %v", err)
+	}
+	networkList := string(out)
+	scanner := bufio.NewScanner(strings.NewReader(networkList))
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, ":")
+		if len(parts) > 1 {
+			if strings.ToLower(parts[1]) != "bushnet" {
+				ssids = append(ssids, strings.TrimSpace(parts[1]))
+			}
+		}
+	}
+	return ssids, err
+}
+
 // parseWPASupplicantConfig uses wpa_cli list_networks to get all networks in the wpa_supplicant configuration
 func parseWPASupplicantConfig() ([]wifiNetwork, error) {
 	out, err := exec.Command("wpa_cli", "list_networks").Output()
@@ -545,8 +566,9 @@ func parseWPASupplicantConfig() ([]wifiNetwork, error) {
 func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 
 	type wifiProperties struct {
-		Networks []wifiNetwork
-		Error    string
+		AvailableNetworks []string
+		Networks          []wifiNetwork
+		Error             string
 	}
 	var err error
 	if r.Method == http.MethodPost {
@@ -560,6 +582,9 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 			err = deleteNetwork(deleteID)
 		} else {
 			ssid := r.FormValue("ssid")
+			if ssid == "" {
+				ssid = r.FormValue("ssid-select")
+			}
 			password := r.FormValue("password")
 			err = addWPANetwork(ssid, password)
 		}
@@ -570,7 +595,7 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 		wifiProps.Error = err.Error()
 	}
 	wifiProps.Networks, err = parseWPASupplicantConfig()
-
+	wifiProps.AvailableNetworks, err = listAvailableWifiNetworkSSIDs()
 	if wifiProps.Error == "" && err != nil {
 		wifiProps.Error = err.Error()
 	}

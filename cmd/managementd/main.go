@@ -19,23 +19,38 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
+	"encoding/json"
 	"fmt"
+	"github.com/gobuffalo/packr"
+	"github.com/godbus/dbus"
+	"github.com/gorilla/mux"
+	"golang.org/x/net/websocket"
 	"log"
 	"net/http"
-
-	"github.com/gobuffalo/packr"
-	"github.com/gorilla/mux"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	goconfig "github.com/TheCacophonyProject/go-config"
+	"github.com/TheCacophonyProject/go-cptv/cptvframe"
 	managementinterface "github.com/TheCacophonyProject/management-interface"
 	"github.com/TheCacophonyProject/management-interface/api"
 )
 
 const (
-	configDir = goconfig.DefaultConfigDir
+	configDir     = goconfig.DefaultConfigDir
+	socketTimeout = 7 * time.Second
 )
 
 var version = "<not set>"
+var sockets = make(map[int64]*WebsocketRegistration)
+var socketsLock sync.RWMutex
+var cameraInfo map[string]interface{}
+var lastFrame *cptvframe.Frame
+var currentFrame = -1
+var managementAPI *api.ManagementAPI
 
 // Set up and handle page requests.
 func main() {
@@ -57,7 +72,8 @@ func main() {
 	// Serve up static content.
 	static := packr.NewBox("../../static")
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(static)))
-
+	router.Handle("/ws", websocket.Handler(WebsocketServer))
+	go sendFrameToSockets()
 	// UI handlers.
 	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
 	router.HandleFunc("/wifi-networks", managementinterface.WifiNetworkHandler).Methods("GET", "POST")
@@ -76,6 +92,8 @@ func main() {
 
 	// API
 	apiObj, err := api.NewAPI(config.config, version)
+	managementAPI = apiObj
+
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -126,4 +144,165 @@ func basicAuth(next http.Handler) http.Handler {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 		}
 	})
+}
+
+type WebsocketRegistration struct {
+	AtomicLock      uint32
+	Socket          *websocket.Conn
+	LastHeartbeatAt time.Time
+}
+
+func (socket *WebsocketRegistration) Inactive() bool {
+	return time.Since(socket.LastHeartbeatAt) >= socketTimeout
+}
+
+type message struct {
+	// the json tag means this will serialize as a lowercased field
+	Type string `json:"type"`
+	Data string `json:"data"`
+	Uuid int64  `json:"uuid"`
+}
+
+func WebsocketServer(ws *websocket.Conn) {
+	for {
+		// Receive any messages from the client
+		message := message{}
+		if err := websocket.JSON.Receive(ws, &message); err != nil {
+			// Probably EOF error, when there's no message.  Maybe could sleep, so we're not thrashing this?
+		} else {
+			// When we first get a connection, register the websocket and push it onto an array of websockets.
+			// Occasionally go through the list and cull any that are no-longer sending heart-beats.
+			if message.Type == "Register" {
+				socketsLock.Lock()
+				sockets[message.Uuid] = &WebsocketRegistration{
+					Socket:          ws,
+					LastHeartbeatAt: time.Now(),
+					AtomicLock:      0,
+				}
+				socketsLock.Unlock()
+			}
+			if message.Type == "Heartbeat" {
+				if socket, ok := sockets[message.Uuid]; ok {
+					socket.LastHeartbeatAt = time.Now()
+				}
+			}
+		}
+		// TODO(jon): This blocks, so lets avoid busy-waiting
+		time.Sleep(1 * time.Millisecond)
+	}
+}
+
+type FrameInfo struct {
+	Camera        map[string]interface{}
+	Telemetry     cptvframe.Telemetry
+	Calibration   map[string]interface{}
+	BinaryVersion string
+	AppVersion    string
+	Mode          string
+}
+
+func sendFrameToSockets() {
+	frameNum := 0
+	for {
+
+		// NOTE: Only bother with this work if we have clients connected.
+		if len(sockets) != 0 {
+			time.Sleep(1 / 9 * time.Second)
+			if cameraInfo == nil {
+				cameraInfo = Headers()
+			}
+			lastFrame = GetFrame()
+			if lastFrame == nil {
+				continue
+			}
+			// Make the frame info
+			buffer := bytes.NewBuffer(make([]byte, 0))
+			// lastFrameLock.RLock()
+			frameInfo := FrameInfo{
+				Camera:    cameraInfo,
+				Telemetry: lastFrame.Status,
+			}
+			frameInfoJson, _ := json.Marshal(frameInfo)
+			frameInfoLen := len(frameInfoJson)
+			// Write out the length of the frameInfo json as a u16
+			_ = binary.Write(buffer, binary.LittleEndian, uint16(frameInfoLen))
+			_ = binary.Write(buffer, binary.LittleEndian, frameInfoJson)
+			for _, row := range lastFrame.Pix {
+				_ = binary.Write(buffer, binary.LittleEndian, row)
+			}
+			// Send the buffer back to the client
+			frameBytes := buffer.Bytes()
+			socketsLock.RLock()
+			for uuid, socket := range sockets {
+				go func(socket *WebsocketRegistration, uuid int64, frameNum int) {
+					// If the socket is busy sending the previous frame,
+					// don't block, just move on to the next socket.
+					if atomic.CompareAndSwapUint32(&socket.AtomicLock, 0, 1) {
+						_ = websocket.Message.Send(socket.Socket, frameBytes)
+						atomic.StoreUint32(&socket.AtomicLock, 0)
+					} else {
+						// Locked, skip this frame to let client catch up.
+						log.Println("Skipping frame for", uuid, frameNum)
+					}
+				}(socket, uuid, frameNum)
+			}
+			socketsLock.RUnlock()
+			frameNum++
+
+			var socketsToRemove []int64
+			socketsLock.RLock()
+			for uuid, socket := range sockets {
+				if socket.Inactive() {
+					socketsToRemove = append(socketsToRemove, uuid)
+				}
+			}
+			socketsLock.RUnlock()
+			if len(socketsToRemove) != 0 {
+				socketsLock.Lock()
+				for _, socketUuid := range socketsToRemove {
+					socket := sockets[socketUuid]
+					delete(sockets, socketUuid)
+					go func(socket *WebsocketRegistration, uuid int64) {
+						log.Println("Dropping old socket", uuid)
+						_ = socket.Socket.Close()
+						log.Println("Dropped old socket", uuid)
+					}(socket, socketUuid)
+				}
+				socketsLock.Unlock()
+			}
+		}
+	}
+}
+
+func Headers() map[string]interface{} {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		return nil
+	}
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
+	specs := map[string]interface{}{}
+	err = recorder.Call("org.cacophony.thermalrecorder.CameraInfo", 0).Store(&specs)
+	if err != nil {
+		return nil
+	}
+	return specs
+}
+
+func GetFrame() *cptvframe.Frame {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		return nil
+	}
+
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
+	f := &cptvframe.Frame{}
+	err = recorder.Call("org.cacophony.thermalrecorder.TakeSnapshot", 0, currentFrame).Store(f)
+	if err != nil {
+		log.Printf("Err taking snapshot %v", err)
+		return nil
+	}
+	if f != nil {
+		currentFrame = f.Status.FrameCount
+	}
+	return f
 }
