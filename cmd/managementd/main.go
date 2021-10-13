@@ -23,15 +23,16 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/gobuffalo/packr"
-	"github.com/godbus/dbus"
-	"github.com/gorilla/mux"
-	"golang.org/x/net/websocket"
 	"log"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/gobuffalo/packr"
+	"github.com/godbus/dbus"
+	"github.com/gorilla/mux"
+	"golang.org/x/net/websocket"
 
 	goconfig "github.com/TheCacophonyProject/go-config"
 	"github.com/TheCacophonyProject/go-cptv/cptvframe"
@@ -203,14 +204,23 @@ type FrameInfo struct {
 
 func sendFrameToSockets() {
 	frameNum := 0
+	fps := 9
+	sleepDuration := time.Duration(1/fps) * time.Second
 	for {
 
 		// NOTE: Only bother with this work if we have clients connected.
 		if len(sockets) != 0 {
-			time.Sleep(1 / 9 * time.Second)
 			if cameraInfo == nil {
 				cameraInfo = Headers()
+				// wairing for camera to connect
+				if cameraInfo == nil {
+					time.Sleep(5)
+					continue
+				}
+				fps = cameraInfo["FPS"].(int)
+				sleepDuration = time.Duration(1/fps) * time.Second
 			}
+			time.Sleep(sleepDuration)
 			lastFrame = GetFrame()
 			if lastFrame == nil {
 				continue
@@ -283,6 +293,7 @@ func Headers() map[string]interface{} {
 	specs := map[string]interface{}{}
 	err = recorder.Call("org.cacophony.thermalrecorder.CameraInfo", 0).Store(&specs)
 	if err != nil {
+		log.Printf("Error getting camera headers %v", err)
 		return nil
 	}
 	return specs
