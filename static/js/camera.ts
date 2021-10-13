@@ -1,6 +1,6 @@
-import { FrameInfo,Frame } from "../../api/types";
+import { FrameInfo, Frame } from "../../api/types";
 
-export const BlobReader = (function(): {
+export const BlobReader = (function (): {
   arrayBuffer: (blob: Blob) => Promise<ArrayBuffer>;
 } {
   // For comparability with older browsers/iOS that don't yet support arrayBuffer()
@@ -22,7 +22,7 @@ export const BlobReader = (function(): {
           });
 
   return {
-    arrayBuffer
+    arrayBuffer,
   };
 })();
 export enum CameraConnectionState {
@@ -48,14 +48,14 @@ interface CameraState {
 
 let snapshotCount = 0;
 let snapshotLimit = 200;
-let cameraConnection:CameraConnection;
+let cameraConnection: CameraConnection;
 function restartCameraViewing() {
   document.getElementById("snapshot-stopped")!.style.display = "none";
   document.getElementById("canvas")!.style.display = "";
   snapshotCount = 0;
   if (cameraConnection) {
     cameraConnection.connect();
-  }else{
+  } else {
     cameraConnection = new CameraConnection(
       window.location.hostname,
       window.location.port,
@@ -70,7 +70,7 @@ window.onload = function () {
   if (urlParams.get("timeout") == "off") {
     snapshotLimit = Number.MAX_SAFE_INTEGER;
   }
-  document.getElementById("snapshot-restart")!.onclick = restartCameraViewing
+  document.getElementById("snapshot-restart")!.onclick = restartCameraViewing;
   cameraConnection = new CameraConnection(
     window.location.hostname,
     window.location.port,
@@ -81,12 +81,12 @@ window.onload = function () {
 
 function stopSnapshots(message: string) {
   if (cameraConnection) {
-    cameraConnection.close()
+    cameraConnection.close();
   }
   document.getElementById("snapshot-stopped-message")!.innerText = message;
   document.getElementById("snapshot-stopped")!.style.display = "";
   document.getElementById("canvas")!.style.display = "none";
-  console.log("stopping snappes")
+  console.log("stopping snappes");
 }
 
 function onConnectionStateChange(connectionState: CameraConnectionState) {}
@@ -117,12 +117,13 @@ async function processFrame(frame: Frame) {
     maxI = index;
   }
   context.putImageData(imgData, 0, 0);
-  document.getElementById("snapshot-frame")!.innerText = `frame ${frame.frameInfo.Telemetry.FrameCount}`;
-
+  document.getElementById(
+    "snapshot-frame"
+  )!.innerText = `frame ${frame.frameInfo.Telemetry.FrameCount}`;
 }
 
 export class CameraConnection {
-  private closing: boolean
+  private closing: boolean;
 
   constructor(
     public host: string,
@@ -148,13 +149,13 @@ export class CameraConnection {
   close() {
     clearInterval(this.state.heartbeatInterval);
     this.closing = true;
-    if(this.state.socket){
+    if (this.state.socket) {
       this.state.socket.close();
     }
   }
   retryConnection(retryTime: number) {
-    if (this.closing){
-      return
+    if (this.closing) {
+      return;
     }
     if (retryTime > 0) {
       setTimeout(() => this.retryConnection(retryTime - 1), 1000);
@@ -209,12 +210,10 @@ export class CameraConnection {
     });
     this.state.socket.addEventListener("message", async (event) => {
       if (event.data instanceof Blob) {
-        this.onFrame(
-          (await this.parseFrame(event.data as Blob)) as Frame
-        );
-      }else{
-      console.log("got message", event.data)
-    }
+        this.onFrame((await this.parseFrame(event.data as Blob)) as Frame);
+      } else {
+        console.log("got message", event.data);
+      }
       snapshotCount++;
 
       if (snapshotCount > snapshotLimit) {

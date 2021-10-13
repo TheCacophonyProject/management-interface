@@ -1,4 +1,3 @@
-
 export interface FrameInfo {
   Telemetry: Telemetry;
   AppVersion: string;
@@ -25,7 +24,6 @@ export interface CameraInfo {
   Firmware: string;
   CameraSerial: number;
 }
-
 
 export interface Frame {
   frameInfo: FrameInfo;
