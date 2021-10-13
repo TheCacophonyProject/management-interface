@@ -207,7 +207,6 @@ func sendFrameToSockets() {
 	fps := 9
 	sleepDuration := time.Duration(1/fps) * time.Second
 	for {
-
 		// NOTE: Only bother with this work if we have clients connected.
 		if len(sockets) != 0 {
 			if cameraInfo == nil {

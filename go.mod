@@ -47,6 +47,4 @@ require (
 	periph.io/x/periph v3.6.8+incompatible // indirect
 )
 
-replace github.com/TheCacophonyProject/thermal-recorder => /home/gp/cacophony/thermal-recorder
-
 replace periph.io/x/periph => github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incompatible
