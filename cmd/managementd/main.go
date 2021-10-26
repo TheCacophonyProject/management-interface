@@ -49,7 +49,7 @@ var version = "<not set>"
 var sockets = make(map[int64]*WebsocketRegistration)
 var socketsLock sync.RWMutex
 var cameraInfo map[string]interface{}
-var lastFrame *cptvframe.Frame
+var lastFrame *FrameData
 var currentFrame = -1
 var managementAPI *api.ManagementAPI
 
@@ -200,11 +200,12 @@ type FrameInfo struct {
 	BinaryVersion string
 	AppVersion    string
 	Mode          string
+	TrackingMeta  string
 }
 
 func sendFrameToSockets() {
 	frameNum := 0
-	fps := 9
+	var fps int32 = 9
 	sleepDuration := time.Duration(1/fps) * time.Second
 	for {
 		// NOTE: Only bother with this work if we have clients connected.
@@ -216,7 +217,7 @@ func sendFrameToSockets() {
 					time.Sleep(5)
 					continue
 				}
-				fps = cameraInfo["FPS"].(int)
+				fps = cameraInfo["FPS"].(int32)
 				sleepDuration = time.Duration(1/fps) * time.Second
 			}
 			time.Sleep(sleepDuration)
@@ -228,15 +229,16 @@ func sendFrameToSockets() {
 			buffer := bytes.NewBuffer(make([]byte, 0))
 			// lastFrameLock.RLock()
 			frameInfo := FrameInfo{
-				Camera:    cameraInfo,
-				Telemetry: lastFrame.Status,
+				Camera:       cameraInfo,
+				Telemetry:    lastFrame.Frame.Status,
+				TrackingMeta: lastFrame.TrackingMeta,
 			}
 			frameInfoJson, _ := json.Marshal(frameInfo)
 			frameInfoLen := len(frameInfoJson)
 			// Write out the length of the frameInfo json as a u16
 			_ = binary.Write(buffer, binary.LittleEndian, uint16(frameInfoLen))
 			_ = binary.Write(buffer, binary.LittleEndian, frameInfoJson)
-			for _, row := range lastFrame.Pix {
+			for _, row := range lastFrame.Frame.Pix {
 				_ = binary.Write(buffer, binary.LittleEndian, row)
 			}
 			// Send the buffer back to the client
@@ -298,21 +300,41 @@ func Headers() map[string]interface{} {
 	return specs
 }
 
-func GetFrame() *cptvframe.Frame {
+type FrameData struct {
+	Frame        *cptvframe.Frame
+	TrackingMeta string
+}
+
+func GetFrame() *FrameData {
 	conn, err := dbus.SystemBus()
 	if err != nil {
 		return nil
 	}
 
 	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
-	f := &cptvframe.Frame{}
-	err = recorder.Call("org.cacophony.thermalrecorder.TakeSnapshot", 0, currentFrame).Store(f)
-	if err != nil {
+	f := &FrameData{&cptvframe.Frame{}, ""}
+	c := recorder.Call("org.cacophony.thermalrecorder.TakeSnapshot", 0, currentFrame)
+	if c.Err != nil {
 		log.Printf("Err taking snapshot %v", err)
 		return nil
 	}
+	val := c.Body[0].([]interface{})
+	tel := val[1].([]interface{})
+	f.Frame.Pix = val[0].([][]uint16)
+	f.Frame.Status.TimeOn = time.Duration(tel[0].(int64))
+	f.Frame.Status.FFCState = tel[1].(string)
+	f.Frame.Status.FrameCount = int(tel[2].(int32))
+	f.Frame.Status.FrameMean = tel[3].(uint16)
+	f.Frame.Status.TempC = tel[4].(float64)
+	f.Frame.Status.LastFFCTempC = tel[5].(float64)
+	f.Frame.Status.LastFFCTime = time.Duration(tel[6].(int64))
+	f.Frame.Status.BackgroundFrame = tel[7].(bool)
+	if len(val) == 3 {
+		f.TrackingMeta = val[2].(string)
+	}
+
 	if f != nil {
-		currentFrame = f.Status.FrameCount
+		currentFrame = f.Frame.Status.FrameCount
 	}
 	return f
 }
