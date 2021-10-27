@@ -200,7 +200,7 @@ type FrameInfo struct {
 	BinaryVersion string
 	AppVersion    string
 	Mode          string
-	TrackingMeta  string
+	Tracks        []map[string]interface{}
 }
 
 func sendFrameToSockets() {
@@ -229,9 +229,9 @@ func sendFrameToSockets() {
 			buffer := bytes.NewBuffer(make([]byte, 0))
 			// lastFrameLock.RLock()
 			frameInfo := FrameInfo{
-				Camera:       cameraInfo,
-				Telemetry:    lastFrame.Frame.Status,
-				TrackingMeta: lastFrame.TrackingMeta,
+				Camera:    cameraInfo,
+				Telemetry: lastFrame.Frame.Status,
+				Tracks:    lastFrame.Tracks,
 			}
 			frameInfoJson, _ := json.Marshal(frameInfo)
 			frameInfoLen := len(frameInfoJson)
@@ -301,8 +301,8 @@ func Headers() map[string]interface{} {
 }
 
 type FrameData struct {
-	Frame        *cptvframe.Frame
-	TrackingMeta string
+	Frame  *cptvframe.Frame
+	Tracks []map[string]interface{}
 }
 
 func GetFrame() *FrameData {
@@ -312,7 +312,7 @@ func GetFrame() *FrameData {
 	}
 
 	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
-	f := &FrameData{&cptvframe.Frame{}, ""}
+	f := &FrameData{&cptvframe.Frame{}, nil}
 	c := recorder.Call("org.cacophony.thermalrecorder.TakeSnapshot", 0, currentFrame)
 	if c.Err != nil {
 		log.Printf("Err taking snapshot %v", err)
@@ -330,7 +330,10 @@ func GetFrame() *FrameData {
 	f.Frame.Status.LastFFCTime = time.Duration(tel[6].(int64))
 	f.Frame.Status.BackgroundFrame = tel[7].(bool)
 	if len(val) == 3 {
-		f.TrackingMeta = val[2].(string)
+		jsonS := val[2].(string)
+		if jsonS != "" {
+			json.Unmarshal([]byte(jsonS), &f.Tracks)
+		}
 	}
 
 	if f != nil {

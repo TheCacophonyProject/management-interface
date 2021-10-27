@@ -3,6 +3,28 @@ export interface FrameInfo {
   AppVersion: string;
   BinaryVersion: string;
   Camera: CameraInfo;
+  Tracks: Track[];
+}
+
+export interface Track {
+  predictions: Prediction[];
+  positions: Region[];
+}
+
+export interface Prediction {
+  label: string;
+  confidence: number;
+  clairty: number;
+}
+
+export interface Region {
+  mass: number;
+  frame_number: number;
+  pixel_variance: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export interface Telemetry {

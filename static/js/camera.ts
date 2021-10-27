@@ -1,4 +1,4 @@
-import { FrameInfo, Frame } from "../../api/types";
+import { FrameInfo, Frame, Region } from "../../api/types";
 
 export const BlobReader = (function (): {
   arrayBuffer: (blob: Blob) => Promise<ArrayBuffer>;
@@ -46,6 +46,7 @@ interface CameraState {
   heartbeatInterval: number;
 }
 
+const colours = ["#ff0000", "#00ff00", "#ffff00", "#80ffff"];
 let snapshotCount = 0;
 let snapshotLimit = 200;
 let cameraConnection: CameraConnection;
@@ -91,6 +92,67 @@ function stopSnapshots(message: string) {
 
 function onConnectionStateChange(connectionState: CameraConnectionState) {}
 
+function drawRectWithText(
+  context: CanvasRenderingContext2D,
+  region: Region,
+  what: string | null,
+  trackIndex: number
+): void {
+  const lineWidth = 1;
+  const outlineWidth = lineWidth + 4;
+  const halfOutlineWidth = outlineWidth / 2;
+  const deviceRatio = window.devicePixelRatio;
+  const scale = 1;
+
+  const x =
+    Math.max(halfOutlineWidth, Math.round(region.x) - halfOutlineWidth) /
+    deviceRatio;
+  const y =
+    Math.max(halfOutlineWidth, Math.round(region.y) - halfOutlineWidth) /
+    deviceRatio;
+  const width =
+    Math.round(
+      Math.min(context.canvas.width - region.x, Math.round(region.width))
+    ) / deviceRatio;
+  const height =
+    Math.round(
+      Math.min(context.canvas.height - region.y, Math.round(region.height))
+    ) / deviceRatio;
+  context.lineJoin = "round";
+  context.lineWidth = outlineWidth;
+  context.strokeStyle = `rgba(0, 0, 0,  0.5)`;
+  context.beginPath();
+  context.strokeRect(x, y, width, height);
+  context.strokeStyle = colours[trackIndex % colours.length];
+  context.lineWidth = lineWidth;
+  context.beginPath();
+  context.strokeRect(x, y, width, height);
+  // If exporting, show all the best guess animal tags, if not unknown
+  if (what !== null) {
+    const text = what;
+    const textHeight = 9 * deviceRatio;
+    const textWidth = context.measureText(text).width * deviceRatio;
+    const marginX = 2 * deviceRatio;
+    const marginTop = 2 * deviceRatio;
+    let textX =
+      Math.min(context.canvas.width, region.x) - (textWidth + marginX);
+    let textY = region.y + region.height + textHeight + marginTop;
+    // Make sure the text doesn't get clipped off if the box is near the frame edges
+    if (textY + textHeight > context.canvas.height) {
+      textY = region.y - textHeight;
+    }
+    if (textX < 0) {
+      textX = region.x + marginX;
+    }
+    context.font = "13px sans-serif";
+    context.lineWidth = 4;
+    context.strokeStyle = "rgba(0, 0, 0, 0.5)";
+    context.strokeText(text, textX / deviceRatio, textY / deviceRatio);
+    context.fillStyle = "white";
+    context.fillText(text, textX / deviceRatio, textY / deviceRatio);
+  }
+}
+
 async function processFrame(frame: Frame) {
   const canvas = document.getElementById("canvas") as HTMLCanvasElement;
   if (canvas == null) {
@@ -117,6 +179,22 @@ async function processFrame(frame: Frame) {
     maxI = index;
   }
   context.putImageData(imgData, 0, 0);
+  let index = 0;
+  if (frame.frameInfo.Tracks) {
+    for (const track of frame.frameInfo.Tracks) {
+      let what = null;
+      if (track.predictions && track.predictions.length > 0) {
+        what = track.predictions[0].label;
+      }
+      drawRectWithText(
+        context,
+        track.positions[track.positions.length - 1],
+        what,
+        index
+      );
+      index += 1;
+    }
+  }
   document.getElementById(
     "snapshot-frame"
   )!.innerText = `frame ${frame.frameInfo.Telemetry.FrameCount}`;
