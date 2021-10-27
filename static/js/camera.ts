@@ -87,7 +87,6 @@ function stopSnapshots(message: string) {
   document.getElementById("snapshot-stopped-message")!.innerText = message;
   document.getElementById("snapshot-stopped")!.style.display = "";
   document.getElementById("canvas")!.style.display = "none";
-  console.log("stopping snappes");
 }
 
 function onConnectionStateChange(connectionState: CameraConnectionState) {}

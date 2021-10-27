@@ -206,7 +206,7 @@ type FrameInfo struct {
 func sendFrameToSockets() {
 	frameNum := 0
 	var fps int32 = 9
-	sleepDuration := time.Duration(1/fps) * time.Second
+	sleepDuration := time.Duration(1000/fps) * time.Millisecond
 	for {
 		// NOTE: Only bother with this work if we have clients connected.
 		if len(sockets) != 0 {
@@ -218,7 +218,7 @@ func sendFrameToSockets() {
 					continue
 				}
 				fps = cameraInfo["FPS"].(int32)
-				sleepDuration = time.Duration(1/fps) * time.Second
+				sleepDuration = time.Duration(1000/fps) * time.Millisecond
 			}
 			time.Sleep(sleepDuration)
 			lastFrame = GetFrame()
@@ -306,6 +306,7 @@ type FrameData struct {
 }
 
 func GetFrame() *FrameData {
+
 	conn, err := dbus.SystemBus()
 	if err != nil {
 		return nil
@@ -313,6 +314,7 @@ func GetFrame() *FrameData {
 
 	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
 	f := &FrameData{&cptvframe.Frame{}, nil}
+
 	c := recorder.Call("org.cacophony.thermalrecorder.TakeSnapshot", 0, currentFrame)
 	if c.Err != nil {
 		log.Printf("Err taking snapshot %v", err)
