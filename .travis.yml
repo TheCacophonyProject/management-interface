@@ -9,7 +9,7 @@ script:
   - go vet ./...
   - go test ./...
   - curl -sL https://git.io/goreleaser | bash -s check
-
+  - git diff
 # Create a release using goreleaser when tests pass and revision is tagged.
 deploy:
 - provider: script
