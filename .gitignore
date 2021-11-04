@@ -3,3 +3,7 @@ debug
 /.vscode/
 /dist/
 /managementd
+api/types.js
+api/types.js.map
+static/js/camera.js
+static/js/camera.js.map
