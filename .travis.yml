@@ -11,7 +11,10 @@ script:
   - curl -sL https://git.io/goreleaser | bash -s check
   - make install-typescript
   - git diff
+  - git status
 # Create a release using goreleaser when tests pass and revision is tagged.
+before_deploy:
+  - git fetch --unshallow
 deploy:
 - provider: script
   skip_cleanup: true
