@@ -9,6 +9,7 @@ script:
   - go vet ./...
   - go test ./...
   - curl -sL https://git.io/goreleaser | bash -s check
+  - make install-typescript
   - git diff
 # Create a release using goreleaser when tests pass and revision is tagged.
 deploy:
