@@ -45,6 +45,7 @@ const (
 	socketTimeout = 7 * time.Second
 )
 
+var haveClients = make(chan bool)
 var version = "<not set>"
 var sockets = make(map[int64]*WebsocketRegistration)
 var socketsLock sync.RWMutex
@@ -175,12 +176,17 @@ func WebsocketServer(ws *websocket.Conn) {
 			// Occasionally go through the list and cull any that are no-longer sending heart-beats.
 			if message.Type == "Register" {
 				socketsLock.Lock()
+				firstSocket := len(sockets) == 0
 				sockets[message.Uuid] = &WebsocketRegistration{
 					Socket:          ws,
 					LastHeartbeatAt: time.Now(),
 					AtomicLock:      0,
 				}
 				socketsLock.Unlock()
+				if firstSocket {
+					log.Print("Git new client register")
+					haveClients <- true
+				}
 			}
 			if message.Type == "Heartbeat" {
 				if socket, ok := sockets[message.Uuid]; ok {
@@ -281,6 +287,9 @@ func sendFrameToSockets() {
 				}
 				socketsLock.Unlock()
 			}
+		} else {
+			log.Print("Wait for new client camera register")
+			<-haveClients
 		}
 	}
 }
