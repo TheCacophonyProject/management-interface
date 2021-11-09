@@ -17,7 +17,11 @@
         <button id="snapshot-restart" type="button">Continue viewing camera</button>
       </div>
       <div>
-      <canvas id="canvas" style="width:100%;max-width:800px;"/>
+      <div class="row" style="position: relative;">
+        <canvas id="frameCanvas" width="160" height="120"  style="width:100%;position: absolute; left: 0; top: 0; z-index: 0;"></canvas>
+        <canvas id="trackCanvas" width="160" height="120" style="width:100%;position: absolute; left: 0; top: 0; z-index: 1;"></canvas>
+     </div>
+
     </div>
       <p id="snapshot-frame"></p>
     </div>

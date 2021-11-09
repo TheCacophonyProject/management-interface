@@ -1,4 +1,4 @@
-import { FrameInfo, Frame, Region } from "../../api/types";
+import { FrameInfo, Frame, Region, CameraInfo } from "../../api/types";
 
 export const BlobReader = (function (): {
   arrayBuffer: (blob: Blob) => Promise<ArrayBuffer>;
@@ -52,7 +52,9 @@ let snapshotLimit = 200;
 let cameraConnection: CameraConnection;
 function restartCameraViewing() {
   document.getElementById("snapshot-stopped")!.style.display = "none";
-  document.getElementById("canvas")!.style.display = "";
+  document.getElementById("frameCanvas")!.style.display = "";
+  document.getElementById("trackCanvas")!.style.display = "";
+
   snapshotCount = 0;
   if (cameraConnection) {
     cameraConnection.connect();
@@ -86,13 +88,15 @@ function stopSnapshots(message: string) {
   }
   document.getElementById("snapshot-stopped-message")!.innerText = message;
   document.getElementById("snapshot-stopped")!.style.display = "";
-  document.getElementById("canvas")!.style.display = "none";
+  document.getElementById("frameCanvas")!.style.display = "none";
+  document.getElementById("trackCanvas")!.style.display = "none";
 }
 
 function onConnectionStateChange(connectionState: CameraConnectionState) {}
 
 function drawRectWithText(
   context: CanvasRenderingContext2D,
+  camera: CameraInfo,
   region: Region,
   what: string | null,
   trackIndex: number
@@ -100,23 +104,15 @@ function drawRectWithText(
   const lineWidth = 1;
   const outlineWidth = lineWidth + 4;
   const halfOutlineWidth = outlineWidth / 2;
-  const deviceRatio = window.devicePixelRatio;
-  const scale = 1;
 
-  const x =
-    Math.max(halfOutlineWidth, Math.round(region.x) - halfOutlineWidth) /
-    deviceRatio;
-  const y =
-    Math.max(halfOutlineWidth, Math.round(region.y) - halfOutlineWidth) /
-    deviceRatio;
-  const width =
-    Math.round(
-      Math.min(context.canvas.width - region.x, Math.round(region.width))
-    ) / deviceRatio;
-  const height =
-    Math.round(
-      Math.min(context.canvas.height - region.y, Math.round(region.height))
-    ) / deviceRatio;
+  const x = Math.max(halfOutlineWidth, Math.round(region.x) - halfOutlineWidth);
+  const y = Math.max(halfOutlineWidth, Math.round(region.y) - halfOutlineWidth);
+  const width = Math.round(
+    Math.min(context.canvas.width - region.x, Math.round(region.width))
+  );
+  const height = Math.round(
+    Math.min(context.canvas.height - region.y, Math.round(region.height))
+  );
   context.lineJoin = "round";
   context.lineWidth = outlineWidth;
   context.strokeStyle = `rgba(0, 0, 0,  0.5)`;
@@ -129,10 +125,10 @@ function drawRectWithText(
   // If exporting, show all the best guess animal tags, if not unknown
   if (what !== null) {
     const text = what;
-    const textHeight = 9 * deviceRatio;
-    const textWidth = context.measureText(text).width * deviceRatio;
-    const marginX = 2 * deviceRatio;
-    const marginTop = 2 * deviceRatio;
+    const textHeight = 9;
+    const textWidth = context.measureText(text).width;
+    const marginX = 2;
+    const marginTop = 2;
     let textX =
       Math.min(context.canvas.width, region.x) - (textWidth + marginX);
     let textY = region.y + region.height + textHeight + marginTop;
@@ -146,14 +142,18 @@ function drawRectWithText(
     context.font = "13px sans-serif";
     context.lineWidth = 4;
     context.strokeStyle = "rgba(0, 0, 0, 0.5)";
-    context.strokeText(text, textX / deviceRatio, textY / deviceRatio);
+    context.strokeText(text, textX, textY);
     context.fillStyle = "white";
-    context.fillText(text, textX / deviceRatio, textY / deviceRatio);
+    context.fillText(text, textX, textY);
   }
 }
 
 async function processFrame(frame: Frame) {
-  const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+  const canvas = document.getElementById("frameCanvas") as HTMLCanvasElement;
+  const trackCanvas = document.getElementById(
+    "trackCanvas"
+  ) as HTMLCanvasElement;
+
   if (canvas == null) {
     return;
   }
@@ -178,6 +178,10 @@ async function processFrame(frame: Frame) {
     maxI = index;
   }
   context.putImageData(imgData, 0, 0);
+
+  const trackContext = trackCanvas.getContext("2d") as CanvasRenderingContext2D;
+  trackContext.clearRect(0, 0, trackCanvas.width, trackCanvas.height);
+
   let index = 0;
   if (frame.frameInfo.Tracks) {
     for (const track of frame.frameInfo.Tracks) {
@@ -186,7 +190,8 @@ async function processFrame(frame: Frame) {
         what = track.predictions[0].label;
       }
       drawRectWithText(
-        context,
+        trackContext,
+        frame.frameInfo.Camera,
         track.positions[track.positions.length - 1],
         what,
         index
