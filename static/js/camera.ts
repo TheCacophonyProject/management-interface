@@ -80,14 +80,6 @@ window.onload = function () {
     processFrame,
     onConnectionStateChange
   );
-  window.onresize = function() {
-    frameCanvas = document.getElementById("frameCanvas");
-    trackCanvas = document.getElementById("trackCanvas");
-      frameCanvas.width = window.innerWidth;
-      frameCanvas.height = window.innerHeight;
-      trackCanvas.width = window.innerWidth;
-      trackCanvas.height = window.innerHeight;   
-  }
 };
 
 function stopSnapshots(message: string) {
