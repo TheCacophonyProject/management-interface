@@ -7,7 +7,7 @@ function loadGroupFromURL() {
     var groups = groupsEncoded.split("--");
     localStorage.setItem(groupStorageKey, JSON.stringify(groups));
   }
-};
+}
 
 function hasGroupList() {
   return localStorage.getItem(groupStorageKey) && true;
