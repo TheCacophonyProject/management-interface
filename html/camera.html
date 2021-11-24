@@ -2,32 +2,46 @@
 <html lang="en">
   <head>
     <title>Camera</title>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css" />
   </head>
 
   <body>
-      {{template "navbar"}}
+    {{ template "navbar" }}
+
 
     <div class="container">
       <h2>Camera</h2>
-      <div id="snapshot-stopped" style="display: none;">
+      <div id="snapshot-stopped" style="display: none">
         <p id="snapshot-stopped-message"></p>
-        <button id="snapshot-restart" type="button">Continue viewing camera</button>
+        <button id="snapshot-restart" type="button">
+          Continue viewing camera
+        </button>
       </div>
       <div>
-      <div class="row" style="position: relative;">
-        <canvas id="frameCanvas" width="160" height="120"  style="width:100%;position: absolute; left: 0; top: 0; z-index: 0;"></canvas>
-        <canvas id="trackCanvas" width="160" height="120" style="width:100%;position: absolute; left: 0; top: 0; z-index: 1;"></canvas>
-     </div>
-
+        <p id="snapshot-frame"></p>
+      </div>
+      <div class="row" style="position: relative">
+        <canvas
+          id="frameCanvas"
+          width="160"
+          height="120"
+          style="width: 100%; position: absolute; left: 0; top: 0; z-index: 0"
+        ></canvas>
+        <canvas
+          id="trackCanvas"
+          width="160"
+          height="120"
+          style="width: 100%; position: absolute; left: 0; top: 0; z-index: 1"
+        ></canvas>
+      </div>
     </div>
-      <p id="snapshot-frame"></p>
-    </div>
-
   </body>
-  <script type="text/javascript" src="/static/js/jquery-3.3.1.slim.min.js"></script>
+  <script
+    type="text/javascript"
+    src="/static/js/jquery-3.3.1.slim.min.js"
+  ></script>
   <script src="/static/js/bootstrap.min.js"></script>
   <script src="/static/js/camera.js" type="module"></script>
 </html>
