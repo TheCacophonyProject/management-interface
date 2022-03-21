@@ -2,6 +2,10 @@
 build-arm: install-packr
 	GOARCH=arm GOARM=7 packr build -ldflags="-s -w" ./cmd/managementd
 
+.PHONY: build-arm64
+build-arm64: install-packr
+	GOARCH=arm64  packr build -ldflags="-s -w" ./cmd/managementd
+
 .PHONY: install-packr
 install-packr:
 	go install github.com/gobuffalo/packr/packr@v1.30.1
