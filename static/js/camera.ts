@@ -150,12 +150,20 @@ function drawRectWithText(
 
 async function processFrame(frame: Frame) {
   const canvas = document.getElementById("frameCanvas") as HTMLCanvasElement;
+
   const trackCanvas = document.getElementById(
     "trackCanvas"
   ) as HTMLCanvasElement;
-
   if (canvas == null) {
     return;
+  }
+  if( canvas.width !=  frame.frameInfo.Camera.ResX){
+    canvas.width =     frame.frameInfo.Camera.ResX
+    trackCanvas.width =     frame.frameInfo.Camera.ResX
+  }
+  if(canvas.height !=  frame.frameInfo.Camera.ResY){
+    canvas.height =     frame.frameInfo.Camera.ResY
+    trackCanvas.height =     frame.frameInfo.Camera.ResY
   }
   const context = canvas.getContext("2d") as CanvasRenderingContext2D;
   const imgData = context.getImageData(
@@ -164,12 +172,24 @@ async function processFrame(frame: Frame) {
     frame.frameInfo.Camera.ResX,
     frame.frameInfo.Camera.ResY
   );
-  const max = Math.max(...frame.frame);
-  const min = Math.min(...frame.frame);
-  const range = max - min;
+  //  gp hack to see if ir camera
+  let irCamera = frame.frameInfo.Camera.ResX == 640;
+  let max=0;
+  let min=0;
+  let range=0;
+  if (!irCamera){
+    max = Math.max(...frame.frame);
+    min = Math.min(...frame.frame);
+    range = max - min;
+  }
   let maxI = 0;
   for (let i = 0; i < frame.frame.length; i++) {
-    const pix = Math.min(255, ((frame.frame[i] - min) / range) * 255.0);
+    let pix = 0
+    if(irCamera){
+      pix = frame.frame[i]
+    }else{
+       pix = Math.min(255, ((frame.frame[i] - min) / range) * 255.0);
+    }
     let index = i * 4;
     imgData.data[index] = pix;
     imgData.data[index + 1] = pix;

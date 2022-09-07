@@ -184,7 +184,7 @@ func WebsocketServer(ws *websocket.Conn) {
 				}
 				socketsLock.Unlock()
 				if firstSocket {
-					log.Print("Git new client register")
+					log.Print("Get new client register")
 					haveClients <- true
 				}
 			}
