@@ -68,12 +68,32 @@ function restartCameraViewing() {
   }
 }
 
+async function takeTestRecording() {
+  document.getElementById("take-snapshot-recording")!.innerText = 'Making a test recording';
+  document.getElementById("take-snapshot-recording")!.setAttribute("disabled", "true");
+  console.log("makign a test recording");
+  fetch('/api/camera/snapshot-recording', {
+    method: 'PUT',
+  headers: {
+    'Authorization': 'Basic YWRtaW46ZmVhdGhlcnM='
+  }})
+  
+  .then(response => console.log(response))
+  .then(data => console.log(data))
+  .catch(error => console.error(error))
+  //TODO handel errors better and check that recordin was made properly instead of just waiting..
+  await new Promise(r => setTimeout(r, 3000));
+  document.getElementById("take-snapshot-recording")!.removeAttribute("disabled");
+  document.getElementById("take-snapshot-recording")!.innerText = 'Take test recording';
+}
+
 window.onload = function () {
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get("timeout") == "off") {
     snapshotLimit = Number.MAX_SAFE_INTEGER;
   }
   document.getElementById("snapshot-restart")!.onclick = restartCameraViewing;
+  document.getElementById("take-snapshot-recording")!.onclick = takeTestRecording;
   cameraConnection = new CameraConnection(
     window.location.hostname,
     window.location.port,
