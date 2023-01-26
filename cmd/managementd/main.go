@@ -119,6 +119,7 @@ func main() {
 	apiRouter.HandleFunc("/event-keys", apiObj.GetEventKeys).Methods("GET")
 	apiRouter.HandleFunc("/events", apiObj.GetEvents).Methods("GET")
 	apiRouter.HandleFunc("/events", apiObj.DeleteEvents).Methods("DELETE")
+	apiRouter.HandleFunc("/trigger-trap", apiObj.TriggerTrap).Methods("PUT")
 	apiRouter.HandleFunc("/check-salt-connection", apiObj.CheckSaltConnection).Methods("GET")
 	apiRouter.HandleFunc("/salt-update", apiObj.StartSaltUpdate).Methods("POST")
 	apiRouter.HandleFunc("/salt-update", apiObj.GetSaltUpdateState).Methods("GET")

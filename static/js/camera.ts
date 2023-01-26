@@ -68,12 +68,32 @@ function restartCameraViewing() {
   }
 }
 
+async function triggerTrap() {
+  document.getElementById("trigger-trap")!.innerText = 'Triggering trap';
+  document.getElementById("trigger-trap")!.setAttribute("disabled", "true");
+  console.log("triggering trap");
+  fetch('/api/trigger-trap', {
+    method: 'PUT',
+  headers: {
+    'Authorization': 'Basic YWRtaW46ZmVhdGhlcnM='
+  }})
+
+  .then(response => console.log(response))
+  .then(data => console.log(data))
+  .catch(error => console.error(error))
+  //TODO handle errors better and check that recording was made properly instead of just waiting..
+  await new Promise(r => setTimeout(r, 3000));
+  document.getElementById("trigger-trap")!.removeAttribute("disabled");
+  document.getElementById("trigger-trap")!.innerText = 'Trigger trap';
+}
+
 window.onload = function () {
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get("timeout") == "off") {
     snapshotLimit = Number.MAX_SAFE_INTEGER;
   }
   document.getElementById("snapshot-restart")!.onclick = restartCameraViewing;
+  document.getElementById("trigger-trap")!.onclick = triggerTrap;
   cameraConnection = new CameraConnection(
     window.location.hostname,
     window.location.port,

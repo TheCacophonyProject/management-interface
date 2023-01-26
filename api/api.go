@@ -453,6 +453,21 @@ func (api *ManagementAPI) DeleteEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Trigger trap
+func (api *ManagementAPI) TriggerTrap(w http.ResponseWriter, r *http.Request) {
+	log.Println("triggering trap")
+	err := eventclient.AddEvent(eventclient.Event{
+		Timestamp: time.Now(),
+		Type:      "trapped",
+		Details:   map[string]interface{}{"test": true},
+	})
+
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+}
+
 // CheckSaltConnection will try to ping the salt server and return the response
 func (api *ManagementAPI) CheckSaltConnection(w http.ResponseWriter, r *http.Request) {
 	log.Println("pinging salt server")
