@@ -212,8 +212,13 @@ async function processFrame(frame: Frame) {
     frame.frameInfo.Camera.ResX,
     frame.frameInfo.Camera.ResY
   );
-  //  gp hack to see if ir camera
-  let irCamera = frame.frameInfo.Camera.ResX == 640;
+  //  gp hack to see if ir camera, dbus from python makes dictionary have to be all int type
+  let irCamera = frame.frameInfo.Camera.Model=="2";
+  if(irCamera){
+    document.getElementById("trigger-trap")!.style.display = "";
+  }else{
+    document.getElementById("trigger-trap")!.style.display = "none";
+  }
   let max=0;
   let min=0;
   let range=0;
