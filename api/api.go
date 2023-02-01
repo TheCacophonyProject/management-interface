@@ -49,7 +49,7 @@ const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
-	apiVersion          = 7
+	apiVersion          = 8
 )
 
 type ManagementAPI struct {
@@ -132,12 +132,18 @@ func (api *ManagementAPI) GetRecording(w http.ResponseWriter, r *http.Request) {
 	cptvPath := getRecordingPath(cptvName, api.cptvDir)
 	if cptvPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, "cptv file not found\n")
+		io.WriteString(w, "file not found\n")
 		return
 	}
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, cptvName))
-	w.Header().Set("Content-Type", "application/x-cptv")
+
+	ext := filepath.Ext(cptvName)
+	if ext == ".cptv" {
+		w.Header().Set("Content-Type", "application/x-cptv")
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+	}
 	f, err := os.Open(cptvPath)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -152,13 +158,19 @@ func (api *ManagementAPI) GetRecording(w http.ResponseWriter, r *http.Request) {
 // DeleteRecording deletes the given cptv file
 func (api *ManagementAPI) DeleteRecording(w http.ResponseWriter, r *http.Request) {
 	cptvName := mux.Vars(r)["id"]
-	log.Printf("delete cptv '%s'", cptvName)
 	recPath := getRecordingPath(cptvName, api.cptvDir)
 	if recPath == "" {
 		w.WriteHeader(http.StatusOK)
 		io.WriteString(w, "cptv file not found\n")
 		return
 	}
+
+	metaFile := strings.TrimSuffix(recPath, filepath.Ext(recPath)) + ".txt"
+	if _, err := os.Stat(metaFile); !os.IsNotExist(err) {
+		log.Printf("deleting meta '%s'", metaFile)
+		os.Remove(metaFile)
+	}
+	log.Printf("delete cptv '%s'", recPath)
 	err := os.Remove(recPath)
 	if os.IsNotExist(err) {
 		w.WriteHeader(http.StatusOK)
@@ -183,6 +195,21 @@ func (api *ManagementAPI) TakeSnapshot(w http.ResponseWriter, r *http.Request) {
 	}
 	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
 	err = recorder.Call("org.cacophony.thermalrecorder.TakeSnapshot", 0).Err
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+// TakeSnapshotRecording will request a new snapshot recording to be taken by thermal-recorder
+func (api *ManagementAPI) TakeSnapshotRecording(w http.ResponseWriter, r *http.Request) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
+	err = recorder.Call("org.cacophony.thermalrecorder.TakeTestRecording", 0).Err
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -374,21 +401,11 @@ func getCptvNames(dir string) []string {
 	return names
 }
 
-func getRecordingPath(cptv, dir string) string {
+func getRecordingPath(file, dir string) string {
 	// Check that given file is a cptv file on the device.
-	isCptvFile := false
-	for _, name := range getCptvNames(dir) {
-		if name == cptv {
-			isCptvFile = true
-			break
-		}
-	}
-	if !isCptvFile {
-		return ""
-	}
 	paths := []string{
-		filepath.Join(dir, cptv),
-		filepath.Join(dir, failedUploadsFolder, cptv),
+		filepath.Join(dir, file),
+		filepath.Join(dir, failedUploadsFolder, file),
 	}
 	for _, path := range paths {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {

@@ -94,6 +94,7 @@ window.onload = function () {
   }
   document.getElementById("snapshot-restart")!.onclick = restartCameraViewing;
   document.getElementById("trigger-trap")!.onclick = triggerTrap;
+  document.getElementById("take-snapshot-recording")!.onclick = takeTestRecording;
   cameraConnection = new CameraConnection(
     window.location.hostname,
     window.location.port,
@@ -101,6 +102,25 @@ window.onload = function () {
     onConnectionStateChange
   );
 };
+
+async function takeTestRecording() {
+  document.getElementById("take-snapshot-recording")!.innerText = 'Making a test recording';
+  document.getElementById("take-snapshot-recording")!.setAttribute("disabled", "true");
+  console.log("making a test recording");
+  fetch('/api/camera/snapshot-recording', {
+    method: 'PUT',
+  headers: {
+    'Authorization': 'Basic YWRtaW46ZmVhdGhlcnM='
+  }})
+
+  .then(response => console.log(response))
+  .then(data => console.log(data))
+  .catch(error => console.error(error))
+  //TODO handle errors better and check that recording was made properly instead of just waiting..
+  await new Promise(r => setTimeout(r, 3000));
+  document.getElementById("take-snapshot-recording")!.removeAttribute("disabled");
+  document.getElementById("take-snapshot-recording")!.innerText = 'Take test recording';
+}
 
 function stopSnapshots(message: string) {
   if (cameraConnection) {
