@@ -201,6 +201,21 @@ func (api *ManagementAPI) TakeSnapshot(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// TakeSnapshotRecording will request a new snapshot recording to be taken by thermal-recorder
+func (api *ManagementAPI) TakeSnapshotRecording(w http.ResponseWriter, r *http.Request) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
+	err = recorder.Call("org.cacophony.thermalrecorder.TakeTestRecording", 0).Err
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
 // Reregister can change the devices name and group
 func (api *ManagementAPI) Reregister(w http.ResponseWriter, r *http.Request) {
 	group := r.FormValue("group")
