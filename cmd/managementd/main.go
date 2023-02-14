@@ -114,6 +114,7 @@ func main() {
 	apiRouter.HandleFunc("/config", apiObj.SetConfig).Methods("POST")
 	apiRouter.HandleFunc("/clear-config-section", apiObj.ClearConfigSection).Methods("POST")
 	apiRouter.HandleFunc("/location", apiObj.SetLocation).Methods("POST") // Set location via a POST request.
+	apiRouter.HandleFunc("/location", apiObj.GetLocation).Methods("GET")  // Set location via a POST request.
 	apiRouter.HandleFunc("/clock", apiObj.GetClock).Methods("GET")
 	apiRouter.HandleFunc("/clock", apiObj.PostClock).Methods("POST")
 	apiRouter.HandleFunc("/version", apiObj.GetVersion).Methods("GET")
@@ -133,9 +134,72 @@ func main() {
 	apiRouter.HandleFunc("/service-restart", apiObj.RestartService).Methods("POST")
 	apiRouter.Use(basicAuth)
 
+	//Setup Hotspot and stop after 5 minutes using a new goroutine
+	go func() {
+		ssid := "bushnet"
+		router_ip := "192.168.4.1"
+		log.Printf("Setting DHCP to default...")
+		if err := restartDHCP(); err != nil {
+			log.Printf("Error restarting dhcpcd: %s", err)
+		}
+		// Wait 1 minute before starting hotspot
+		time.Sleep(1 * time.Minute)
+		// Check if already connected to a network
+		// If not connected to a network, start hotspot
+		if err := checkIsConnectedToNetwork(); err != nil {
+			log.Printf("Error checking network: %s", err)
+			log.Printf("Starting Hotspot...")
+			log.Printf("Creating Configs...")
+			if err := createAPConfig(ssid); err != nil {
+				log.Printf("Error creating hostapd config: %s", err)
+			}
+			if err := createDNSConfig(router_ip, "192.168.4.2,192.168.4.20"); err != nil {
+				log.Printf("Error creating dnsmasq config: %s", err)
+			}
+
+			log.Printf("Starting DHCP...")
+			if err := startDHCP(); err != nil {
+				log.Printf("Error starting dhcpcd: %s", err)
+			}
+			log.Printf("Starting DNS...")
+			if err := startDNS(); err != nil {
+				log.Printf("Error starting dnsmasq: %s", err)
+			}
+			log.Printf("Starting Access Point...")
+			if err := startAccessPoint(ssid); err != nil {
+				log.Printf("Error starting hostapd: %s", err)
+			}
+			// Wait 5 minutes before stopping hotspot extending timer
+			// if apiRouter is used
+			t := time.NewTimer(1 * time.Minute)
+			apiRouter.Use(func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					t.Reset(5 * time.Minute)
+					next.ServeHTTP(w, r)
+				})
+			})
+
+			<-t.C
+
+			log.Printf("Stopping Hotspot")
+			if err := stopAccessPoint(); err != nil {
+				log.Printf("Error stopping hotspot: %s", err)
+			}
+			if err := stopDNS(); err != nil {
+				log.Printf("Error stopping dnsmasq: %s", err)
+			}
+			if err := restartDHCP(); err != nil {
+				log.Printf("Error restarting dhcp: %s", err)
+			}
+		} else {
+			log.Printf("Already connected to a network")
+		}
+	}()
+
 	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, router))
+
 }
 
 func basicAuth(next http.Handler) http.Handler {

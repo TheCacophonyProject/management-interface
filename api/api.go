@@ -325,6 +325,16 @@ func (api *ManagementAPI) ClearConfigSection(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+func (api *ManagementAPI) GetLocation(w http.ResponseWriter, r *http.Request) {
+	location := goconfig.Location{}
+	jsonString, err := json.Marshal(location)
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.Write(jsonString)
+}
+
 // SetLocation is for specifically writing to location setting.
 func (api *ManagementAPI) SetLocation(w http.ResponseWriter, r *http.Request) {
 	log.Println("update location")
@@ -496,7 +506,7 @@ func (api *ManagementAPI) StartSaltUpdate(w http.ResponseWriter, r *http.Request
 	}
 }
 
-//GetSaltUpdateState will get the salt update status
+// GetSaltUpdateState will get the salt update status
 func (api *ManagementAPI) GetSaltUpdateState(w http.ResponseWriter, r *http.Request) {
 	state, err := saltrequester.State()
 	if err != nil {
@@ -507,7 +517,7 @@ func (api *ManagementAPI) GetSaltUpdateState(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(state)
 }
 
-//GetSaltAutoUpdate will check if salt auto update is enabled
+// GetSaltAutoUpdate will check if salt auto update is enabled
 func (api *ManagementAPI) GetSaltAutoUpdate(w http.ResponseWriter, r *http.Request) {
 	autoUpdate, err := saltrequester.IsAutoUpdateOn()
 	if err != nil {
@@ -518,7 +528,7 @@ func (api *ManagementAPI) GetSaltAutoUpdate(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(map[string]interface{}{"autoUpdate": autoUpdate})
 }
 
-//PostSaltAutoUpdate will set if auto update is enabled or not
+// PostSaltAutoUpdate will set if auto update is enabled or not
 func (api *ManagementAPI) PostSaltAutoUpdate(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		parseFormErrorResponse(&w, err)
