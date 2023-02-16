@@ -3,9 +3,11 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // refactor createAPConfig to remove duplication
@@ -45,7 +47,6 @@ var dhcp_config_default = []string{
 	"option rapid_commit",
 	"option domain_name_servers, domain_name, domain_search, host_name",
 	"option classless_static_routes",
-	"option ntp_servers",
 	"option interface_mtu",
 	"require dhcp_server_identifier",
 	"slaac private",
@@ -123,15 +124,24 @@ func restartDHCP() error {
 	if err := writeLines("/etc/dhcpcd.conf", dhcp_config_default); err != nil {
 		return err
 	}
+
+	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
+		return err
+	}
 	return exec.Command("systemctl", "restart", "dhcpcd").Run()
 }
 
-func checkIsConnectedToNetwork() error {
-	// check if network is up
-	if err := exec.Command("iwgetid", "wlan0", "-r").Run(); err != nil {
-		return err
+func checkIsConnectedToNetwork() (string, error) {
+	if val, err := exec.Command("iwgetid", "wlan0", "-r").Output(); err != nil {
+		return "", err
+	} else {
+		network := strings.TrimSpace(string(val))
+		if network == "" {
+			return "", fmt.Errorf("not connected to a network")
+		} else {
+			return string(network), nil
+		}
 	}
-	return nil
 }
 
 func createDNSConfig(router_ip string, ip_range string) error {
@@ -171,6 +181,61 @@ func creatConfigFile(name string, config []string) error {
 	}
 	err = w.Flush()
 	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Setup Hotspot and stop after 5 minutes using a new goroutine
+func initilseHotspot() error {
+	ssid := "bushnet"
+	router_ip := "192.168.4.1"
+	log.Printf("Setting DHCP to default...")
+	if err := restartDHCP(); err != nil {
+		log.Printf("Error restarting dhcpcd: %s", err)
+	}
+	// Wait 1 minute before starting hotspot
+	time.Sleep(30 * time.Second)
+	// Check if already connected to a network
+	// If not connected to a network, start hotspot
+	log.Printf("Checking if connected to network...")
+	if network, err := checkIsConnectedToNetwork(); err != nil {
+		log.Printf("Starting Hotspot...")
+		log.Printf("Creating Configs...")
+		if err := createAPConfig(ssid); err != nil {
+			return err
+		}
+		if err := createDNSConfig(router_ip, "192.168.4.2,192.168.4.20"); err != nil {
+			return err
+		}
+
+		log.Printf("Starting DHCP...")
+		if err := startDHCP(); err != nil {
+			return err
+		}
+		log.Printf("Starting DNS...")
+		if err := startDNS(); err != nil {
+			return err
+		}
+		log.Printf("Starting Access Point...")
+		if err := startAccessPoint(ssid); err != nil {
+			return err
+		}
+		return nil
+	} else {
+		return fmt.Errorf("already connected to a network: %s", network)
+	}
+}
+
+func stopHotspot() error {
+	log.Printf("Stopping Hotspot")
+	if err := stopAccessPoint(); err != nil {
+		return err
+	}
+	if err := stopDNS(); err != nil {
+		return err
+	}
+	if err := restartDHCP(); err != nil {
 		return err
 	}
 	return nil

@@ -389,6 +389,42 @@ func doesWPANetworkExist(ssid string) (bool, error) {
 	return false, nil
 }
 
+var dhcp_config_default = []string{
+	"hostname",
+	"clientid",
+	"persistent",
+	"option rapid_commit",
+	"option domain_name_servers, domain_name, domain_search, host_name",
+	"option classless_static_routes",
+	"option interface_mtu",
+	"require dhcp_server_identifier",
+	"slaac private",
+}
+
+func writeLines(file_path string, lines []string) error {
+	file, err := os.Create(file_path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	w := bufio.NewWriter(file)
+	for _, line := range lines {
+		_, _ = fmt.Fprintln(w, line)
+	}
+	return w.Flush()
+}
+
+func restartDHCP() error {
+	if err := writeLines("/etc/dhcpcd.conf", dhcp_config_default); err != nil {
+		return err
+	}
+	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
+		return err
+	}
+	return exec.Command("systemctl", "restart", "dhcpcd").Run()
+}
+
 // addWPANetwork adds a new wpa network in the wpa_supplication configuration
 // with specified ssid and password (if it doesn't already exist)
 func addWPANetwork(ssid string, password string) error {
@@ -397,10 +433,13 @@ func addWPANetwork(ssid string, password string) error {
 	} else if strings.ToLower(ssid) == "bushnet" {
 		return errors.New("SSID cannot be bushnet")
 	}
+	if err := restartDHCP(); err != nil {
+		return err
+	}
 
 	networkExists, err := doesWPANetworkExist(ssid)
 	if err != nil {
-		return err
+		log.Println(err)
 	}
 	if networkExists {
 		return fmt.Errorf("SSID %s already exists", ssid)
