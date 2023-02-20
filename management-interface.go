@@ -415,14 +415,17 @@ func writeLines(file_path string, lines []string) error {
 	return w.Flush()
 }
 
-func restartDHCP() error {
+func restartNetwork() error {
 	if err := writeLines("/etc/dhcpcd.conf", dhcp_config_default); err != nil {
 		return err
 	}
 	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
 		return err
 	}
-	return exec.Command("systemctl", "restart", "dhcpcd").Run()
+	if err := exec.Command("systemctl", "restart", "dhcpcd").Run(); err != nil {
+		return err
+	}
+	return exec.Command("systemctl", "restart", "networking").Run()
 }
 
 // addWPANetwork adds a new wpa network in the wpa_supplication configuration
@@ -433,7 +436,7 @@ func addWPANetwork(ssid string, password string) error {
 	} else if strings.ToLower(ssid) == "bushnet" {
 		return errors.New("SSID cannot be bushnet")
 	}
-	if err := restartDHCP(); err != nil {
+	if err := restartNetwork(); err != nil {
 		return err
 	}
 

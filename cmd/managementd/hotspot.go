@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 )
 
 // refactor createAPConfig to remove duplication
@@ -194,8 +193,6 @@ func initilseHotspot() error {
 	if err := restartDHCP(); err != nil {
 		log.Printf("Error restarting dhcpcd: %s", err)
 	}
-	// Wait 1 minute before starting hotspot
-	time.Sleep(30 * time.Second)
 	// Check if already connected to a network
 	// If not connected to a network, start hotspot
 	log.Printf("Checking if connected to network...")

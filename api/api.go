@@ -326,13 +326,27 @@ func (api *ManagementAPI) ClearConfigSection(w http.ResponseWriter, r *http.Requ
 }
 
 func (api *ManagementAPI) GetLocation(w http.ResponseWriter, r *http.Request) {
-	location := goconfig.Location{}
-	jsonString, err := json.Marshal(location)
-	if err != nil {
+	var location goconfig.Location
+	if err := api.config.Unmarshal(goconfig.LocationKey, &location); err != nil {
 		serverError(&w, err)
 		return
 	}
-	w.Write(jsonString)
+	type Location struct {
+		Latitude  float32 `json:"latitude"`
+		Longitude float32 `json:"longitude"`
+		Altitude  float32 `json:"altitude"`
+		Accuracy  float32 `json:"accuracy"`
+		Timestamp string  `json:"timestamp"`
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(Location{
+		Latitude:  location.Latitude,
+		Longitude: location.Longitude,
+		Altitude:  location.Altitude,
+		Accuracy:  location.Accuracy,
+		Timestamp: location.Timestamp.UTC().Format(time.RFC3339),
+	})
 }
 
 // SetLocation is for specifically writing to location setting.
