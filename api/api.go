@@ -43,6 +43,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/TheCacophonyProject/event-reporter/eventclient"
+	"github.com/TheCacophonyProject/trap-controller/trapdbusclient"
 )
 
 const (
@@ -473,13 +474,8 @@ func (api *ManagementAPI) DeleteEvents(w http.ResponseWriter, r *http.Request) {
 // Trigger trap
 func (api *ManagementAPI) TriggerTrap(w http.ResponseWriter, r *http.Request) {
 	log.Println("triggering trap")
-	err := eventclient.AddEvent(eventclient.Event{
-		Timestamp: time.Now(),
-		Type:      "trapped",
-		Details:   map[string]interface{}{"test": true},
-	})
 
-	if err != nil {
+	if err := trapdbusclient.TriggerTrap(map[string]interface{}{"test": true}); err != nil {
 		badRequest(&w, err)
 		return
 	}
