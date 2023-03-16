@@ -114,7 +114,7 @@ func main() {
 	apiRouter.HandleFunc("/config", apiObj.SetConfig).Methods("POST")
 	apiRouter.HandleFunc("/clear-config-section", apiObj.ClearConfigSection).Methods("POST")
 	apiRouter.HandleFunc("/location", apiObj.SetLocation).Methods("POST") // Set location via a POST request.
-	apiRouter.HandleFunc("/location", apiObj.GetLocation).Methods("GET")  // Set location via a POST request.
+	apiRouter.HandleFunc("/location", apiObj.GetLocation).Methods("GET")  // Get location via a POST request.
 	apiRouter.HandleFunc("/clock", apiObj.GetClock).Methods("GET")
 	apiRouter.HandleFunc("/clock", apiObj.PostClock).Methods("POST")
 	apiRouter.HandleFunc("/version", apiObj.GetVersion).Methods("GET")
