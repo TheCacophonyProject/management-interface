@@ -43,6 +43,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/TheCacophonyProject/event-reporter/eventclient"
+	"github.com/TheCacophonyProject/trap-controller/trapdbusclient"
 )
 
 const (
@@ -132,12 +133,18 @@ func (api *ManagementAPI) GetRecording(w http.ResponseWriter, r *http.Request) {
 	cptvPath := getRecordingPath(cptvName, api.cptvDir)
 	if cptvPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, "cptv file not found\n")
+		io.WriteString(w, "file not found\n")
 		return
 	}
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, cptvName))
-	w.Header().Set("Content-Type", "application/x-cptv")
+
+	ext := filepath.Ext(cptvName)
+	if ext == ".cptv" {
+		w.Header().Set("Content-Type", "application/x-cptv")
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+	}
 	f, err := os.Open(cptvPath)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -152,13 +159,19 @@ func (api *ManagementAPI) GetRecording(w http.ResponseWriter, r *http.Request) {
 // DeleteRecording deletes the given cptv file
 func (api *ManagementAPI) DeleteRecording(w http.ResponseWriter, r *http.Request) {
 	cptvName := mux.Vars(r)["id"]
-	log.Printf("delete cptv '%s'", cptvName)
 	recPath := getRecordingPath(cptvName, api.cptvDir)
 	if recPath == "" {
 		w.WriteHeader(http.StatusOK)
 		io.WriteString(w, "cptv file not found\n")
 		return
 	}
+
+	metaFile := strings.TrimSuffix(recPath, filepath.Ext(recPath)) + ".txt"
+	if _, err := os.Stat(metaFile); !os.IsNotExist(err) {
+		log.Printf("deleting meta '%s'", metaFile)
+		os.Remove(metaFile)
+	}
+	log.Printf("delete cptv '%s'", recPath)
 	err := os.Remove(recPath)
 	if os.IsNotExist(err) {
 		w.WriteHeader(http.StatusOK)
@@ -413,21 +426,11 @@ func getCptvNames(dir string) []string {
 	return names
 }
 
-func getRecordingPath(cptv, dir string) string {
+func getRecordingPath(file, dir string) string {
 	// Check that given file is a cptv file on the device.
-	isCptvFile := false
-	for _, name := range getCptvNames(dir) {
-		if name == cptv {
-			isCptvFile = true
-			break
-		}
-	}
-	if !isCptvFile {
-		return ""
-	}
 	paths := []string{
-		filepath.Join(dir, cptv),
-		filepath.Join(dir, failedUploadsFolder, cptv),
+		filepath.Join(dir, file),
+		filepath.Join(dir, failedUploadsFolder, file),
 	}
 	for _, path := range paths {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
@@ -489,6 +492,16 @@ func (api *ManagementAPI) DeleteEvents(w http.ResponseWriter, r *http.Request) {
 			serverError(&w, err)
 			return
 		}
+	}
+}
+
+// Trigger trap
+func (api *ManagementAPI) TriggerTrap(w http.ResponseWriter, r *http.Request) {
+	log.Println("triggering trap")
+
+	if err := trapdbusclient.TriggerTrap(map[string]interface{}{"test": true}); err != nil {
+		badRequest(&w, err)
+		return
 	}
 }
 
