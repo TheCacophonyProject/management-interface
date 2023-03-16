@@ -114,6 +114,7 @@ func main() {
 	apiRouter.HandleFunc("/config", apiObj.SetConfig).Methods("POST")
 	apiRouter.HandleFunc("/clear-config-section", apiObj.ClearConfigSection).Methods("POST")
 	apiRouter.HandleFunc("/location", apiObj.SetLocation).Methods("POST") // Set location via a POST request.
+	apiRouter.HandleFunc("/location", apiObj.GetLocation).Methods("GET")  // Get location via a POST request.
 	apiRouter.HandleFunc("/clock", apiObj.GetClock).Methods("GET")
 	apiRouter.HandleFunc("/clock", apiObj.PostClock).Methods("POST")
 	apiRouter.HandleFunc("/version", apiObj.GetVersion).Methods("GET")
@@ -134,9 +135,29 @@ func main() {
 	apiRouter.HandleFunc("/service-restart", apiObj.RestartService).Methods("POST")
 	apiRouter.Use(basicAuth)
 
+	go func() {
+		if err := initilseHotspot(); err != nil {
+			log.Println("Failed to initialise hotspot:", err)
+		} else {
+			t := time.NewTimer(5 * time.Minute)
+			apiRouter.Use(func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					t.Reset(5 * time.Minute)
+					next.ServeHTTP(w, r)
+				})
+			})
+
+			<-t.C
+			if err := stopHotspot(); err != nil {
+				log.Println("Failed to stop hotspot:", err)
+			}
+		}
+	}()
+
 	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, router))
+
 }
 
 func basicAuth(next http.Handler) http.Handler {
