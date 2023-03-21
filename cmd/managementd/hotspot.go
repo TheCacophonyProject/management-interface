@@ -150,7 +150,6 @@ func createDNSConfig(router_ip string, ip_range string) error {
 		"interface=wlan0",
 		"dhcp-range=" + ip_range + ",12h",
 		"domain=wlan",
-		"address=/#/" + router_ip,
 	}
 	return creatConfigFile(file_name, config_lines)
 
