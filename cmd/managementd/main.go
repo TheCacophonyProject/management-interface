@@ -137,6 +137,9 @@ func main() {
 
 	go func() {
 		if err := initilseHotspot(); err != nil {
+			if err := stopHotspot(); err != nil {
+				log.Println("Failed to stop hotspot:", err)
+			}
 			log.Println("Failed to initialise hotspot:", err)
 		} else {
 			t := time.NewTimer(5 * time.Minute)
