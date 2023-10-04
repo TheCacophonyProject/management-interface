@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // refactor createAPConfig to remove duplication
@@ -147,6 +148,19 @@ func checkIsConnectedToNetwork() (string, error) {
 	}
 }
 
+func checkIsConnectedToNetworkWithRetries() (string, error) {
+	var err error
+	var ssid string
+	for i := 0; i < 10; i++ {
+		ssid, err = checkIsConnectedToNetwork()
+		if ssid != "" {
+			return ssid, nil
+		}
+		time.Sleep(time.Second)
+	}
+	return ssid, err
+}
+
 func createDNSConfig(router_ip string, ip_range string) error {
 	// DNSMASQ config
 	file_name := "/etc/dnsmasq.conf"
@@ -199,7 +213,7 @@ func initilseHotspot() error {
 	// Check if already connected to a network
 	// If not connected to a network, start hotspot
 	log.Printf("Checking if connected to network...")
-	if network, err := checkIsConnectedToNetwork(); err != nil {
+	if network, err := checkIsConnectedToNetworkWithRetries(); err != nil {
 		log.Printf("Starting Hotspot...")
 		log.Printf("Creating Configs...")
 		if err := createAPConfig(ssid); err != nil {
