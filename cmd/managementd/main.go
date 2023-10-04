@@ -133,6 +133,7 @@ func main() {
 	apiRouter.HandleFunc("/logs", apiObj.GetServiceLogs).Methods("GET")
 	apiRouter.HandleFunc("/service", apiObj.GetServiceStatus).Methods("GET")
 	apiRouter.HandleFunc("/service-restart", apiObj.RestartService).Methods("POST")
+	apiRouter.HandleFunc("/device-type", apiObj.GetDeviceType).Methods("GET")
 	apiRouter.Use(basicAuth)
 
 	go func() {

@@ -614,6 +614,23 @@ func (api *ManagementAPI) GetServiceStatus(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(serviceStatus)
 }
 
+func (api *ManagementAPI) GetDeviceType(w http.ResponseWriter, r *http.Request) {
+	data, err := os.ReadFile("/etc/salt/minion_id")
+	if err != nil {
+		http.Error(w, "Error reading minion_id", http.StatusInternalServerError)
+		return
+	}
+
+	parts := strings.Split(string(data), "-")
+	if len(parts) < 2 {
+		http.Error(w, "Invalid format in minion_id", http.StatusBadRequest)
+		return
+	}
+
+	deviceType := strings.Join(parts[:len(parts)-1], "-")
+	w.Write([]byte(deviceType))
+}
+
 func (api *ManagementAPI) RestartService(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		parseFormErrorResponse(&w, err)
