@@ -62,40 +62,30 @@ var dhcp_config_lines = []string{
 	"nohook wpa_supplicant",
 }
 
-func createDHCPConfig() error {
+func createDHCPConfig() (bool, error) {
 	file_path := "/etc/dhcpcd.conf"
 
 	// append to dhcpcd.conf if lines don't already exist
 	config_lines := append(dhcp_config_default, dhcp_config_lines...)
-	if err := writeLines(file_path, config_lines); err != nil {
-		return err
-	}
-	return nil
+	return writeLines(file_path, config_lines)
 }
 
-func removeLines(file_path string, removed_lines []string) error {
-	file, err := os.Open(file_path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	var lines []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !contains(removed_lines, line) {
-			lines = append(lines, line)
+func writeLines(file_path string, lines []string) (bool, error) {
+	// Check if file already exists with the same config.
+	if _, err := os.Stat(file_path); err == nil {
+		currentContent, err := os.ReadFile(file_path)
+		if err != nil {
+			return false, err
+		}
+		newContent := strings.Join(lines, "\n") + "\n"
+		if string(currentContent) == newContent {
+			return false, nil
 		}
 	}
 
-	return writeLines(file_path, lines)
-}
-
-func writeLines(file_path string, lines []string) error {
 	file, err := os.Create(file_path)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer file.Close()
 
@@ -103,36 +93,40 @@ func writeLines(file_path string, lines []string) error {
 	for _, line := range lines {
 		_, _ = fmt.Fprintln(w, line)
 	}
-	return w.Flush()
-}
-
-func contains(lines []string, line string) bool {
-	for _, l := range lines {
-		if strings.TrimSpace(l) == strings.TrimSpace(line) {
-			return true
-		}
+	if err := w.Flush(); err != nil {
+		return false, err
 	}
-	return false
+
+	return true, nil
 }
 
 func startDHCP() error {
 	// modify /etc/dhcpcd.conf
-	if err := createDHCPConfig(); err != nil {
+	configModified, err := createDHCPConfig()
+	if err != nil {
 		return err
 	}
+	if configModified {
+		return exec.Command("systemctl", "restart", "dhcpcd").Run()
+	}
+	return exec.Command("systemctl", "start", "dhcpcd").Run()
 
-	return exec.Command("systemctl", "restart", "dhcpcd").Run()
 }
 
 func restartDHCP() error {
-	if err := writeLines("/etc/dhcpcd.conf", dhcp_config_default); err != nil {
+	// Only restart if config has changed
+	configModified, err := writeLines("/etc/dhcpcd.conf", dhcp_config_default)
+	if err != nil {
 		return err
 	}
 
 	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
 		return err
 	}
-	return exec.Command("systemctl", "restart", "dhcpcd").Run()
+	if configModified {
+		return exec.Command("systemctl", "restart", "dhcpcd").Run()
+	}
+	return exec.Command("systemctl", "start", "dhcpcd").Run()
 }
 
 func checkIsConnectedToNetwork() (string, error) {

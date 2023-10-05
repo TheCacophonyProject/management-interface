@@ -777,6 +777,10 @@ func Config(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "config.html", nil)
 }
 
+func Modem(w http.ResponseWriter, r *http.Request) {
+	tmpl.ExecuteTemplate(w, "modem.html", nil)
+}
+
 type audiobaitResponse struct {
 	Running      bool
 	Schedule     schedule
