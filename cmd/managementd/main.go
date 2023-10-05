@@ -52,7 +52,6 @@ var socketsLock sync.RWMutex
 var cameraInfo map[string]interface{}
 var lastFrame *FrameData
 var currentFrame = -1
-var managementAPI *api.ManagementAPI
 
 // Set up and handle page requests.
 func main() {
@@ -91,10 +90,10 @@ func main() {
 	router.HandleFunc("/rename", managementinterface.Rename).Methods("GET")
 	router.HandleFunc("/config", managementinterface.Config).Methods("GET")
 	router.HandleFunc("/audiobait", managementinterface.Audiobait).Methods("GET")
+	router.HandleFunc("/modem", managementinterface.Modem).Methods("GET")
 
 	// API
 	apiObj, err := api.NewAPI(config.config, version)
-	managementAPI = apiObj
 
 	if err != nil {
 		log.Fatal(err)
@@ -133,7 +132,7 @@ func main() {
 	apiRouter.HandleFunc("/logs", apiObj.GetServiceLogs).Methods("GET")
 	apiRouter.HandleFunc("/service", apiObj.GetServiceStatus).Methods("GET")
 	apiRouter.HandleFunc("/service-restart", apiObj.RestartService).Methods("POST")
-	apiRouter.HandleFunc("/device-type", apiObj.GetDeviceType).Methods("GET")
+	apiRouter.HandleFunc("/modem", apiObj.GetModem).Methods("GET")
 	apiRouter.Use(basicAuth)
 
 	go func() {
@@ -245,9 +244,9 @@ func sendFrameToSockets() {
 		if len(sockets) != 0 {
 			if cameraInfo == nil {
 				cameraInfo = Headers()
-				// wairing for camera to connect
+				// waiting for camera to connect
 				if cameraInfo == nil {
-					time.Sleep(5)
+					time.Sleep(time.Second)
 					continue
 				}
 				fps = cameraInfo["FPS"].(int32)
@@ -378,8 +377,7 @@ func GetFrame() *FrameData {
 		}
 	}
 
-	if f != nil {
-		currentFrame = f.Frame.Status.FrameCount
-	}
+	currentFrame = f.Frame.Status.FrameCount
+
 	return f
 }

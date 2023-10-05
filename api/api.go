@@ -96,12 +96,14 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 		Groupname  string `json:"groupname"`
 		Devicename string `json:"devicename"`
 		DeviceID   int    `json:"deviceID"`
+		Type       string `json:"type"`
 	}
 	info := deviceInfo{
 		ServerURL:  device.Server,
 		Groupname:  device.Group,
 		Devicename: device.Name,
 		DeviceID:   device.ID,
+		Type:       getDeviceType(),
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(info)
@@ -614,21 +616,46 @@ func (api *ManagementAPI) GetServiceStatus(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(serviceStatus)
 }
 
-func (api *ManagementAPI) GetDeviceType(w http.ResponseWriter, r *http.Request) {
+func (api *ManagementAPI) GetModem(w http.ResponseWriter, r *http.Request) {
+	// Send dbus call to modem service to get all modem statuses
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
+		return
+	}
+
+	modemDbus := conn.Object("org.cacophony.modemd", "/org/cacophony/modemd")
+
+	var status map[string]interface{}
+	err = modemDbus.Call("org.cacophony.modemd.GetStatus", 0).Store(&status)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to get modem status", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	encoder := json.NewEncoder(w)
+	if err := encoder.Encode(status); err != nil {
+		http.Error(w, "Failed to encode status to JSON", http.StatusInternalServerError)
+	}
+}
+
+func getDeviceType() string {
 	data, err := os.ReadFile("/etc/salt/minion_id")
 	if err != nil {
-		http.Error(w, "Error reading minion_id", http.StatusInternalServerError)
-		return
+		log.Println(err)
+		return ""
 	}
 
 	parts := strings.Split(string(data), "-")
 	if len(parts) < 2 {
-		http.Error(w, "Invalid format in minion_id", http.StatusBadRequest)
-		return
+		log.Printf("Failed to parse '%s' device type from /etc/salt/minion_id", string(data))
+		return ""
 	}
 
-	deviceType := strings.Join(parts[:len(parts)-1], "-")
-	w.Write([]byte(deviceType))
+	return strings.Join(parts[:len(parts)-1], "-")
 }
 
 func (api *ManagementAPI) RestartService(w http.ResponseWriter, r *http.Request) {
