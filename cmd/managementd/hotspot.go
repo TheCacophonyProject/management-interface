@@ -71,7 +71,7 @@ func createDHCPConfig() (bool, error) {
 }
 
 func writeLines(file_path string, lines []string) (bool, error) {
-	// Check if file exists
+	// Check if file already exists with the same config.
 	if _, err := os.Stat(file_path); err == nil {
 		currentContent, err := os.ReadFile(file_path)
 		if err != nil {
@@ -82,7 +82,6 @@ func writeLines(file_path string, lines []string) (bool, error) {
 			return false, nil
 		}
 	}
-	log.Println("Updating file")
 
 	file, err := os.Create(file_path)
 	if err != nil {
