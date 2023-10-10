@@ -50,7 +50,7 @@ const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
-	apiVersion          = 9
+	apiVersion          = 8
 )
 
 type ManagementAPI struct {
@@ -96,14 +96,14 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 		Groupname  string `json:"groupname"`
 		Devicename string `json:"devicename"`
 		DeviceID   int    `json:"deviceID"`
-		Type       string `json:"type"`
+		//Type       string `json:"type"`	// TOOD Removed to avoid sidekick issues for now.
 	}
 	info := deviceInfo{
 		ServerURL:  device.Server,
 		Groupname:  device.Group,
 		Devicename: device.Name,
 		DeviceID:   device.ID,
-		Type:       getDeviceType(),
+		//Type:       getDeviceType(),	// TODO Removed to avoid sidekick issues for now.
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(info)
@@ -614,6 +614,54 @@ func (api *ManagementAPI) GetServiceStatus(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	json.NewEncoder(w).Encode(serviceStatus)
+}
+
+type BatteryReading struct {
+	Time        string `json:"time"`
+	MainBattery string `json:"mainBattery"`
+	RTCBattery  string `json:"rtcBattery"`
+}
+
+func getLastBatteryReading() (BatteryReading, error) {
+	file, err := os.Open("/var/log/battery-readings.csv")
+	if err != nil {
+		return BatteryReading{}, err
+	}
+	defer file.Close()
+
+	var lastLine string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lastLine = scanner.Text()
+	}
+
+	if scanner.Err() != nil {
+		return BatteryReading{}, scanner.Err()
+	}
+
+	parts := strings.Split(lastLine, ",")
+	if len(parts) != 3 {
+		return BatteryReading{}, errors.New("unexpected format in battery-readings.csv")
+	}
+
+	return BatteryReading{
+		Time:        parts[0],
+		MainBattery: parts[1],
+		RTCBattery:  parts[2],
+	}, nil
+}
+
+func (api *ManagementAPI) GetBattery(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		parseFormErrorResponse(&w, err)
+		return
+	}
+	battery, err := getLastBatteryReading()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(battery)
 }
 
 func (api *ManagementAPI) GetModem(w http.ResponseWriter, r *http.Request) {

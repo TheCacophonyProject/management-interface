@@ -781,6 +781,30 @@ func Modem(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "modem.html", nil)
 }
 
+func Battery(w http.ResponseWriter, r *http.Request) {
+	tmpl.ExecuteTemplate(w, "battery.html", nil)
+}
+
+func DownloadBatteryCSV(w http.ResponseWriter, r *http.Request) {
+	filePath := "/var/log/battery-readings.csv"
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer file.Close()
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=battery-readings.csv")
+
+	_, err = io.Copy(w, file)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+}
+
 type audiobaitResponse struct {
 	Running      bool
 	Schedule     schedule
