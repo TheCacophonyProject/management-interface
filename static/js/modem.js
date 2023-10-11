@@ -9,17 +9,29 @@ async function getState() {
     var response = await apiGetJSON("/api/modem");
     console.log(response);
 
-    $("#GPS").html(response.GPS);
-    $("#band").html(response.band);
-    $("#connectedTime").html(response.connectedTime);
-    $("#name").html(response.name);
-    $("#netdev").html(response.netdev);
+    $("#timestamp").html(response.timestamp);
     $("#onOffReason").html(response.onOffReason);
     $("#powered").html(response.powered ? 'True' : 'False');
-    $("#signalStrength").html(response.signalStrength);
-    $("#simCardStatus").html(response.simCardStatus);
-    $("#time").html(response.time);
-    $("#vendor").html(response.vendor);
+    $("#GPS").html(response.GPS);
+
+    $("#connectedTime").html(response.modem.connectedTime);
+    $("#manufacturer").html(response.modem.manufacturer);
+    $("#model").html(response.modem.model);
+    $("#name").html(response.modem.name);
+    $("#netdev").html(response.modem.netdev);
+    $("#serial").html(response.modem.serial);
+    $("#temp").html(response.modem.temp);
+    $("#vendor").html(response.modem.vendor);
+    $("#voltage").html(response.modem.voltage);
+
+    $("#band").html(response.signal.band);
+    $("#provider").html(response.signal.provider);
+    $("#accessTechnology").html(response.signal.accessTechnology);
+    $("#signalStrength").html(response.signal.strength);
+
+    $("#ICCID").html(response.simCard.ICCID);
+    $("#simProvider").html(response.simCard.provider);
+    $("#simCardStatus").html(response.simCard.simCardStatus);
 
   } catch (e) {
     console.log(e);
