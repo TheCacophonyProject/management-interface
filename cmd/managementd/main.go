@@ -91,6 +91,8 @@ func main() {
 	router.HandleFunc("/config", managementinterface.Config).Methods("GET")
 	router.HandleFunc("/audiobait", managementinterface.Audiobait).Methods("GET")
 	router.HandleFunc("/modem", managementinterface.Modem).Methods("GET")
+	router.HandleFunc("/battery", managementinterface.Battery).Methods("GET")
+	router.HandleFunc("/battery-csv", managementinterface.DownloadBatteryCSV).Methods("GET")
 
 	// API
 	apiObj, err := api.NewAPI(config.config, version)
@@ -133,6 +135,7 @@ func main() {
 	apiRouter.HandleFunc("/service", apiObj.GetServiceStatus).Methods("GET")
 	apiRouter.HandleFunc("/service-restart", apiObj.RestartService).Methods("POST")
 	apiRouter.HandleFunc("/modem", apiObj.GetModem).Methods("GET")
+	apiRouter.HandleFunc("/battery", apiObj.GetBattery).Methods("GET")
 	apiRouter.Use(basicAuth)
 
 	go func() {

@@ -786,7 +786,7 @@ func Battery(w http.ResponseWriter, r *http.Request) {
 }
 
 func DownloadBatteryCSV(w http.ResponseWriter, r *http.Request) {
-	filePath := "/var/log/battery-readings.csv"
+	filePath := "/var/log/battery_voltage.log"
 
 	file, err := os.Open(filePath)
 	if err != nil {

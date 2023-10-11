@@ -623,7 +623,7 @@ type BatteryReading struct {
 }
 
 func getLastBatteryReading() (BatteryReading, error) {
-	file, err := os.Open("/var/log/battery-readings.csv")
+	file, err := os.Open("/var/log/battery_voltage.log")
 	if err != nil {
 		return BatteryReading{}, err
 	}
