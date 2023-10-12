@@ -12,7 +12,20 @@ async function getState() {
     $("#timestamp").html(response.timestamp);
     $("#onOffReason").html(response.onOffReason);
     $("#powered").html(response.powered ? 'True' : 'False');
-    $("#GPS").html(response.GPS);
+    if (typeof(response.GPS) == 'string') {
+      $("#noGPS").show();
+      $("#gpsData").hide();
+      $("#noGPSReason").html(response.GPS);
+    } else {
+      $("#noGPS").hide();
+      $("#gpsData").show();
+      $("#gpsLatitude").html(response.GPS.latitude)
+      $("#gpsLongitude").html(response.GPS.longitude)
+      $("#gpsAltitude").html(response.GPS.altitude)
+      $("#gpsUTCTime").html(response.GPS.utcDateTime)
+      $("#gpsCourse").html(response.GPS.course)
+      $("#gpsSpeed").html(response.GPS.speed)
+    }
 
     $("#connectedTime").html(response.modem.connectedTime);
     $("#manufacturer").html(response.modem.manufacturer);
