@@ -664,16 +664,43 @@ func (api *ManagementAPI) GetBattery(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(battery)
 }
 
-func (api *ManagementAPI) GetModem(w http.ResponseWriter, r *http.Request) {
-	// Send dbus call to modem service to get all modem statuses
+func getModemDbus() (dbus.BusObject, error) {
 	conn, err := dbus.SystemBus()
+	if err != nil {
+		return nil, err
+	}
+	return conn.Object("org.cacophony.modemd", "/org/cacophony/modemd"), nil
+}
+
+func (api *ManagementAPI) ModemStayOnFor(w http.ResponseWriter, r *http.Request) {
+	modemDbus, err := getModemDbus()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
 		return
 	}
 
-	modemDbus := conn.Object("org.cacophony.modemd", "/org/cacophony/modemd")
+	minutes, err := strconv.Atoi(r.FormValue("minutes"))
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+	err = modemDbus.Call("org.cacophony.modemd.StayOnFor", 0, minutes).Store()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to request modem to stay on", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (api *ManagementAPI) GetModem(w http.ResponseWriter, r *http.Request) {
+	// Send dbus call to modem service to get all modem statuses
+	modemDbus, err := getModemDbus()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
+		return
+	}
 
 	var status map[string]interface{}
 	err = modemDbus.Call("org.cacophony.modemd.GetStatus", 0).Store(&status)

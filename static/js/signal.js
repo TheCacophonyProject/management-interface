@@ -13,42 +13,29 @@ async function updateSignalTC2() {
   var response = await apiGetJSON("/api/modem");
   
   if (!response.signal) {
-    $(".svg-signal").hide();
-    $(".signal-unavail").show();
+    handleSignalSuccess(0);
     return;
   }
-  $(".signal-unavail").hide();
-  $(".svg-signal").show();
-
   strength = response.signal.strength;
-  signalFails = 0;
-  refreshTime = refreshMillis;
 
-  barsStrength = 0;
+  barsStrength = 1;
   if (strength < 9) {
-    barsStrength = 1;
-  } else if (strength < 14) {
     barsStrength = 2;
-  } else if (strength < 19) {
+  } else if (strength < 14) {
     barsStrength = 3;
-  } else if (strength < 30) {
+  } else if (strength < 19) {
     barsStrength = 4;
+  } else if (strength < 30) {
+    barsStrength = 5;
   }
-
-  for (var i = 1; i <= bars; i++) {
-    var bar = $(".signal-" + i);
-    if (i <= barsStrength) {
-      bar.addClass("signal");
-      bar.removeClass("no-signal");
-    } else {
-      bar.addClass("no-signal");
-      bar.removeClass("signal");
-    }
-  }
+  handleSignalSuccess(barsStrength)
+  
+  return;
 }
 
 
 async function updateSignal() {
+  //TODO Check if device is TC2, just hard coded for now.
   updateSignalTC2()
   return;
   var xmlHttp = new XMLHttpRequest();

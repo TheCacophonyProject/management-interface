@@ -12,40 +12,55 @@ async function getState() {
     $("#timestamp").html(response.timestamp);
     $("#onOffReason").html(response.onOffReason);
     $("#powered").html(response.powered ? 'True' : 'False');
-    if (typeof(response.GPS) == 'string') {
-      $("#noGPS").show();
-      $("#gpsData").hide();
-      $("#noGPSReason").html(response.GPS);
+    
+
+    if (response.modem != null) {
+      if (typeof(response.GPS) == 'string') {
+        $("#noGPS").show();
+        $("#gpsData").hide();
+        $("#noGPSReason").html(response.GPS);
+      } else {
+        $("#noGPS").hide();
+        $("#gpsData").show();
+        $("#gpsLatitude").html(response.GPS.latitude)
+        $("#gpsLongitude").html(response.GPS.longitude)
+        $("#gpsAltitude").html(response.GPS.altitude)
+        $("#gpsUTCTime").html(response.GPS.utcDateTime)
+        $("#gpsCourse").html(response.GPS.course)
+        $("#gpsSpeed").html(response.GPS.speed)
+      }
+      $("#modemData").show();
+      $("#connectedTime").html(response.modem.connectedTime);
+      $("#manufacturer").html(response.modem.manufacturer);
+      $("#model").html(response.modem.model);
+      $("#name").html(response.modem.name);
+      $("#netdev").html(response.modem.netdev);
+      $("#serial").html(response.modem.serial);
+      $("#temp").html(response.modem.temp);
+      $("#vendor").html(response.modem.vendor);
+      $("#voltage").html(response.modem.voltage);
+
+      $("#band").html(response.signal.band);
+      $("#provider").html(response.signal.provider);
+      $("#accessTechnology").html(response.signal.accessTechnology);
+      $("#signalStrength").html(response.signal.strength);
+
+      $("#ICCID").html(response.simCard.ICCID);
+      $("#simProvider").html(response.simCard.provider);
+      $("#simCardStatus").html(response.simCard.simCardStatus);
     } else {
-      $("#noGPS").hide();
-      $("#gpsData").show();
-      $("#gpsLatitude").html(response.GPS.latitude)
-      $("#gpsLongitude").html(response.GPS.longitude)
-      $("#gpsAltitude").html(response.GPS.altitude)
-      $("#gpsUTCTime").html(response.GPS.utcDateTime)
-      $("#gpsCourse").html(response.GPS.course)
-      $("#gpsSpeed").html(response.GPS.speed)
+      $("#modemData").hide();
     }
 
-    $("#connectedTime").html(response.modem.connectedTime);
-    $("#manufacturer").html(response.modem.manufacturer);
-    $("#model").html(response.modem.model);
-    $("#name").html(response.modem.name);
-    $("#netdev").html(response.modem.netdev);
-    $("#serial").html(response.modem.serial);
-    $("#temp").html(response.modem.temp);
-    $("#vendor").html(response.modem.vendor);
-    $("#voltage").html(response.modem.voltage);
+  } catch (e) {
+    console.log(e);
+  }
+}
 
-    $("#band").html(response.signal.band);
-    $("#provider").html(response.signal.provider);
-    $("#accessTechnology").html(response.signal.accessTechnology);
-    $("#signalStrength").html(response.signal.strength);
-
-    $("#ICCID").html(response.simCard.ICCID);
-    $("#simProvider").html(response.simCard.provider);
-    $("#simCardStatus").html(response.simCard.simCardStatus);
-
+async function turnModemOn() {
+  var data = { minutes: 10 };
+  try {
+    await apiFormURLEncodedPost("/api/modem-stay-on-for", data);
   } catch (e) {
     console.log(e);
   }

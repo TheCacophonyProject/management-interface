@@ -38,97 +38,101 @@
             <p class="col-3 text-right">GPS:</p>
             <p id="noGPSReason" class="col-9 monospace"></p>
         </div>
-        <div id="gpsData" style="display: none;">
+        <div id="modemData">
+            <div id="gpsData" style="display: none;">
+                <div class="row">
+                    <p class="col-3 text-right">GPS latitude:</p>
+                    <p id="gpsLatitude" class="col-9 monospace"></p>
+                </div>
+                <div class="row">
+                    <p class="col-3 text-right">GPS longitude:</p>
+                    <p id="gpsLongitude" class="col-9 monospace"></p>
+                </div>
+                <div class="row">
+                    <p class="col-3 text-right">GPS altitude:</p>
+                    <p id="gpsAltitude" class="col-9 monospace"></p>
+                </div>
+                <div class="row">
+                    <p class="col-3 text-right">GPS UTC timestamp:</p>
+                    <p id="gpsUTCTime" class="col-9 monospace"></p>
+                </div>
+                <div class="row">
+                    <p class="col-3 text-right">GPS course:</p>
+                    <p id="gpsCourse" class="col-9 monospace"></p>
+                </div>
+                <div class="row">
+                    <p class="col-3 text-right">GPS speed:</p>
+                    <p id="gpsSpeed" class="col-9 monospace"></p>
+                </div>
+            </div>
+        
             <div class="row">
-                <p class="col-3 text-right">GPS latitude:</p>
-                <p id="gpsLatitude" class="col-9 monospace"></p>
+                <p class="col-3 text-right">Signal Strength:</p>
+                <p id="signalStrength" class="col-9 monospace"></p>
             </div>
             <div class="row">
-                <p class="col-3 text-right">GPS longitude:</p>
-                <p id="gpsLongitude" class="col-9 monospace"></p>
+                <p class="col-3 text-right">Band:</p>
+                <p id="band" class="col-9 monospace"></p>
             </div>
             <div class="row">
-                <p class="col-3 text-right">GPS altitude:</p>
-                <p id="gpsAltitude" class="col-9 monospace"></p>
+                <p class="col-3 text-right">Connected Time:</p>
+                <p id="connectedTime" class="col-9 monospace"></p>
             </div>
             <div class="row">
-                <p class="col-3 text-right">GPS UTC timestamp:</p>
-                <p id="gpsUTCTime" class="col-9 monospace"></p>
+                <p class="col-3 text-right">Name:</p>
+                <p id="name" class="col-9 monospace"></p>
             </div>
             <div class="row">
-                <p class="col-3 text-right">GPS course:</p>
-                <p id="gpsCourse" class="col-9 monospace"></p>
+                <p class="col-3 text-right">Vendor:</p>
+                <p id="vendor" class="col-9 monospace"></p>
             </div>
             <div class="row">
-                <p class="col-3 text-right">GPS speed:</p>
-                <p id="gpsSpeed" class="col-9 monospace"></p>
+                <p class="col-3 text-right">Netdev:</p>
+                <p id="netdev" class="col-9 monospace"></p>
             </div>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Signal Strength:</p>
-            <p id="signalStrength" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Band:</p>
-            <p id="band" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Connected Time:</p>
-            <p id="connectedTime" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Name:</p>
-            <p id="name" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Vendor:</p>
-            <p id="vendor" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Netdev:</p>
-            <p id="netdev" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Sim Card Status:</p>
-            <p id="simCardStatus" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Model:</p>
-            <p id="model" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Manufacturer:</p>
-            <p id="manufacturer" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">ICCID:</p>
-            <p id="ICCID" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Serial:</p>
-            <p id="serial" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Network provider:</p>
-            <p id="provider" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Network type:</p>
-            <p id="accessTechnology" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Sim Provider:</p>
-            <p id="simProvider" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Temperature:</p>
-            <p id="temp" class="col-9 monospace"></p>
-        </div>
-        <div class="row">
-            <p class="col-3 text-right">Voltage:</p>
-            <p id="voltage" class="col-9 monospace"></p>
+            <div class="row">
+                <p class="col-3 text-right">Sim Card Status:</p>
+                <p id="simCardStatus" class="col-9 monospace"></p>
+            </div>
+            <div class="row">
+                <p class="col-3 text-right">Model:</p>
+                <p id="model" class="col-9 monospace"></p>
+            </div>
+            <div class="row">
+                <p class="col-3 text-right">Manufacturer:</p>
+                <p id="manufacturer" class="col-9 monospace"></p>
+            </div>
+            <div class="row">
+                <p class="col-3 text-right">ICCID:</p>
+                <p id="ICCID" class="col-9 monospace"></p>
+            </div>
+            <div class="row">
+                <p class="col-3 text-right">Serial:</p>
+                <p id="serial" class="col-9 monospace"></p>
+            </div>
+            <div class="row">
+                <p class="col-3 text-right">Network provider:</p>
+                <p id="provider" class="col-9 monospace"></p>
+            </div>
+            <div class="row">
+                <p class="col-3 text-right">Network type:</p>
+                <p id="accessTechnology" class="col-9 monospace"></p>
+            </div>
+            <div class="row">
+                <p class="col-3 text-right">Sim Provider:</p>
+                <p id="simProvider" class="col-9 monospace"></p>
+            </div>
+            <div class="row">
+                <p class="col-3 text-right">Temperature:</p>
+                <p id="temp" class="col-9 monospace"></p>
+            </div>
+            <div class="row">
+                <p class="col-3 text-right">Voltage:</p>
+                <p id="voltage" class="col-9 monospace"></p>
+            </div>
         </div>
     </div>
+    <button onclick=turnModemOn() class="btn btn-primary">Turn Modem On</button>
 
     <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
     <script src="/static/js/bootstrap.min.js"></script>
