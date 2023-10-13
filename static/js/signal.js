@@ -27,6 +27,8 @@ async function updateSignalTC2() {
     barsStrength = 4;
   } else if (strength < 30) {
     barsStrength = 5;
+  } else {
+    barsStrength = 6;
   }
   handleSignalSuccess(barsStrength)
   
