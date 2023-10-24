@@ -651,6 +651,71 @@ func getLastBatteryReading() (BatteryReading, error) {
 	}, nil
 }
 
+func (api *ManagementAPI) GetTestVideos(w http.ResponseWriter, r *http.Request) {
+	recordings, err := os.ReadDir("/var/spool/cptv/test-recordings")
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	recordingNames := []string{}
+	for _, recording := range recordings {
+		if strings.HasSuffix(recording.Name(), ".cptv") {
+			recordingNames = append(recordingNames, recording.Name())
+		}
+	}
+	json.NewEncoder(w).Encode(recordingNames)
+}
+
+type VideoRequest struct {
+	Video string `json:"video"`
+}
+
+func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		parseFormErrorResponse(&w, err)
+		return
+	}
+
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+		return
+	}
+
+	var req VideoRequest
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
+		log.Printf("Failed to parse request body: %s, error: %s", bodyBytes, err)
+		http.Error(w, "Failed to parse request body", http.StatusBadRequest)
+		return
+	}
+
+	videoName := "/var/spool/cptv/test-recordings/" + req.Video
+	log.Printf("Playing %s", videoName)
+
+	out, err := exec.Command("systemctl", "stop", "thermal-recorder").CombinedOutput()
+	if err != nil {
+		log.Fatalf("Failed to run command: %s, %s", err, out)
+	}
+	out, err = exec.Command("systemctl", "stop", "tc2-agent").CombinedOutput()
+	if err != nil {
+		log.Fatalf("Failed to run command: %s, %s", err, out)
+	}
+
+	out, err = exec.Command("/home/pi/classifier/bin/python3", "/home/pi/classifier-pipeline/piclassify.py", "--file", videoName).CombinedOutput()
+	if err != nil {
+		log.Fatalf("Failed to run command: %s, %s", err, out)
+	}
+
+	out, err = exec.Command("systemctl", "start", "thermal-recorder").CombinedOutput()
+	if err != nil {
+		log.Fatalf("Failed to run command: %s, %s", err, out)
+	}
+	out, err = exec.Command("systemctl", "start", "tc2-agent").CombinedOutput()
+	if err != nil {
+		log.Fatalf("Failed to run command: %s, %s", err, out)
+	}
+}
+
 func (api *ManagementAPI) GetBattery(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		parseFormErrorResponse(&w, err)

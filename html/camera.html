@@ -20,7 +20,6 @@
         Take test recording
       </button>
       <div id="snapshot-stopped" style="display: none">
-
         <p id="snapshot-stopped-message"></p>
         <button id="snapshot-restart" type="button">
           Continue viewing camera
@@ -28,6 +27,20 @@
       </div>
       <div>
         <p id="snapshot-frame"></p>
+      </div>
+      <div id="test-videos" style="display: none;">
+        <!-- Dropdown Menu -->
+        <div class="mt-2">
+          <select class="form-select" id="test-video-options">
+            <option selected>Select Video Option</option>
+          </select>
+        </div>
+        <!-- Play Button -->
+        <div class="mt-2">
+          <button id="play-test-video" class="btn btn-primary" type="button">
+            Play
+          </button>
+        </div>
       </div>
       <div class="row" style="position: relative">
         <canvas

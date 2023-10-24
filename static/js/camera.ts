@@ -95,12 +95,14 @@ window.onload = function () {
   document.getElementById("snapshot-restart")!.onclick = restartCameraViewing;
   document.getElementById("trigger-trap")!.onclick = triggerTrap;
   document.getElementById("take-snapshot-recording")!.onclick = takeTestRecording;
+  document.getElementById("play-test-video")!.onclick = playTestVideo;
   cameraConnection = new CameraConnection(
     window.location.hostname,
     window.location.port,
     processFrame,
     onConnectionStateChange
   );
+  updateTestVideos();
 };
 
 async function takeTestRecording() {
@@ -410,4 +412,56 @@ export class CameraConnection {
     }
     return null;
   }
+}
+
+function updateTestVideos(): void {
+  fetch("/api/test-videos",
+    {
+      method: "GET",
+      headers : {
+        "Authorization": "Basic " + btoa("admin:feathers"),
+      }
+    })
+    .then(response => response.json())
+    .then((videos: string[]) => {
+      if (videos.length === 0) {
+        return;
+      }
+      document.getElementById("test-videos")!.style.display = "block"
+      const dropdown = document.getElementById("test-video-options") as HTMLSelectElement;
+      videos.forEach(video => {
+        const option = document.createElement("option");
+        option.value = video;
+        option.innerText = video;
+        dropdown.appendChild(option);
+      })
+    })
+    .catch(error => {
+      console.error("Error fetching test videos:", error);
+    });
+}
+
+function playTestVideo(): void {
+  const dropdown = document.getElementById("test-video-options") as HTMLSelectElement;
+  const selectedVideo: string = dropdown.value;
+
+  if (selectedVideo && selectedVideo !== "Select Video Option") {
+    sendVideoRequest(selectedVideo);
+  } else {
+    alert("Please select a video option first!");
+  }
+}
+
+function sendVideoRequest(videoName: string): void {
+  fetch("/api/play-test-video", {
+    method: "POST",
+    headers: {
+      "Authorization": "Basic " + btoa("admin:feathers"),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ video: videoName })
+  })
+  .catch(error => {
+    console.error("Error playing test video:", error);
+  });
 }

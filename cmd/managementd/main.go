@@ -74,6 +74,18 @@ func main() {
 	static := packr.NewBox("../../static")
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(static)))
 	router.Handle("/ws", websocket.Handler(WebsocketServer))
+	router.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		favicon, err := static.Find("favicon.ico")
+		if err != nil {
+			http.Error(w, "Favicon not found", http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "image/x-icon")
+		w.WriteHeader(http.StatusOK)
+		w.Write(favicon)
+	})
+
 	go sendFrameToSockets()
 	// UI handlers.
 	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
@@ -137,6 +149,8 @@ func main() {
 	apiRouter.HandleFunc("/modem", apiObj.GetModem).Methods("GET")
 	apiRouter.HandleFunc("/modem-stay-on-for", apiObj.ModemStayOnFor).Methods("POST")
 	apiRouter.HandleFunc("/battery", apiObj.GetBattery).Methods("GET")
+	apiRouter.HandleFunc("/test-videos", apiObj.GetTestVideos).Methods("GET")
+	apiRouter.HandleFunc("/play-test-video", apiObj.PlayTestVideo).Methods("POST")
 
 	apiRouter.Use(basicAuth)
 
