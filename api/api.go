@@ -701,9 +701,29 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 		log.Fatalf("Failed to run command: %s, %s", err, out)
 	}
 
-	out, err = exec.Command("/home/pi/classifier/bin/python3", "/home/pi/classifier-pipeline/piclassify.py", "--file", videoName).CombinedOutput()
+	cmd := exec.Command("/home/pi/classifier/bin/python3", "/home/pi/classifier-pipeline/piclassify.py", "-c", "/home/pi/classifier-pipeline/pi-classifier.yaml", "--file", videoName)
+	log.Println(strings.Join(cmd.Args, " "))
+
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatalf("Failed to run command: %s, %s", err, out)
+		log.Fatalf("Failed to create stdout pipe: %s", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		log.Fatalf("Failed to create stderr pipe: %s", err)
+	}
+
+	go streamOutput(stdout)
+	go streamOutput(stderr)
+
+	err = cmd.Start()
+	if err != nil {
+		log.Fatalf("Failed to start command: %s", err)
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		log.Fatalf("Command finished with error: %s", err)
 	}
 
 	out, err = exec.Command("systemctl", "start", "thermal-recorder").CombinedOutput()
@@ -713,6 +733,13 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 	out, err = exec.Command("systemctl", "start", "tc2-agent").CombinedOutput()
 	if err != nil {
 		log.Fatalf("Failed to run command: %s, %s", err, out)
+	}
+}
+
+func streamOutput(pipe io.ReadCloser) {
+	scanner := bufio.NewScanner(pipe)
+	for scanner.Scan() {
+		log.Println(scanner.Text())
 	}
 }
 
