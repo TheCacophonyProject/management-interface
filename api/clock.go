@@ -43,6 +43,7 @@ type clockInfo struct {
 	LowRTCBattery bool
 	RTCIntegrity  bool
 	NTPSynced     bool
+	Timezone      string
 }
 
 func (api *ManagementAPI) GetClock(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +79,7 @@ func (api *ManagementAPI) GetClock(w http.ResponseWriter, r *http.Request) {
 		LowRTCBattery: rtcState.LowBattery,
 		RTCIntegrity:  rtcState.ClockIntegrity,
 		NTPSynced:     ntpSynced,
+		Timezone:      getTimezone(),
 	})
 	if err != nil {
 		serverError(&w, err)
@@ -87,6 +89,15 @@ func (api *ManagementAPI) GetClock(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *ManagementAPI) PostClock(w http.ResponseWriter, r *http.Request) {
+	timezone := r.FormValue("timezone")
+	if timezone != "" {
+		cmd := exec.Command("timedatectl", "set-timezone", timezone)
+		_, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
 	if getDeviceType() == "tc2" {
 		api.PostClockTC2(w, r)
 		return
@@ -105,6 +116,17 @@ func (api *ManagementAPI) PostClock(w http.ResponseWriter, r *http.Request) {
 	if err := rtc.Write(1); err != nil {
 		serverError(&w, err)
 	}
+}
+
+func getTimezone() string {
+	cmd := exec.Command("timedatectl", "show", "-p", "Timezone", "--value")
+
+	out, err := cmd.Output()
+	if err != nil {
+		fmt.Printf("Error getting timezone: %v\n", err)
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func (api *ManagementAPI) GetClockTC2(w http.ResponseWriter, r *http.Request) {
@@ -154,6 +176,7 @@ func (api *ManagementAPI) GetClockTC2(w http.ResponseWriter, r *http.Request) {
 		SystemTime:   systemTime.Format(timeFormat),
 		RTCIntegrity: integrity,
 		NTPSynced:    ntpSynced,
+		Timezone:     getTimezone(),
 	})
 	if err != nil {
 		serverError(&w, err)
