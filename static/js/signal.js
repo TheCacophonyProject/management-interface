@@ -12,6 +12,16 @@ var signalFails = 0;
 async function updateSignalTC2() {
   var response = await apiGetJSON("/api/modem");
   
+  if (response.simCard) {
+    if (response.simCard.simCardStatus == "READY") {
+      $("#modem-status").html("");
+    } else {
+      $("#modem-status").html("No Sim Card");
+    }
+  } else {
+    $("#modem-status").html("");
+  }
+
   if (!response.signal) {
     handleSignalSuccess(0);
     return;
