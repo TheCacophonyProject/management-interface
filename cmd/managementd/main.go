@@ -45,13 +45,15 @@ const (
 	socketTimeout = 7 * time.Second
 )
 
-var haveClients = make(chan bool)
-var version = "<not set>"
-var sockets = make(map[int64]*WebsocketRegistration)
-var socketsLock sync.RWMutex
-var cameraInfo map[string]interface{}
-var lastFrame *FrameData
-var currentFrame = -1
+var (
+	haveClients  = make(chan bool)
+	version      = "<not set>"
+	sockets      = make(map[int64]*WebsocketRegistration)
+	socketsLock  sync.RWMutex
+	cameraInfo   map[string]interface{}
+	lastFrame    *FrameData
+	currentFrame = -1
+)
 
 // Set up and handle page requests.
 func main() {
@@ -108,7 +110,6 @@ func main() {
 
 	// API
 	apiObj, err := api.NewAPI(config.config, version)
-
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -151,6 +152,10 @@ func main() {
 	apiRouter.HandleFunc("/battery", apiObj.GetBattery).Methods("GET")
 	apiRouter.HandleFunc("/test-videos", apiObj.GetTestVideos).Methods("GET")
 	apiRouter.HandleFunc("/play-test-video", apiObj.PlayTestVideo).Methods("POST")
+	apiRouter.HandleFunc("/network/interfaces", apiObj.GetNetworkInterfaces).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi", apiObj.GetWifiNetworks).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi/current", apiObj.GetCurrentWifiNetwork).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi", apiObj.ConnectToWifi).Methods("POST")
 
 	apiRouter.Use(basicAuth)
 
@@ -179,7 +184,6 @@ func main() {
 	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, router))
-
 }
 
 func basicAuth(next http.Handler) http.Handler {
@@ -360,7 +364,6 @@ type FrameData struct {
 }
 
 func GetFrame() *FrameData {
-
 	conn, err := dbus.SystemBus()
 	if err != nil {
 		return nil

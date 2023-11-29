@@ -25,11 +25,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -287,16 +289,16 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	configDefaults := map[string]interface{}{
-		toCamelCase(goconfig.AudioKey):            goconfig.DefaultAudio(),
-		toCamelCase(goconfig.GPIOKey):             goconfig.DefaultGPIO(),
-		toCamelCase(goconfig.LeptonKey):           goconfig.DefaultLepton(),
-		toCamelCase(goconfig.ModemdKey):           goconfig.DefaultModemd(),
-		toCamelCase(goconfig.PortsKey):            goconfig.DefaultPorts(),
-		toCamelCase(goconfig.TestHostsKey):        goconfig.DefaultTestHosts(),
-		toCamelCase(goconfig.ThermalMotionKey):    goconfig.DefaultThermalMotion(lepton3.Model35), //TODO don't assume that model 3.5 is being used
-		toCamelCase(goconfig.ThermalRecorderKey):  goconfig.DefaultThermalRecorder(),
-		toCamelCase(goconfig.ThermalThrottlerKey): goconfig.DefaultThermalThrottler(),
-		toCamelCase(goconfig.WindowsKey):          goconfig.DefaultWindows(),
+		goconfig.AudioKey:            goconfig.DefaultAudio(),
+		goconfig.GPIOKey:             goconfig.DefaultGPIO(),
+		goconfig.LeptonKey:           goconfig.DefaultLepton(),
+		goconfig.ModemdKey:           goconfig.DefaultModemd(),
+		goconfig.PortsKey:            goconfig.DefaultPorts(),
+		goconfig.TestHostsKey:        goconfig.DefaultTestHosts(),
+		goconfig.ThermalMotionKey:    goconfig.DefaultThermalMotion(lepton3.Model35), // TODO don't assume that model 3.5 is being used
+		goconfig.ThermalRecorderKey:  goconfig.DefaultThermalRecorder(),
+		goconfig.ThermalThrottlerKey: goconfig.DefaultThermalThrottler(),
+		goconfig.WindowsKey:          goconfig.DefaultWindows(),
 	}
 
 	configValues := map[string]interface{}{
@@ -747,6 +749,173 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		log.Fatalf("Failed to run command: %s, %s", err, out)
 	}
+}
+
+// Network API
+func (api *ManagementAPI) GetNetworkInterfaces(w http.ResponseWriter, r *http.Request) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		log.Printf("Error getting network interfaces: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to get network interfaces\n")
+		return
+	}
+
+	var result []map[string]interface{}
+	for _, iface := range interfaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			log.Printf("Error getting addresses for interface %s: %v", iface.Name, err)
+			continue // Skip this interface
+		}
+
+		var addrStrings []string
+		for _, addr := range addrs {
+			addrStrings = append(addrStrings, addr.String())
+		}
+
+		result = append(result, map[string]interface{}{
+			"name":       iface.Name,
+			"addresses":  addrStrings,
+			"mtu":        iface.MTU,
+			"macAddress": iface.HardwareAddr.String(),
+			"flags":      iface.Flags.String(),
+		})
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(result)
+}
+
+func getCurrentWifiNetwork() (string, error) {
+	cmd := exec.Command("iwgetid", "wlan0", "-r")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
+func (api *ManagementAPI) GetCurrentWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	// Get the current Wi-Fi network
+	log.Println("Getting current Wi-Fi network")
+	currentNetwork, err := getCurrentWifiNetwork()
+	if err != nil {
+		log.Printf("Error getting current Wi-Fi network: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to get current Wi-Fi network\n")
+		return
+	}
+	log.Printf("Current Wi-Fi network: %s", currentNetwork)
+
+	// Send the current network as a JSON response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"SSID": currentNetwork})
+}
+
+func (api *ManagementAPI) ConnectToWifi(w http.ResponseWriter, r *http.Request) {
+	// Parse request for SSID and password
+	var wifiDetails struct {
+		SSID     string `json:"ssid"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&wifiDetails); err != nil {
+		log.Printf("Error decoding request: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, "invalid request body\n")
+		return
+	}
+
+	// Execute the command to connect to the Wi-Fi network
+	log.Printf("Connecting to Wi-Fi network: %s", wifiDetails.SSID)
+	cmd := exec.Command("nmcli", "dev", "wifi", "connect", wifiDetails.SSID, "password", wifiDetails.Password)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("Error connecting to Wi-Fi network: %v, output: %s", err, string(output))
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to connect to Wi-Fi network\n")
+		return
+	}
+
+	// Send a success response
+	log.Printf("Connected to Wi-Fi network: %s", wifiDetails.SSID)
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, "connected to Wi-Fi network\n")
+}
+
+func (api *ManagementAPI) GetWifiNetworks(w http.ResponseWriter, r *http.Request) {
+	// Execute the command to scan for Wi-Fi networks
+	log.Println("Scanning for Wi-Fi networks")
+	cmd := exec.Command("iwlist", "wlan0", "scan")
+	output, err := cmd.Output()
+	if err != nil {
+		log.Printf("Error scanning for Wi-Fi networks: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to scan for Wi-Fi networks\n")
+		return
+	}
+
+	// Parse the output to extract network information
+	networks := parseWiFiScanOutput(string(output))
+	if err != nil {
+		log.Printf("Error parsing Wi-Fi scan output: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to parse Wi-Fi scan output\n")
+		return
+	}
+	log.Printf("Found %d Wi-Fi networks", len(networks))
+
+	// Send the list of networks as a JSON response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(networks)
+}
+
+func parseWiFiScanOutput(output string) []map[string]string {
+	var networks []map[string]string
+	var currentNetwork map[string]string
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "Cell") {
+			if currentNetwork != nil {
+				networks = append(networks, currentNetwork)
+			}
+			currentNetwork = make(map[string]string)
+		} else if strings.Contains(line, "ESSID:") {
+			ssid := strings.Split(line, "\"")[1]
+			currentNetwork["SSID"] = ssid
+		} else if strings.Contains(line, "Quality=") {
+			quality := regexp.MustCompile("Quality=([0-9]+/[0-9]+)").FindStringSubmatch(line)[1]
+			signalLevel := regexp.MustCompile("Signal level=(-?[0-9]+ dBm)").FindStringSubmatch(line)[1]
+			currentNetwork["Quality"] = quality
+			currentNetwork["Signal Level"] = signalLevel
+		} else if strings.Contains(line, "Encryption key:on") {
+			currentNetwork["Security"] = "On"
+		} else if strings.Contains(line, "IE: IEEE 802.11i/WPA2") {
+			currentNetwork["Security"] = "WPA2"
+		} else if strings.Contains(line, "IE: WPA Version 1") {
+			currentNetwork["Security"] = "WPA"
+		} else if strings.Contains(line, "IE: Unknown") && currentNetwork["Security"] == "" {
+			// Default to 'Unknown' if no other security information is found
+			currentNetwork["Security"] = "Unknown"
+		}
+	}
+
+	// Append the last network if not empty
+	if currentNetwork != nil {
+		networks = append(networks, currentNetwork)
+	}
+
+	return networks
+}
+
+func getLastKey(m map[string]string) string {
+	var lastKey string
+	for k := range m {
+		lastKey = k
+	}
+	return lastKey
 }
 
 func streamOutput(pipe io.ReadCloser) {
