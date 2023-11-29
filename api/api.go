@@ -96,14 +96,14 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 		Groupname  string `json:"groupname"`
 		Devicename string `json:"devicename"`
 		DeviceID   int    `json:"deviceID"`
-		//Type       string `json:"type"`	// TOOD Removed to avoid sidekick issues for now.
+		Type       string `json:"type"`
 	}
 	info := deviceInfo{
 		ServerURL:  device.Server,
 		Groupname:  device.Group,
 		Devicename: device.Name,
 		DeviceID:   device.ID,
-		//Type:       getDeviceType(),	// TODO Removed to avoid sidekick issues for now.
+		Type:       getDeviceType(),
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(info)
