@@ -18,7 +18,10 @@ require (
 	golang.org/x/net v0.0.0-20211118161319-6a13c67c3ce4
 )
 
-require github.com/TheCacophonyProject/trap-controller v0.0.0-20230227002937-262a1adfaa47
+require (
+	github.com/TheCacophonyProject/trap-controller v0.0.0-20230227002937-262a1adfaa47
+	golang.org/x/text v0.3.7
+)
 
 require (
 	github.com/TheCacophonyProject/event-reporter/v3 v3.3.0 // indirect
@@ -41,7 +44,6 @@ require (
 	github.com/spf13/viper v1.9.0 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	golang.org/x/sys v0.0.0-20211117180635-dee7805ff2e1 // indirect
-	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/ini.v1 v1.64.0 // indirect
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
