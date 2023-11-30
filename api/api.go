@@ -41,6 +41,8 @@ import (
 	saltrequester "github.com/TheCacophonyProject/salt-updater"
 	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/TheCacophonyProject/event-reporter/eventclient"
 	"github.com/TheCacophonyProject/trap-controller/trapdbusclient"
@@ -285,29 +287,29 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	configDefaults := map[string]interface{}{
-		goconfig.AudioKey:            goconfig.DefaultAudio(),
-		goconfig.GPIOKey:             goconfig.DefaultGPIO(),
-		goconfig.LeptonKey:           goconfig.DefaultLepton(),
-		goconfig.ModemdKey:           goconfig.DefaultModemd(),
-		goconfig.PortsKey:            goconfig.DefaultPorts(),
-		goconfig.TestHostsKey:        goconfig.DefaultTestHosts(),
-		goconfig.ThermalMotionKey:    goconfig.DefaultThermalMotion(lepton3.Model35), //TODO don't assume that model 3.5 is being used
-		goconfig.ThermalRecorderKey:  goconfig.DefaultThermalRecorder(),
-		goconfig.ThermalThrottlerKey: goconfig.DefaultThermalThrottler(),
-		goconfig.WindowsKey:          goconfig.DefaultWindows(),
+		toCamelCase(goconfig.AudioKey):            goconfig.DefaultAudio(),
+		toCamelCase(goconfig.GPIOKey):             goconfig.DefaultGPIO(),
+		toCamelCase(goconfig.LeptonKey):           goconfig.DefaultLepton(),
+		toCamelCase(goconfig.ModemdKey):           goconfig.DefaultModemd(),
+		toCamelCase(goconfig.PortsKey):            goconfig.DefaultPorts(),
+		toCamelCase(goconfig.TestHostsKey):        goconfig.DefaultTestHosts(),
+		toCamelCase(goconfig.ThermalMotionKey):    goconfig.DefaultThermalMotion(lepton3.Model35), //TODO don't assume that model 3.5 is being used
+		toCamelCase(goconfig.ThermalRecorderKey):  goconfig.DefaultThermalRecorder(),
+		toCamelCase(goconfig.ThermalThrottlerKey): goconfig.DefaultThermalThrottler(),
+		toCamelCase(goconfig.WindowsKey):          goconfig.DefaultWindows(),
 	}
 
 	configValues := map[string]interface{}{
-		goconfig.AudioKey:            &goconfig.Audio{},
-		goconfig.GPIOKey:             &goconfig.GPIO{},
-		goconfig.LeptonKey:           &goconfig.Lepton{},
-		goconfig.ModemdKey:           &goconfig.Modemd{},
-		goconfig.PortsKey:            &goconfig.Ports{},
-		goconfig.TestHostsKey:        &goconfig.TestHosts{},
-		goconfig.ThermalMotionKey:    &goconfig.ThermalMotion{},
-		goconfig.ThermalRecorderKey:  &goconfig.ThermalRecorder{},
-		goconfig.ThermalThrottlerKey: &goconfig.ThermalThrottler{},
-		goconfig.WindowsKey:          &goconfig.Windows{},
+		toCamelCase(goconfig.AudioKey):            &goconfig.Audio{},
+		toCamelCase(goconfig.GPIOKey):             &goconfig.GPIO{},
+		toCamelCase(goconfig.LeptonKey):           &goconfig.Lepton{},
+		toCamelCase(goconfig.ModemdKey):           &goconfig.Modemd{},
+		toCamelCase(goconfig.PortsKey):            &goconfig.Ports{},
+		toCamelCase(goconfig.TestHostsKey):        &goconfig.TestHosts{},
+		toCamelCase(goconfig.ThermalMotionKey):    &goconfig.ThermalMotion{},
+		toCamelCase(goconfig.ThermalRecorderKey):  &goconfig.ThermalRecorder{},
+		toCamelCase(goconfig.ThermalThrottlerKey): &goconfig.ThermalThrottler{},
+		toCamelCase(goconfig.WindowsKey):          &goconfig.Windows{},
 	}
 
 	for section, sectionStruct := range configValues {
@@ -328,6 +330,17 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(jsonString)
+}
+
+func toCamelCase(s string) string {
+	words := strings.FieldsFunc(s, func(r rune) bool {
+		return r == '-' || r == '_'
+	})
+	c := cases.Title(language.English)
+	for i := 1; i < len(words); i++ {
+		words[i] = c.String(words[i])
+	}
+	return strings.Join(words, "")
 }
 
 // ClearConfigSection will delete the config from a section so the default values will be used.

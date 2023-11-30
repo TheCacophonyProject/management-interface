@@ -56,6 +56,9 @@ function loadConfig() {
       if (response.values.modemd.ConnectionTimeout != 0) {
         $("#input-connection-timeout").val(formatDuration(response.values.modemd.ConnectionTimeout));
       }
+
+      $("#input-run-classifier").prop('checked', response.values.thermalMotion.runClassifier);
+      $("#input-tracking-events").prop('checked', response.values.thermalMotion.trackingEvents);
     } else {
       console.log("error with getting device details");
     }
@@ -153,6 +156,36 @@ function saveModemConfig() {
   formData.append("section", "modemd");
   formData.append("config", JSON.stringify(data));
   xmlHttp.send(formData);
+}
+
+function saveThermalMotionConfig() {
+  var data = {}
+  data["run-classifier"] = $("#input-run-classifier").prop('checked');
+  data["tracking-events"] = $("#input-tracking-events").prop('checked');
+  
+  var formData = new FormData();
+  formData.append("section", "thermal-motion");
+  formData.append("config", JSON.stringify(data));
+
+  fetch('/api/config', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Basic ' + btoa('admin:feathers')
+    },
+    body: formData
+  })
+  .then(response => {
+    if (response.ok) {
+      alert("Thermal motion config saved");
+      loadConfig();
+    } else {
+      configError();
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    configError();
+  });
 }
 
 function configError() {
