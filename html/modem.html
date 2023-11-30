@@ -131,8 +131,16 @@
                 <p id="voltage" class="col-9 monospace"></p>
             </div>
         </div>
+
+        <div class="row">
+            <p class="col-3 text-right">Log name:</p>
+            <input type="text" id="signal-log-name" placeholder="modem test log">
+            <button id="signal-log-button" onclick=startLogging() class="btn btn-primary">Start Logging</button>
+        </div>
+        <div class="row">
+            <button onclick=turnModemOn() class="btn btn-primary">Turn Modem On</button>
+        </div>
     </div>
-    <button onclick=turnModemOn() class="btn btn-primary">Turn Modem On</button>
 
     <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
     <script src="/static/js/bootstrap.min.js"></script>

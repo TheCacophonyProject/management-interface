@@ -7,7 +7,7 @@ window.onload = function () {
 async function getState() {
   try {
     var response = await apiGetJSON("/api/modem");
-    console.log(response);
+    //console.log(response);
 
     $("#timestamp").html(response.timestamp);
     $("#onOffReason").html(response.onOffReason);
@@ -64,4 +64,57 @@ async function turnModemOn() {
   } catch (e) {
     console.log(e);
   }
+}
+
+
+let logData = [];
+
+function startLogging() {
+  $("#signal-log-button").prop('disabled', true);
+  $("#signal-log-button").css('opacity', '0.5');
+  $("#signal-log-button").text("Logging...");
+  const intervalId = setInterval(() => {
+    logSignalData();
+  }, 2000);
+
+  setTimeout(() => {
+    clearInterval(intervalId);
+    createCSVDownload();
+  }, 60000);
+}
+
+async function logSignalData() {
+  try {
+    const response = await apiGetJSON("/api/modem");
+    if (response && response.signal) {
+      logData.push({
+        timestamp: new Date().toISOString(),
+        band: response.signal.band,
+        strength: response.signal.strength
+      });
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function createCSVDownload() {
+  let csvContent = "data:text/csv;charset=utf-8,";
+  csvContent += "Timestamp,Band,Strength\r\n";
+
+  logData.forEach(row => {
+    let rowString = `${row.timestamp},${row.band},${row.strength}\r\n`;
+    csvContent += rowString;
+  });
+
+  var encodedUri = encodeURI(csvContent);
+  var link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", $("#signal-log-name").val());
+  document.body.appendChild(link); // Required for FF
+
+  link.click(); // This will download the file
+  $("#signal-log-button").prop('disabled', false);
+  $("#signal-log-button").css('opacity', '1');
+  $("#signal-log-button").text("Start Logging");
 }
