@@ -431,14 +431,16 @@ func restartNetwork() error {
 // addWPANetwork adds a new wpa network in the wpa_supplication configuration
 // with specified ssid and password (if it doesn't already exist)
 func addWPANetwork(ssid string, password string) error {
+	log.Printf("Adding network '%s' with password '%s'", ssid, password)
 	if ssid == "" {
 		return errors.New("SSID must have a value")
 	} else if strings.ToLower(ssid) == "bushnet" {
 		return errors.New("SSID cannot be bushnet")
 	}
-	if err := restartNetwork(); err != nil {
-		return err
-	}
+	// TODO Are we wanting to restart the network after adding a new network?
+	//if err := restartNetwork(); err != nil {
+	//	return err
+	//}
 
 	networkExists, err := doesWPANetworkExist(ssid)
 	if err != nil {

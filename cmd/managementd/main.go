@@ -155,7 +155,7 @@ func main() {
 	apiRouter.Use(basicAuth)
 
 	go func() {
-		if err := initilseHotspot(); err != nil {
+		if err := initialiseHotspot(); err != nil {
 			if err := stopHotspot(); err != nil {
 				log.Println("Failed to stop hotspot:", err)
 			}

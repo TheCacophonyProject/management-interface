@@ -14,8 +14,8 @@ update_config=1
 country=NZ
 
 network={
-    ssid="bushnet"
-    psk="feathers"
+    ssid=\"$SSID\"
+    psk=\"$PASSWORD\"
 }
 " > $TEMP_WPA_SUPPLICANT_CONF
 
@@ -47,7 +47,7 @@ done
 sudo systemctl start $HOSTAPD_SERVICE
 
 # Remove the temporary config
-sudo rm $TEMP_WPA_SUPPLICANT_CONF
+#sudo rm $TEMP_WPA_SUPPLICANT_CONF
 
 # Exit with connection status
 exit $CONNECTION_STATUS
