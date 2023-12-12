@@ -155,24 +155,43 @@ func main() {
 	apiRouter.Use(basicAuth)
 
 	go func() {
-		if err := initialiseHotspot(); err != nil {
-			if err := stopHotspot(); err != nil {
-				log.Println("Failed to stop hotspot:", err)
-			}
-			log.Println("Failed to initialise hotspot:", err)
-		} else {
-			t := time.NewTimer(5 * time.Minute)
-			apiRouter.Use(func(next http.Handler) http.Handler {
-				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					t.Reset(5 * time.Minute)
-					next.ServeHTTP(w, r)
-				})
-			})
+		log.Println("Setting up wifi.")
+		if err := setupWifi(); err != nil {
+			log.Println("Failed to setup wifi:", err)
+			return
+		}
 
-			<-t.C
-			if err := stopHotspot(); err != nil {
-				log.Println("Failed to stop hotspot:", err)
-			}
+		log.Println("Checking if device is connected to a network.")
+		connected, err := waitAndCheckIfConnectedToNetwork()
+		if err != nil {
+			log.Println("Error checking if device connected to network:", err)
+			return
+		}
+		if connected {
+			log.Println("Connected to network. Not starting up hotspot.")
+			return
+		}
+
+		// Setup timer that will stop the hotspot if not used for 5 minutes.
+		//t := time.NewTimer(5 * time.Minute)
+		t := time.NewTimer(1 * time.Minute)
+		apiRouter.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				//t.Reset(5 * time.Minute)
+				t.Reset(1 * time.Minute)
+				next.ServeHTTP(w, r)
+			})
+		})
+
+		log.Println("Starting hotspot")
+		if err := setupHotspot(); err != nil {
+			log.Println("Failed to setup hotspot:", err)
+			return
+		}
+		<-t.C
+		log.Println("No API usage for 5 minutes, stopping hotspot.")
+		if err := setupWifi(); err != nil {
+			log.Println("Failed to stop hotspot:", err)
 		}
 	}()
 

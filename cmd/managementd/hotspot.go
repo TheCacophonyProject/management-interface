@@ -27,15 +27,7 @@ func createAPConfig(name string) error {
 		"wpa_pairwise=TKIP",
 		"rsn_pairwise=CCMP",
 	}
-	return creatConfigFile(file_name, config_lines)
-}
-
-func startAccessPoint(name string) error {
-	return exec.Command("systemctl", "restart", "hostapd").Start()
-}
-
-func stopAccessPoint() error {
-	return exec.Command("systemctl", "stop", "hostapd").Start()
+	return createConfigFile(file_name, config_lines)
 }
 
 const router_ip = "192.168.4.1"
@@ -112,7 +104,6 @@ func checkIsConnectedToNetwork() (bool, error) {
 	ssid := ""
 	ipAddress := ""
 	stateCompleted := false
-	// Parse the output
 	scanner := bufio.NewScanner(strings.NewReader(string(output)))
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -126,6 +117,8 @@ func checkIsConnectedToNetwork() (bool, error) {
 			stateCompleted = true
 		}
 	}
+	// When connecting to a network with the wrong password and wpa_state can be 'COMPLETED',
+	// so to check that it has the correct password we also check for an ip address.
 	if stateCompleted && ssid != "" && ipAddress != "" {
 		log.Printf("Connected to '%s' with address '%s'", ssid, ipAddress)
 		return true, nil
@@ -186,7 +179,7 @@ uuid=50431fd7-93e8-5d27-a41d-0ab834fb4511
 */
 // waitAndCheckIfConnectedToNetwork will return true if a network is connected to within 10 seconds
 func waitAndCheckIfConnectedToNetwork() (bool, error) {
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 30; i++ {
 		connected, err := checkIsConnectedToNetwork()
 		if err != nil {
 			return false, err
@@ -207,19 +200,10 @@ func createDNSConfig(router_ip string, ip_range string) error {
 		"dhcp-range=" + ip_range + ",12h",
 		"domain=wlan",
 	}
-	return creatConfigFile(file_name, config_lines)
-
+	return createConfigFile(file_name, config_lines)
 }
 
-func startDNS() error {
-	return exec.Command("systemctl", "restart", "dnsmasq").Start()
-}
-
-func stopDNS() error {
-	return exec.Command("systemctl", "stop", "dnsmasq").Start()
-}
-
-func creatConfigFile(name string, config []string) error {
+func createConfigFile(name string, config []string) error {
 	file, err := os.Create(name)
 	if err != nil {
 		return err
@@ -244,7 +228,7 @@ func creatConfigFile(name string, config []string) error {
 func initialiseHotspot() error {
 	log.Println("Initialising Hotspot, first checking if device is connected to a wifi network.")
 	log.Printf("Setting up DHCP config for connecting to wifi networks.")
-	if err := setDHCPMode(dhcpModeWifi); err != nil {
+	if err := setupWifi(); err != nil {
 		return err
 	}
 
@@ -256,11 +240,16 @@ func initialiseHotspot() error {
 	if connected {
 		return fmt.Errorf("already connected to a network")
 	}
-
 	log.Println("Not connected to a network, starting up hotspot.")
-	ssid := "bushnet"
+	return setupHotspot()
+}
+
+func setupHotspot() error {
+	log.Println("Setting up network for hosting a hotspot.")
+
+	hotspotSSID := "bushnet"
 	log.Printf("Creating AP config...")
-	if err := createAPConfig(ssid); err != nil {
+	if err := createAPConfig(hotspotSSID); err != nil {
 		return err
 	}
 	log.Printf("Creating DNS config...")
@@ -273,25 +262,63 @@ func initialiseHotspot() error {
 		return err
 	}
 	log.Printf("Starting DNS...")
-	if err := startDNS(); err != nil {
+	if err := run("systemctl", "restart", "dnsmasq"); err != nil {
 		return err
 	}
 	log.Printf("Starting Access Point...")
-	if err := startAccessPoint(ssid); err != nil {
+	if err := run("systemctl", "restart", "hostapd"); err != nil {
 		return err
 	}
 	return nil
 }
 
-func stopHotspot() error {
-	log.Printf("Stopping Hotspot")
-	if err := stopAccessPoint(); err != nil {
-		return err
+func run(args ...string) error {
+	out, err := exec.Command(args[0], args[1:]...).CombinedOutput()
+	if err != nil {
+		argsStr := strings.TrimSpace(strings.Join(args, " "))
+		outStr := strings.TrimSpace(string(out))
+		return fmt.Errorf("error running '%s', output: '%s', error: '%s'", argsStr, outStr, err)
 	}
-	if err := stopDNS(); err != nil {
-		return err
-	}
+	return nil
+}
+
+// setupWifi will set up the wifi network settings for connecting to wifi networks.
+// This includes stopping the hotspot.
+func setupWifi() error {
+	log.Println("Setting up network for connecting to Wifi networks.")
+	log.Println("Setting up DHCP config for connecting to wifi networks.")
 	if err := setDHCPMode(dhcpModeWifi); err != nil {
+		return err
+	}
+	log.Println("Stopping Hotspot")
+	if err := run("systemctl", "stop", "hostapd"); err != nil {
+		return err
+	}
+	log.Println("Stopping dnsmasq")
+	if err := run("systemctl", "stop", "dnsmasq"); err != nil {
+		return err
+	}
+
+	// Check if network needs restarting.
+
+	log.Println("Restart networking") // This slows down the process, //TODO Find a safe way to not do this.
+
+	// Only needs to be run when the hotspot restarts
+	// TODO run `rm /var/run/wpa_supplicant/wlan0` if needing to restart network.
+	/*
+		if err := run("systemctl", "restart", "networking"); err != nil {
+			_ = run("rm", "/var/run/wpa_supplicant/wlan0")
+			if err := run("systemctl", "restart", "networking"); err != nil {
+				return err
+			}
+		}
+	*/
+	log.Println("Restart WPA Supplicant")
+	if err := run("systemctl", "restart", "wpa_supplicant"); err != nil {
+		return err
+	}
+	log.Println("Re-enable wlan0")
+	if err := run("ip", "link", "set", "wlan0", "up"); err != nil {
 		return err
 	}
 	return nil
@@ -314,16 +341,19 @@ var dhcp_config_default = []string{
 	"option interface_mtu",
 	"require dhcp_server_identifier",
 	"slaac private",
-	"interface usb0",
-	"metric 300",
-	"interface wlan0",
-	"metric 200",
+	// TODO Add these lines when in wifi mode only, or maybe with the dhcpcd fix this won't be an issue anymore.
+	// "interface usb0",
+	// "metric 300",
+	// "interface wlan0",
+	// "metric 200",
 }
 
 var dhcp_config_hotspot_extra_lines = []string{
 	"interface wlan0",
 	"static ip_address=" + router_ip + "/24",
 	"nohook wpa_supplicant",
+	"nohook lookup-hostname, waitip, waitipv6 wlan0",
+	"nohook lookup-hostname, waitip, waitipv6 eth0",
 }
 
 func setDHCPMode(mode dhcpMode) error {
@@ -346,7 +376,7 @@ func setDHCPMode(mode dhcpMode) error {
 		newContent := strings.Join(config, "\n") + "\n"
 		if string(currentContent) == newContent {
 			// Config has not changed, ensure DHCP is running.
-			return exec.Command("systemctl", "start", "dhcpcd").Run()
+			return run("systemctl", "start", "dhcpcd")
 		}
 	}
 
@@ -365,5 +395,12 @@ func setDHCPMode(mode dhcpMode) error {
 	}
 
 	// Restart DHCP
-	return exec.Command("systemctl", "restart", "dhcpcd").Run()
+	log.Println("Restarting dhcpcd")
+
+	// TODO Sometimes dhcpcd takes a wile to restart, running these can help.
+	// ip link set wlan0 down
+	// ip link set eth0 down
+	// ip link set wlan0 up
+	// ip link set eth0 up
+	return run("systemctl", "restart", "dhcpcd")
 }
