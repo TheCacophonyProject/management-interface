@@ -7,7 +7,7 @@ ssh-add "$ssh_key_location"
 
 # Discover Raspberry Pi services on the network
 echo "Discovering Raspberry Pis with service _cacophonator-management._tcp..."
-readarray -t services < <(avahi-browse -t -r _cacophonator-management._tcp | grep 'address' | awk '{print $3}' | tr -d '[]')
+readarray -t services < <(avahi-browse -t -r _cacophonator-management._tcp | grep 'hostname' | awk '{print $3}' | sed 's/\[//' | sed 's/\]//' | sed 's/\.$/.local/')
 
 if [ ${#services[@]} -eq 0 ]; then
 	echo "No Raspberry Pi services found on the network."
@@ -76,9 +76,9 @@ while true; do
 	echo "Streaming logs from managementd.service... (press Ctrl+C to stop)"
 	"${log_command[@]}"
 
-	echo "Deployment completed. Press Enter to redeploy or any other key to exit."
-	read -r -n 1 key
-	if [ "$key" != '' ]; then
+	echo "Deployment completed. Press any key to deploy again or Ctrl+C to exit."
+	read -n 1 -s
+	if [ $? -ne 0 ]; then
 		break
 	fi
 	echo # new line for readability

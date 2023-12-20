@@ -54,7 +54,6 @@ var tmpl *template.Template
 // This does some initialisation.  It parses our html templates up front and
 // finds the location where this executable was started.
 func init() {
-
 	// The name of the device we are running this executable on.
 	deviceName := getDeviceName()
 	tmpl = template.New("")
@@ -85,7 +84,6 @@ func getDeviceName() string {
 
 // Return the serial number for the Raspberr Pi in the device.
 func getRaspberryPiSerialNumber() string {
-
 	if runtime.GOOS == "windows" {
 		return ""
 	}
@@ -166,7 +164,6 @@ func getDiskSpace() (string, error) {
 		return err.Error(), err
 	}
 	return string(out), nil
-
 }
 
 // Return info on memory e.g. memory used, memory available etc.
@@ -190,7 +187,6 @@ func getMemoryStats() (string, error) {
 
 // DiskMemoryHandler shows disk space usage and memory usage
 func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
-
 	diskData, err := getDiskSpace()
 	if err != nil {
 		log.Fatal(err)
@@ -237,12 +233,13 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 		NumMemoryRows  int
 		MemoryDataRows [][]string
 	}
-	outputStruct := table{NumDiskRows: len(outputStrings), DiskDataRows: outputStrings,
-		NumMemoryRows: len(outputStrings2), MemoryDataRows: outputStrings2}
+	outputStruct := table{
+		NumDiskRows: len(outputStrings), DiskDataRows: outputStrings,
+		NumMemoryRows: len(outputStrings2), MemoryDataRows: outputStrings2,
+	}
 
 	// Execute the actual template.
 	tmpl.ExecuteTemplate(w, "disk-memory.html", outputStruct)
-
 }
 
 // IndexHandler is the root handler.
@@ -257,7 +254,6 @@ func AdvancedMenuHandler(w http.ResponseWriter, r *http.Request) {
 
 // Get the IP address for a given interface.  There can be 0, 1 or 2 (e.g. IPv4 and IPv6)
 func getIPAddresses(iface net.Interface) []string {
-
 	var IPAddresses []string
 
 	addrs, err := iface.Addrs()
@@ -273,7 +269,6 @@ func getIPAddresses(iface net.Interface) []string {
 
 // NetworkHandler - Show the status of each network interface
 func NetworkHandler(w http.ResponseWriter, r *http.Request) {
-
 	// Type used in serving interface information.
 	type interfaceProperties struct {
 		Name        string
@@ -312,7 +307,8 @@ func NetworkHandler(w http.ResponseWriter, r *http.Request) {
 		Interfaces:       interfaces,
 		Config:           *config,
 		ErrorEncountered: err != nil,
-		ErrorMessage:     errorMessage}
+		ErrorMessage:     errorMessage,
+	}
 
 	// Need to respond to individual requests to test if a network status is up or down.
 	tmpl.ExecuteTemplate(w, "network.html", state)
@@ -327,32 +323,36 @@ func getNetworkSSID(networkID string) (string, error) {
 
 	stdOut := string(out)
 	scanner := bufio.NewScanner(strings.NewReader(stdOut))
-	scanner.Scan() //skip 1st line interface line
+	scanner.Scan() // skip 1st line interface line
 	scanner.Scan()
 	ssid := scanner.Text()
 	return ssid, err
-
 }
 
 // deleteNetwork removes the network from the wpa_supplicant configuration with specified id.
 func deleteNetwork(id string) error {
-	//check if is bushnet
+	// check if is bushnet
 	ssid, err := getNetworkSSID(id)
 	if err != nil {
 		return err
 	}
+	return DeleteNetworkBySSID(ssid)
+}
+
+func DeleteNetworkBySSID(ssid string) error {
+	// check if is bushnet
 	if strings.ToLower(ssid) == "\"bushnet\"" {
 		return errors.New("error bushnet cannot be deleted")
 	}
 
-	//remove network
+	// remove network
 	cmd := exec.Command("wpa_cli")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("error getting stdin pipe from cmd -error %s", err)
 	}
 	defer stdin.Close()
-	io.WriteString(stdin, fmt.Sprintf("remove_network %s\n", id))
+	io.WriteString(stdin, fmt.Sprintf("remove_network %s\n", ssid))
 	io.WriteString(stdin, "quit\n")
 
 	out, err := cmd.CombinedOutput()
@@ -366,13 +366,16 @@ func deleteNetwork(id string) error {
 		return err
 	}
 
-	//save and reload config
+	// save and reload config
 	err = saveWPAConfig()
-	reloadErr := reloadWPAConfig()
-	if err == nil { //probably wont happen
-		err = reloadErr
+	if err != nil {
+		return err
 	}
-	return err
+	err = reloadWPAConfig()
+	if err != nil { // probably wont happen
+		return err
+	}
+	return nil
 }
 
 // doesWpaNetworkExist checks for a network with the specified ssid in the wpa_supplicant configuration.
@@ -460,7 +463,7 @@ func addWPANetwork(ssid string, password string) error {
 
 	err = saveWPAConfig()
 	reloadErr := reloadWPAConfig()
-	if err == nil { //probably wont happen
+	if err == nil { // probably wont happen
 		err = reloadErr
 	}
 	return err
@@ -469,16 +472,16 @@ func addWPANetwork(ssid string, password string) error {
 // addNewNetwork adds a new network in the wpa_supplication configuration and returns the new network id
 func addNewNetwork() (int, error) {
 	out, err := exec.Command("wpa_cli", "add_network").Output()
-	var networkID = -1
+	networkID := -1
 
 	if err != nil {
 		return networkID, fmt.Errorf("error executing wpa_cli add_network - error %s output %s", err, out)
 	}
 	stdOut := string(out)
 
-	//get the networkid of the new networks from stdOut
+	// get the networkid of the new networks from stdOut
 	scanner := bufio.NewScanner(strings.NewReader(stdOut))
-	scanner.Scan() //skip interface line
+	scanner.Scan() // skip interface line
 	if scanner.Scan() {
 		line := scanner.Text()
 		networkID, err = strconv.Atoi(line)
@@ -584,7 +587,7 @@ func parseWPASupplicantConfig() ([]wifiNetwork, error) {
 	}
 	networkList := string(out)
 	scanner := bufio.NewScanner(strings.NewReader(networkList))
-	scanner.Scan() //skip interface listing
+	scanner.Scan() // skip interface listing
 	for scanner.Scan() {
 		line := scanner.Text()
 		parts := strings.Split(line, "\t")
@@ -606,7 +609,6 @@ func parseWPASupplicantConfig() ([]wifiNetwork, error) {
 
 // WifiNetworkHandler show the wireless networks listed in the wpa_supplicant configuration
 func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
-
 	type wifiProperties struct {
 		AvailableNetworks []string
 		Networks          []wifiNetwork
@@ -647,19 +649,16 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 
 // Return info on the packages that are currently installed on the device.
 func getInstalledPackages() (string, error) {
-
 	if runtime.GOOS == "windows" {
 		return "", nil
 	}
 
 	out, err := exec.Command("/usr/bin/dpkg-query", "--show", "--showformat", "${Package}|${Version}|${Maintainer}\n").Output()
-
 	if err != nil {
 		return "", err
 	}
 
 	return string(out), nil
-
 }
 
 // AboutHandlerGen is a wrapper for the AboutHandler function.
@@ -671,7 +670,6 @@ func AboutHandlerGen(conf *goconfig.Config) func(http.ResponseWriter, *http.Requ
 
 // AboutHandler shows the currently installed packages on the device.
 func AboutHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config) {
-
 	type aboutResponse struct {
 		RaspberryPiSerialNumber string
 		SaltMinionID            string
@@ -821,7 +819,7 @@ type schedule struct {
 }
 
 type combo struct {
-	Every     int //Minutes
+	Every     int // Minutes
 	From      string
 	Until     string
 	SoundInfo []soundInfo

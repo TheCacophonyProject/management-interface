@@ -1,7 +1,8 @@
-package main
+package api
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"log"
 	"net"
@@ -28,7 +29,7 @@ func createAPConfig(name string) error {
 		"wpa_pairwise=TKIP",
 		"rsn_pairwise=CCMP",
 	}
-	return creatConfigFile(file_name, config_lines)
+	return createConfigFile(file_name, config_lines)
 }
 
 func isInterfaceUp(interfaceName string) bool {
@@ -170,7 +171,7 @@ func checkIsConnectedToNetwork() (string, error) {
 func checkIsConnectedToNetworkWithRetries() (string, error) {
 	var err error
 	var ssid string
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 3; i++ {
 		ssid, err = checkIsConnectedToNetwork()
 		if ssid != "" {
 			return ssid, nil
@@ -188,7 +189,7 @@ func createDNSConfig(ip_range string) error {
 		"dhcp-range=" + ip_range + ",12h",
 		"domain=wlan",
 	}
-	return creatConfigFile(file_name, config_lines)
+	return createConfigFile(file_name, config_lines)
 }
 
 func startDNS() error {
@@ -199,7 +200,7 @@ func stopDNS() error {
 	return exec.Command("systemctl", "stop", "dnsmasq").Start()
 }
 
-func creatConfigFile(name string, config []string) error {
+func createConfigFile(name string, config []string) error {
 	file, err := os.Create(name)
 	if err != nil {
 		return err
@@ -243,39 +244,36 @@ func initilseHotspot() error {
 	// Check if already connected to a network
 	// If not connected to a network, start hotspot
 	log.Printf("Checking if connected to network...")
-	if network, err := checkIsConnectedToNetworkWithRetries(); err != nil {
+	if network, err := checkIsConnectedToNetwork(); err == nil {
 		// Check if the hotspot is already running
-		if isHotspotRunning() {
-			return fmt.Errorf("hotspot is already running")
-		}
-		log.Printf("Starting Hotspot...")
-		log.Printf("Creating Configs...")
-		if err := createAPConfig(ssid); err != nil {
-			return err
-		}
-		if err := createDNSConfig("192.168.4.2,192.168.4.20"); err != nil {
-			return err
-		}
-
-		log.Printf("Starting Access Point...")
-		if err := startAccessPoint(ssid); err != nil {
-			return err
-		}
-		log.Printf("Starting DHCP...")
-		if err := startDHCP(); err != nil {
-			return err
-		}
-		log.Printf("Starting DNS...")
-		if err := startDNS(); err != nil {
-			return err
-		}
-		return nil
-	} else {
 		return fmt.Errorf("already connected to a network: %s", network)
 	}
+	log.Printf("Starting Hotspot...")
+	log.Printf("Creating Configs...")
+	if err := createAPConfig(ssid); err != nil {
+		return err
+	}
+	if err := createDNSConfig("192.168.4.2,192.168.4.20"); err != nil {
+		return err
+	}
+
+	log.Printf("Starting Access Point...")
+	if err := startAccessPoint(ssid); err != nil {
+		return err
+	}
+	log.Printf("Starting DNS...")
+	if err := startDNS(); err != nil {
+		return err
+	}
+	log.Printf("Starting DHCP...")
+	if err := startDHCP(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func stopHotspot() error {
+	log.Printf("test")
 	log.Printf("Stopping Hotspot")
 	if err := stopAccessPoint(); err != nil {
 		return err
@@ -287,4 +285,33 @@ func stopHotspot() error {
 		return err
 	}
 	return nil
+}
+
+// listConnectedDevices returns a slice of MAC addresses of devices connected to the hotspot
+func listConnectedDevices() ([]string, error) {
+	cmd := exec.Command("iw", "dev", "wlan0", "station", "dump")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	return parseMACAddresses(out.String()), nil
+}
+
+// parseMACAddresses parses the output of 'iw dev wlan0 station dump' to extract MAC addresses
+func parseMACAddresses(output string) []string {
+	var macAddresses []string
+	scanner := bufio.NewScanner(strings.NewReader(output))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "Station") {
+			fields := strings.Fields(line)
+			if len(fields) > 1 {
+				macAddresses = append(macAddresses, fields[1])
+			}
+		}
+	}
+	return macAddresses
 }
