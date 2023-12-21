@@ -77,8 +77,8 @@ github.com/TheCacophonyProject/modemd v0.0.0-20190605010435-ae5b0f2eb760/go.mod 
 github.com/TheCacophonyProject/modemd v0.0.0-20190708011609-1940f5b6677b/go.mod h1:txGgnRinv6H0/jB4n71MpuS+2qtu8tAlntIjY5udXDU=
 github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incompatible h1:0pEn1FoMTgOZR3EkqOTiqd0++jOS/jWlGrbvOHK0/KM=
 github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incompatible/go.mod h1:K1wa07sGXKzV0G9p+4R069mZk4GOpqKW8GU6/k+BrIo=
-github.com/TheCacophonyProject/rpi-net-manager v0.1.0 h1:RLe7KqHWGD0jzgkMu0LTOZEX7NAeetWe2nCF+S1FqrU=
-github.com/TheCacophonyProject/rpi-net-manager v0.1.0/go.mod h1:6Xl1Dp7F8IyvufOv0O5EfoXQjqoA/qNLeoWh3Rv1Y0c=
+github.com/TheCacophonyProject/rpi-net-manager v0.1.1 h1:Ncqw/WGIkKA4Hf8bjjgImy8B+5Mo2SHRMaangYdp7T8=
+github.com/TheCacophonyProject/rpi-net-manager v0.1.1/go.mod h1:6Xl1Dp7F8IyvufOv0O5EfoXQjqoA/qNLeoWh3Rv1Y0c=
 github.com/TheCacophonyProject/rtc-utils v1.2.0 h1:570sPJE/s0b21NrP9VVeSI/gBh/dLK+G5Ne/ZFwkNv0=
 github.com/TheCacophonyProject/rtc-utils v1.2.0/go.mod h1:uV1SIy93TLZrrBcqDczUNFUz2G/Pk6pZNUdTRglmANU=
 github.com/TheCacophonyProject/salt-updater v0.4.0 h1:2RCgdI4wr/ZoeWOvfGlZ/Epgz3GTC+Vc7/wS6EI90c0=

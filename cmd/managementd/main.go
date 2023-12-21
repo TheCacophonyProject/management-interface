@@ -38,7 +38,7 @@ import (
 	"github.com/TheCacophonyProject/go-cptv/cptvframe"
 	managementinterface "github.com/TheCacophonyProject/management-interface"
 	"github.com/TheCacophonyProject/management-interface/api"
-	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
+	"github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
 )
 
 const (
@@ -90,7 +90,7 @@ func main() {
 	go sendFrameToSockets()
 	// UI handlers.
 	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
-	router.HandleFunc("/wifi-networks", managementinterface.WifiNetworkHandler).Methods("GET", "POST")
+	router.HandleFunc("/wifi-networks", managementinterface.WifiNetworkHandler).Methods("GET")
 	router.HandleFunc("/network", managementinterface.NetworkHandler).Methods("GET")
 	router.HandleFunc("/interface-status/{name:[a-zA-Z0-9-* ]+}", managementinterface.CheckInterfaceHandler).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")

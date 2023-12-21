@@ -979,6 +979,10 @@ func (api *ManagementAPI) DeleteWifiNetwork(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if err := netmanagerclient.RemoveWifiNetwork(ssid); err != nil {
+		if _, ok := err.(netmanagerclient.InputError); ok {
+			badRequest(&w, err)
+			return
+		}
 		serverError(&w, err)
 		return
 	}
