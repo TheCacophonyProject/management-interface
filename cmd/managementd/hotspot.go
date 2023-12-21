@@ -10,6 +10,56 @@ import (
 	"time"
 )
 
+type networkState string
+
+const (
+	NS_WIFI          networkState = "WIFI"
+	NS_WIFI_SETUP    networkState = "WIFI_SETUP"
+	NS_HOTSPOT       networkState = "HOTSPOT"
+	NS_HOTSPOT_SETUP networkState = "HOTSPOT_SETUP"
+)
+
+type networkHandler struct {
+	state networkState
+}
+
+func (nh *networkHandler) setState(ns networkState) {
+	if nh.state != ns {
+		log.Printf("State changed from %s to %s", nh.state, ns)
+		nh.state = ns
+	}
+}
+
+func (nh *networkHandler) reconfigureWifi() error {
+
+	if nh.busy() {
+		return fmt.Errorf("busy")
+	}
+	log.Println("Reconfigure wifi network.")
+	if nh.state != NS_WIFI {
+		log.Println("Setting up wifi before reconfiguring.")
+		err := nh.setupWifi()
+		if err != nil {
+			return err
+		}
+	}
+	nh.setState(NS_WIFI_SETUP)
+	if err := run("wpa_cli", "-i", "wlan0", "reconfigure"); err != nil {
+		return err
+	}
+	connected, err := waitAndCheckIfConnectedToNetwork()
+	if err != nil {
+		return err
+	}
+	if !connected {
+		log.Println("Failed to connect to network, starting up hotspot.")
+		return nh.setupHotspot()
+	}
+	log.Println("WIFI connected after reconfigure.")
+	nh.setState(NS_WIFI)
+	return nil
+}
+
 // refactor createAPConfig to remove duplication
 func createAPConfig(name string) error {
 	file_name := "/etc/hostapd/hostapd.conf"
@@ -18,7 +68,7 @@ func createAPConfig(name string) error {
 		"interface=wlan0",
 		"ssid=" + name,
 		"hw_mode=g",
-		"channel=7",
+		"channel=6",
 		"macaddr_acl=0",
 		"ignore_broadcast_ssid=0",
 		"wpa=2",
@@ -32,73 +82,18 @@ func createAPConfig(name string) error {
 
 const router_ip = "192.168.4.1"
 
-/*
-func createDHCPConfig() (bool, error) {
-	file_path := "/etc/dhcpcd.conf"
-
-	// append to dhcpcd.conf if lines don't already exist
-	config_lines := append(dhcp_config_default, dhcp_config_hotspot_extra_lines...)
-	return writeLines(file_path, config_lines)
-}
-
-func writeLines(file_path string, lines []string) (bool, error) {
-
-}
-*/
-
-/*
-func startDHCP() error {
-	// modify /etc/dhcpcd.conf
-	configModified, err := createDHCPConfig()
-	if err != nil {
-		return err
-	}
-	if configModified {
-		return exec.Command("systemctl", "restart", "dhcpcd").Run()
-	}
-	return exec.Command("systemctl", "start", "dhcpcd").Run()
-
-}
-*/
-
-/*
-func setDHCPToDefault() error {
-	// Only restart if config has changed
-	configModified, err := writeLines("/etc/dhcpcd.conf", dhcp_config_default)
-	if err != nil {
-		return err
-	}
-
-	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
-		return err
-	}
-	if configModified {
-		return exec.Command("systemctl", "restart", "dhcpcd").Run()
-	}
-	return exec.Command("systemctl", "start", "dhcpcd").Run()
-}
-*/
-
-/*
-func checkIsConnectedToNetworkOld() (string, bool, error) {
-	if val, err := exec.Command("iwgetid", "wlan0", "-r").Output(); err != nil {
-		return "", false, err
-	} else {
-		network := strings.TrimSpace(string(val))
-		if network == "" {
-			return "", false, fmt.Errorf("not connected to a network")
-		} else {
-			return string(network), true, nil
-		}
-	}
-}
-*/
-
-func checkIsConnectedToNetwork() (bool, error) {
+func checkIsConnectedToNetwork() (bool, string, string, error) {
 	cmd := exec.Command("wpa_cli", "-i", "wlan0", "status")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return false, fmt.Errorf("error executing wpa_cli: %w", err)
+		// TODO this stop the hotspot from running
+		//log.Println("Failed to read wpa_cli status. Restarting networking.")
+		//_ = run("systemctl", "restart", "networking")
+		//cmd := exec.Command("wpa_cli", "-i", "wlan0", "status")
+		//output, err = cmd.CombinedOutput()
+		if err != nil {
+			return false, "", "", fmt.Errorf("error executing wpa_cli: %w", err)
+		}
 	}
 
 	ssid := ""
@@ -121,66 +116,16 @@ func checkIsConnectedToNetwork() (bool, error) {
 	// so to check that it has the correct password we also check for an ip address.
 	if stateCompleted && ssid != "" && ipAddress != "" {
 		log.Printf("Connected to '%s' with address '%s'", ssid, ipAddress)
-		return true, nil
+		return true, ssid, ipAddress, nil
 	} else {
-		return false, nil
+		return false, ssid, ipAddress, nil
 	}
 }
 
-// To check if connected to a network run `wpa_cli -i wlan0 status and check that wpa_state=COMPLETED and that there is a ip_address`
-/*
-var connected = `
-$ wpa_cli -i wlan0 status
-bssid=be:dc:b0:3e:21:f5
-freq=2462
-ssid=bushnet
-id=0
-mode=station
-pairwise_cipher=CCMP
-group_cipher=CCMP
-key_mgmt=WPA2-PSK
-wpa_state=COMPLETED
-ip_address=192.168.50.41
-p2p_device_address=ba:27:eb:c5:25:75
-address=b8:27:eb:c5:25:75
-`
-
-var notConnected = `
-$ wpa_cli -i wlan0 status
-wpa_state=SCANNING
-p2p_device_address=ba:27:eb:c5:25:75
-address=b8:27:eb:c5:25:75
-uuid=50431fd7-93e8-5d27-a41d-0ab834fb4511
-`
-
-var tryingToConnectWithWrongPassword = `
-$ wpa_cli -i wlan0 status
-wpa_state=ASSOCIATING
-p2p_device_address=ba:27:eb:c5:25:75
-address=b8:27:eb:c5:25:75
-uuid=50431fd7-93e8-5d27-a41d-0ab834fb4511
-
-and
-
-$ wpa_cli -i wlan0 status
-bssid=7c:ff:4d:1b:58:3e
-freq=2417
-ssid=bushnet2
-id=2
-mode=station
-pairwise_cipher=CCMP
-group_cipher=CCMP
-key_mgmt=WPA2-PSK
-wpa_state=COMPLETED
-p2p_device_address=ba:27:eb:c5:25:75
-address=b8:27:eb:c5:25:75
-uuid=50431fd7-93e8-5d27-a41d-0ab834fb4511
-`
-*/
 // waitAndCheckIfConnectedToNetwork will return true if a network is connected to within 10 seconds
 func waitAndCheckIfConnectedToNetwork() (bool, error) {
 	for i := 0; i < 30; i++ {
-		connected, err := checkIsConnectedToNetwork()
+		connected, _, _, err := checkIsConnectedToNetwork()
 		if err != nil {
 			return false, err
 		}
@@ -224,6 +169,7 @@ func createConfigFile(name string, config []string) error {
 	return nil
 }
 
+/*
 // Setup Hotspot and stop after 5 minutes using a new goroutine
 func initialiseHotspot() error {
 	log.Println("Initialising Hotspot, first checking if device is connected to a wifi network.")
@@ -243,9 +189,57 @@ func initialiseHotspot() error {
 	log.Println("Not connected to a network, starting up hotspot.")
 	return setupHotspot()
 }
+*/
 
-func setupHotspot() error {
+func (nh *networkHandler) busy() bool {
+	return nh.state == NS_WIFI_SETUP || nh.state == NS_HOTSPOT_SETUP
+}
+
+func (nh *networkHandler) setupWifiWithRollback() error {
+	if nh.busy() {
+		return fmt.Errorf("busy")
+	}
+	if nh.state != NS_WIFI {
+		err := nh.setupWifi()
+		if err != nil {
+			return err
+		}
+	}
+
+	log.Println("WiFi network is up, checking that device can connect to a network.")
+	connected, err := waitAndCheckIfConnectedToNetwork()
+	if err != nil {
+		return err
+	}
+	if !connected {
+		log.Println("Failed to connect to wifi. Starting up hotspot.")
+		return nh.setupHotspot()
+	}
+	return nil
+}
+
+func (nh *networkHandler) setupHotspot() error {
+	if nh.busy() {
+		return fmt.Errorf("busy")
+	}
+	nh.setState(NS_HOTSPOT_SETUP)
 	log.Println("Setting up network for hosting a hotspot.")
+
+	if err := run("wpa_cli", "-i", "wlan0", "disconnect"); err != nil {
+		return err
+	}
+
+	if err := run("systemctl", "stop", "wpa_supplicant"); err != nil {
+		return err
+	}
+
+	if err := run("ip", "addr", "flush", "dev", "wlan0"); err != nil {
+		return err
+	}
+
+	if err := run("ip", "link", "set", "wlan0", "down"); err != nil {
+		return err
+	}
 
 	hotspotSSID := "bushnet"
 	log.Printf("Creating AP config...")
@@ -261,6 +255,11 @@ func setupHotspot() error {
 	if err := setDHCPMode(dhcpModeHotspot); err != nil {
 		return err
 	}
+
+	if err := run("ip", "link", "set", "wlan0", "up"); err != nil {
+		return err
+	}
+
 	log.Printf("Starting DNS...")
 	if err := run("systemctl", "restart", "dnsmasq"); err != nil {
 		return err
@@ -269,6 +268,7 @@ func setupHotspot() error {
 	if err := run("systemctl", "restart", "hostapd"); err != nil {
 		return err
 	}
+	nh.setState(NS_HOTSPOT)
 	return nil
 }
 
@@ -284,7 +284,8 @@ func run(args ...string) error {
 
 // setupWifi will set up the wifi network settings for connecting to wifi networks.
 // This includes stopping the hotspot.
-func setupWifi() error {
+func (nh *networkHandler) setupWifi() error {
+	nh.setState(NS_WIFI_SETUP)
 	log.Println("Setting up network for connecting to Wifi networks.")
 	log.Println("Setting up DHCP config for connecting to wifi networks.")
 	if err := setDHCPMode(dhcpModeWifi); err != nil {
@@ -304,15 +305,18 @@ func setupWifi() error {
 	log.Println("Restart networking") // This slows down the process, //TODO Find a safe way to not do this.
 
 	// Only needs to be run when the hotspot restarts
-	// TODO run `rm /var/run/wpa_supplicant/wlan0` if needing to restart network.
-	/*
+	_, _, ipAddress, err := checkIsConnectedToNetwork()
+	if err != nil || ipAddress == "192.168.4.1" {
+		// Networking needs restarting
+		log.Println("Networking needs restarting.")
 		if err := run("systemctl", "restart", "networking"); err != nil {
 			_ = run("rm", "/var/run/wpa_supplicant/wlan0")
 			if err := run("systemctl", "restart", "networking"); err != nil {
 				return err
 			}
 		}
-	*/
+	}
+
 	log.Println("Restart WPA Supplicant")
 	if err := run("systemctl", "restart", "wpa_supplicant"); err != nil {
 		return err
@@ -321,6 +325,8 @@ func setupWifi() error {
 	if err := run("ip", "link", "set", "wlan0", "up"); err != nil {
 		return err
 	}
+
+	nh.setState(NS_WIFI)
 	return nil
 }
 
@@ -341,6 +347,7 @@ var dhcp_config_default = []string{
 	"option interface_mtu",
 	"require dhcp_server_identifier",
 	"slaac private",
+	"denyinterfaces eth0",
 	// TODO Add these lines when in wifi mode only, or maybe with the dhcpcd fix this won't be an issue anymore.
 	// "interface usb0",
 	// "metric 300",
@@ -357,6 +364,10 @@ var dhcp_config_hotspot_extra_lines = []string{
 }
 
 func setDHCPMode(mode dhcpMode) error {
+	// TODO Have this done instead by having the config file be a symbolic link to either the wifi
+	// or hotspot configuration. Can then check where the symbolic link is pointed to to see if it needs
+	// changed and restarted.
+
 	// Get config from what mode selected.
 	config := []string{}
 	switch mode {
@@ -398,9 +409,14 @@ func setDHCPMode(mode dhcpMode) error {
 	log.Println("Restarting dhcpcd")
 
 	// TODO Sometimes dhcpcd takes a wile to restart, running these can help.
-	// ip link set wlan0 down
-	// ip link set eth0 down
-	// ip link set wlan0 up
-	// ip link set eth0 up
-	return run("systemctl", "restart", "dhcpcd")
+	//_ = run("ip", "link", "set", "wlan0", "down")
+	//_ = run("ip", "link", "set", "eth0", "down")
+	//_ = run("ip", "link", "set", "wlan0", "up")
+	//_ = run("ip", "link", "set", "eth0", "up")
+	log.Println("Rebooting dhcpcd")
+	if err := run("systemctl", "restart", "dhcpcd"); err != nil {
+		return err
+	}
+	log.Println("Done rebooting dhcpcd")
+	return nil
 }

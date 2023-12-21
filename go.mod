@@ -19,6 +19,7 @@ require (
 )
 
 require (
+	github.com/TheCacophonyProject/rpi-net-manager v0.1.0
 	github.com/TheCacophonyProject/trap-controller v0.0.0-20230227002937-262a1adfaa47
 	golang.org/x/text v0.3.7
 )
@@ -30,6 +31,7 @@ require (
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/gobuffalo/envy v1.9.0 // indirect
 	github.com/gobuffalo/packd v1.0.0 // indirect
+	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/joho/godotenv v1.4.0 // indirect

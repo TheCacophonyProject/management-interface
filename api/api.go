@@ -46,6 +46,8 @@ import (
 
 	"github.com/TheCacophonyProject/event-reporter/eventclient"
 	"github.com/TheCacophonyProject/trap-controller/trapdbusclient"
+
+	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
 )
 
 const (
@@ -936,4 +938,92 @@ func getServiceLogs(service string, lines int) ([]string, error) {
 		return logLines[:len(logLines)-1], nil
 	}
 	return logLines, nil
+}
+
+func (api *ManagementAPI) GetWifiNetworks(w http.ResponseWriter, r *http.Request) {
+	networks, err := netmanagerclient.ListSavedWifiNetworks()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(networks)
+}
+
+func (api *ManagementAPI) PostWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	ssid := r.FormValue("ssid")
+	if ssid == "" {
+		badRequest(&w, errors.New("ssid field was empty"))
+		return
+	}
+	psk := r.FormValue("psk")
+	if psk == "" {
+		badRequest(&w, errors.New("psk field was empty"))
+		return
+	}
+	if err := netmanagerclient.AddWifiNetwork(ssid, psk); err != nil {
+		if _, ok := err.(netmanagerclient.InputError); ok {
+			badRequest(&w, err)
+			return
+		}
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *ManagementAPI) DeleteWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	ssid := r.FormValue("ssid")
+	if ssid == "" {
+		badRequest(&w, errors.New("ssid field was empty"))
+		return
+	}
+	if err := netmanagerclient.RemoveWifiNetwork(ssid); err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *ManagementAPI) ScanWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	networks, err := netmanagerclient.ScanWiFiNetworks()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(networks)
+}
+
+func (api *ManagementAPI) EnableWifi(w http.ResponseWriter, r *http.Request) {
+	if err := netmanagerclient.EnableWifi(false); err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *ManagementAPI) EnableHotspot(w http.ResponseWriter, r *http.Request) {
+	go func() {
+		//TODO Wait before enabling hotspot to give time for response
+		time.Sleep(time.Second)
+		if err := netmanagerclient.EnableHotspot(true); err != nil {
+			log.Println(err)
+		}
+	}()
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *ManagementAPI) GetConnectionStatus(w http.ResponseWriter, r *http.Request) {
+	state, err := netmanagerclient.ReadState()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+
+	data := map[string]interface{}{
+		"state": state,
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(data)
 }

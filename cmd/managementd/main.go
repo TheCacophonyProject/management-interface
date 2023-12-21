@@ -38,6 +38,7 @@ import (
 	"github.com/TheCacophonyProject/go-cptv/cptvframe"
 	managementinterface "github.com/TheCacophonyProject/management-interface"
 	"github.com/TheCacophonyProject/management-interface/api"
+	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
 )
 
 const (
@@ -151,49 +152,22 @@ func main() {
 	apiRouter.HandleFunc("/battery", apiObj.GetBattery).Methods("GET")
 	apiRouter.HandleFunc("/test-videos", apiObj.GetTestVideos).Methods("GET")
 	apiRouter.HandleFunc("/play-test-video", apiObj.PlayTestVideo).Methods("POST")
+	apiRouter.HandleFunc("/wifi-networks", apiObj.GetWifiNetworks).Methods("GET")
+	apiRouter.HandleFunc("/wifi-networks", apiObj.PostWifiNetwork).Methods("POST")
+	apiRouter.HandleFunc("/wifi-networks", apiObj.DeleteWifiNetwork).Methods("Delete")
+	apiRouter.HandleFunc("/wifi-network-scan", apiObj.ScanWifiNetwork).Methods("GET")
+	apiRouter.HandleFunc("/enable-wifi", apiObj.EnableWifi).Methods("POST")
+	apiRouter.HandleFunc("/enable-hotspot", apiObj.EnableHotspot).Methods("POST")
+	apiRouter.HandleFunc("/wifi-status", apiObj.GetConnectionStatus).Methods("GET")
 
 	apiRouter.Use(basicAuth)
 
-	go func() {
-		log.Println("Setting up wifi.")
-		if err := setupWifi(); err != nil {
-			log.Println("Failed to setup wifi:", err)
-			return
-		}
-
-		log.Println("Checking if device is connected to a network.")
-		connected, err := waitAndCheckIfConnectedToNetwork()
-		if err != nil {
-			log.Println("Error checking if device connected to network:", err)
-			return
-		}
-		if connected {
-			log.Println("Connected to network. Not starting up hotspot.")
-			return
-		}
-
-		// Setup timer that will stop the hotspot if not used for 5 minutes.
-		//t := time.NewTimer(5 * time.Minute)
-		t := time.NewTimer(1 * time.Minute)
-		apiRouter.Use(func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				//t.Reset(5 * time.Minute)
-				t.Reset(1 * time.Minute)
-				next.ServeHTTP(w, r)
-			})
+	apiRouter.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			netmanagerclient.KeepHotspotOnFor(60 * 5)
+			next.ServeHTTP(w, r)
 		})
-
-		log.Println("Starting hotspot")
-		if err := setupHotspot(); err != nil {
-			log.Println("Failed to setup hotspot:", err)
-			return
-		}
-		<-t.C
-		log.Println("No API usage for 5 minutes, stopping hotspot.")
-		if err := setupWifi(); err != nil {
-			log.Println("Failed to stop hotspot:", err)
-		}
-	}()
+	})
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
