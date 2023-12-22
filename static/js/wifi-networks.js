@@ -18,7 +18,6 @@ function showHidePassword(e) {
 }
 
 function addNetwork() {
-  // Get the SSID and password from the form
   $("#add-network-button").prop('disabled', true);
   $("#add-network-button").css('opacity', '0.5');
   $("#add-network-button").text("Adding Network...");
@@ -37,13 +36,12 @@ function addNetwork() {
   };
 
   // Send POST request to the server
-  fetch('/api/wifi-networks?ssid=' + encodeURIComponent(ssid) + '&psk=' + encodeURIComponent(password), { // Replace with your actual API endpoint
+  fetch('/api/wifi-networks?ssid=' + encodeURIComponent(ssid) + '&psk=' + encodeURIComponent(password), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': 'Basic ' + btoa('admin:feathers') // Update with actual credentials
+      'Authorization': 'Basic ' + btoa('admin:feathers')
     },
-    //body: JSON.stringify(data)
   })
   .then(response => {
     if (!response.ok) {
@@ -65,19 +63,14 @@ function addNetwork() {
 
 
 function removeNetwork(ssid) {
-  console.log("remove network " + ssid);
-
-  // Prepare the request options
-  const requestOptions = {
+  // Send DELETE request to the server
+  fetch('/api/wifi-networks?ssid=' + encodeURIComponent(ssid), {
     method: 'DELETE',
      headers: {
       'Content-Type': 'application/json',
       'Authorization': 'Basic ' + btoa('admin:feathers')
     }
-  };
-
-  // Send DELETE request to the server
-  fetch('/api/wifi-networks?ssid=' + encodeURIComponent(ssid), requestOptions)
+  })
     .then(response => {
       if (!response.ok) {
         console.log(response)
@@ -87,7 +80,6 @@ function removeNetwork(ssid) {
     })
     .then(data => {
       console.log('Network removed:', data);
-      // Refresh the page after a short delay
       setTimeout(function() {
         location.reload();
       }, 500);
