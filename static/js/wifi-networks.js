@@ -19,6 +19,10 @@ function showHidePassword(e) {
 
 function addNetwork() {
   // Get the SSID and password from the form
+  $("#add-network-button").prop('disabled', true);
+  $("#add-network-button").css('opacity', '0.5');
+  $("#add-network-button").text("Adding Network...");
+
   var ssid = document.getElementById('text-ssid').value;
   var ssid = document.getElementById('text-ssid').value;
   if (ssid == "") {
@@ -47,13 +51,16 @@ function addNetwork() {
     }
     return;
   })
-  .then(data => {
-    console.log('Network added:', data);
-    location.reload();
-  })
   .catch(error => {
     console.error('Error adding network:', error);
-  });
+  }).finally(() => {
+    setTimeout(function() {
+      $("#add-network-button").prop('disabled', false);
+      $("#add-network-button").css('opacity', '1');
+      $("#add-network-button").text("Add Network");
+      location.reload();
+    }, 500);
+  })
 }
 
 
@@ -80,8 +87,10 @@ function removeNetwork(ssid) {
     })
     .then(data => {
       console.log('Network removed:', data);
-      // Refresh the page
-      location.reload();
+      // Refresh the page after a short delay
+      setTimeout(function() {
+        location.reload();
+      }, 500);
     })
     .catch(error => {
       console.error('Error removing network:', error);
