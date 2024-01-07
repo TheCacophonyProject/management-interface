@@ -82,20 +82,15 @@ func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string) (*Ma
 func (s *ManagementAPI) StartHotspotTimer() {
 	s.hotspotTimer = time.NewTicker(5 * time.Minute)
 	go func() {
-		for range s.hotspotTimer.C {
-			connectedDevices, err := listConnectedDevices()
-			if err != nil {
-				log.Printf("Error checking connected devices: %v", err)
-				continue
-			}
-			if len(connectedDevices) == 0 {
-				log.Println("No devices connected. Stopping hotspot.")
-				if err := stopHotspot(); err != nil {
-					log.Printf("Failed to stop hotspot: %v", err)
-				}
-				s.StopHotspotTimer()
-				break
-			}
+		s.router.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				s.hotspotTimer.Reset(5 * time.Minute)
+				next.ServeHTTP(w, r)
+			})
+		})
+		<-s.hotspotTimer.C
+		if err := stopHotspot(); err != nil {
+			log.Println("Failed to stop hotspot:", err)
 		}
 	}()
 }
@@ -831,7 +826,6 @@ func (api *ManagementAPI) GetNetworkInterfaces(w http.ResponseWriter, r *http.Re
 func getCurrentWifiNetwork() (string, error) {
 	cmd := exec.Command("iwgetid", "wlan0", "-r")
 	output, err := cmd.Output()
-
 	// Check if the error is due to no network being connected.
 	if err != nil {
 		// The command returns an error when no network is connected.
@@ -877,6 +871,7 @@ func CheckInternetConnection(interfaceName string) (bool, error) {
 	// 5. Internet is reachable
 	return true, nil
 }
+
 func (api *ManagementAPI) CheckModemInternetConnection(w http.ResponseWriter, r *http.Request) {
 	// Check if connected to modem
 	log.Println("Checking modem connection")
@@ -929,8 +924,10 @@ func (api *ManagementAPI) GetCurrentWifiNetwork(w http.ResponseWriter, r *http.R
 	json.NewEncoder(w).Encode(map[string]string{"SSID": currentNetwork})
 }
 
-const connectionCheckTimeout = 30 * time.Second
-const connectionCheckInterval = 5 * time.Second
+const (
+	connectionCheckTimeout  = 30 * time.Second
+	connectionCheckInterval = 5 * time.Second
+)
 
 // waitForWifiConnection checks if the device has connected to the specified SSID
 func (api *ManagementAPI) waitForWifiConnection(ssid string) bool {

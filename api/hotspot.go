@@ -273,7 +273,6 @@ func initilseHotspot() error {
 }
 
 func stopHotspot() error {
-	log.Printf("test")
 	log.Printf("Stopping Hotspot")
 	if err := stopAccessPoint(); err != nil {
 		return err
