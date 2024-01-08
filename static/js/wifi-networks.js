@@ -89,4 +89,20 @@ function removeNetwork(ssid) {
     });
 }
 
+function switchToWifi() {
+  fetch('/api/enable-wifi', {
+    method: 'POST',
+    headers: {'Authorization': 'Basic ' + btoa('admin:feathers')}
+  }).then(response => {
+    if (!response.ok) {
+      console.log(response)
+      throw new Error('Failed to enable wifi');
+    }
+    return
+  })
+  .catch(error => {
+    console.error('Error removing network:', error);
+  });
+}
+
 $('#toggle-password').click(showHidePassword);
