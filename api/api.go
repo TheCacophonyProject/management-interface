@@ -20,11 +20,13 @@ package api
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -48,6 +50,8 @@ import (
 
 	"github.com/TheCacophonyProject/event-reporter/eventclient"
 	"github.com/TheCacophonyProject/trap-controller/trapdbusclient"
+
+	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
 )
 
 const (
@@ -133,14 +137,14 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 
 	type deviceInfo struct {
 		ServerURL  string `json:"serverURL"`
-		Groupname  string `json:"groupname"`
+		GroupName  string `json:"groupname"`
 		Devicename string `json:"devicename"`
 		DeviceID   int    `json:"deviceID"`
 		Type       string `json:"type"`
 	}
 	info := deviceInfo{
 		ServerURL:  device.Server,
-		Groupname:  device.Group,
+		GroupName:  device.Group,
 		Devicename: device.Name,
 		DeviceID:   device.ID,
 		Type:       getDeviceType(),
@@ -826,14 +830,11 @@ func (api *ManagementAPI) GetNetworkInterfaces(w http.ResponseWriter, r *http.Re
 func getCurrentWifiNetwork() (string, error) {
 	cmd := exec.Command("iwgetid", "wlan0", "-r")
 	output, err := cmd.Output()
-	// Check if the error is due to no network being connected.
 	if err != nil {
-		// The command returns an error when no network is connected.
-		// We can check the output - if it's empty, it means no network is connected.
 		if len(output) == 0 {
-			return "", nil // No error, just no network connected.
+			return "", nil
 		}
-		return "", err // Some other error occurred.
+		return "", err
 	}
 
 	return strings.TrimSpace(string(output)), nil
@@ -841,13 +842,10 @@ func getCurrentWifiNetwork() (string, error) {
 
 // CheckInternetConnection checks if a specified network interface has internet access
 func CheckInternetConnection(interfaceName string) (bool, error) {
-	// 1. Get list of network interfaces
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return false, err
 	}
-
-	// 2. Find the specified interface
 	var foundInterface net.Interface
 	for _, iface := range interfaces {
 		if iface.Name == interfaceName {
@@ -855,20 +853,13 @@ func CheckInternetConnection(interfaceName string) (bool, error) {
 			break
 		}
 	}
-
-	// 3. Check if interface is up
 	if foundInterface.Flags&net.FlagUp == 0 {
 		return false, fmt.Errorf("interface %s is down", interfaceName)
 	}
-
-	// 4. Perform a network operation to check internet connectivity
-	// Example: DNS lookup
 	_, err = net.LookupHost("www.google.com")
 	if err != nil {
 		return false, nil // Internet is not reachable
 	}
-
-	// 5. Internet is reachable
 	return true, nil
 }
 
@@ -947,68 +938,130 @@ func (api *ManagementAPI) waitForWifiConnection(ssid string) bool {
 	}
 }
 
-// ConnectToWifi instructs the device to connect to the specified Wi-Fi network.
 func (api *ManagementAPI) ConnectToWifi(w http.ResponseWriter, r *http.Request) {
-	// Parse request for SSID and password
 	var wifiDetails struct {
 		SSID     string `json:"ssid"`
 		Password string `json:"password"`
 	}
+
+	// Decode the JSON body
 	if err := json.NewDecoder(r.Body).Decode(&wifiDetails); err != nil {
 		log.Printf("Error decoding request: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, "invalid request body\n")
-		return
-	}
-	removeNetworkFromWPAConfig(wifiDetails.SSID)
-	networkConfig := fmt.Sprintf("network={\nssid=\"%s\"\npsk=\"%s\"\npriority=1\n}\n", wifiDetails.SSID, wifiDetails.Password)
-	// Open the file in append mode
-	file, err := os.OpenFile("/etc/wpa_supplicant/wpa_supplicant.conf", os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		log.Printf("Error opening wpa_supplicant.conf: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "failed to open Wi-Fi network configuration file\n")
-		return
-	}
-	defer file.Close()
-
-	// Append network configuration
-	if _, err := file.WriteString(networkConfig); err != nil {
-		log.Printf("Error writing to wpa_supplicant.conf: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "failed to update Wi-Fi network configuration\n")
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := exec.Command("wpa_cli", "-i", "wlan0", "disconnect").Run(); err != nil {
-		log.Printf("Error disconnecting from Wi-Fi network: %v", err)
-	}
-	// Instruct wpa_supplicant to reconfigure
-	cmd := exec.Command("wpa_cli", "-i", "wlan0", "reconfigure")
-	if _, err := cmd.CombinedOutput(); err != nil {
-		log.Printf("Error reconfiguring Wi-Fi network: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "failed to reconfigure Wi-Fi network\n")
+	log.Printf("Attempting to connect to Wi-Fi SSID: %s", wifiDetails.SSID)
+	// Connect to the specified Wi-Fi network using wpa_cli
+	if err := connectToWifi(wifiDetails.SSID, wifiDetails.Password); err != nil {
+		log.Printf("Error connecting to Wi-Fi: %v", err)
+		http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+		go api.ManageHotspot()
 		return
 	}
-	// Reconnect to a network
-	if err := exec.Command("wpa_cli", "-i", "wlan0", "reconnect").Run(); err != nil {
-		log.Printf("Error reconnecting to Wi-Fi network: %v", err)
-		// Handle the error
-	}
-
-	// Check if connected to specified Wi-Fi network
-	success := api.waitForWifiConnection(wifiDetails.SSID)
-	if !success {
-		removeNetworkFromWPAConfig(wifiDetails.SSID)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "failed to connect to Wi-Fi network\n")
-		return
-	}
-
-	// Send a success response
+	// Disconnect from the wifi to send the response
+	//	log.Println("Disconnecting from Wi-Fi")
+	//	cmd := exec.Command("wpa_cli", "-i", "wlan0", "disconnect")
+	//	if err := cmd.Run(); err != nil {
+	//		log.Printf("Error disconnecting from Wi-Fi: %v", err)
+	//	}
+	log.Println("Connected to Wi-Fi successfully")
 	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, "successfully connected to Wi-Fi network\n")
+	w.Write([]byte("Connected to Wi-Fi successfully"))
+	//if err := connectToWifi(wifiDetails.SSID, wifiDetails.Password); err != nil {
+	//	log.Printf("Error connecting to Wi-Fi: %v", err)
+	//	http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+	//}
+}
+
+func streamWifiState(ctx context.Context, ssid string) bool {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			// Check the Wi-Fi connection status
+			statusCmd := exec.Command("wpa_cli", "-i", "wlan0", "status")
+			statusOut, err := statusCmd.Output()
+			if err != nil {
+				log.Printf("Error checking Wi-Fi status: %v", err)
+				continue
+			}
+
+			// Parse the status output
+			status := strings.TrimSpace(string(statusOut))
+			if strings.Contains(status, "ssid="+ssid) && strings.Contains(status, "wpa_state=COMPLETED") {
+				// Connected to the specified SSID
+				return true
+			}
+		case <-ctx.Done():
+			// Timeout
+			return false
+		}
+	}
+}
+
+// connectToWifi connects to a Wi-Fi network using wpa_cli
+func connectToWifi(ssid string, passkey string) error {
+	// Add ssid to wpa_supplicant.conf then reconfigure
+	if err := netmanagerclient.AddWifiNetwork(ssid, passkey); err != nil {
+		return err
+	}
+
+	// Reload the wpa_supplicant config
+	if err := netmanagerclient.ReconfigureWifi(); err != nil {
+		// Remove the network from the config
+		if err := removeNetworkFromWPAConfig(ssid); err != nil {
+			return err
+		}
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if connected := streamWifiState(ctx, ssid); !connected {
+		// Remove the network from the config
+		if err := netmanagerclient.RemoveWifiNetwork(ssid); err != nil {
+			log.Printf("Error removing Wi-Fi network: %v", err)
+			return err
+		}
+		return errors.New("failed to connect to Wi-Fi within the timeout")
+	}
+
+	log.Printf("Successfully connected to Wi-Fi SSID: %s", ssid)
+	// restart dhcp client
+	if err := exec.Command("systemctl", "restart", "dhcpcd").Run(); err != nil {
+		log.Printf("Error restarting DHCP client: %v", err)
+	}
+
+	return nil
+}
+
+func addNetworkToWPAConfig(ssid string, passkey string) error {
+	configFile := "/etc/wpa_supplicant/wpa_supplicant.conf"
+
+	// Read the current config file
+	content, err := os.ReadFile(configFile)
+	if err != nil {
+		return err
+	}
+
+	// Check if the network is already in the config
+	if strings.Contains(string(content), fmt.Sprintf("ssid=\"%s\"", ssid)) {
+		return nil
+	}
+
+	// Append the network to the config
+	newContent := fmt.Sprintf(`%s
+network={
+	ssid="%s"
+	psk="%s"
+	key_mgmt=WPA-PSK
+	priority=1
+}`, string(content), ssid, passkey)
+
+	return os.WriteFile(configFile, []byte(newContent), 0644)
 }
 
 func removeNetworkFromWPAConfig(ssid string) error {
@@ -1061,12 +1114,6 @@ func (api *ManagementAPI) GetWifiNetworks(w http.ResponseWriter, r *http.Request
 
 	// Parse the output to extract network information
 	networks := parseWiFiScanOutput(string(output))
-	if err != nil {
-		log.Printf("Error parsing Wi-Fi scan output: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "failed to parse Wi-Fi scan output\n")
-		return
-	}
 	log.Printf("Found %d Wi-Fi networks", len(networks))
 
 	// Send the list of networks as a JSON response
@@ -1133,11 +1180,14 @@ func (api *ManagementAPI) DisconnectFromWifi(w http.ResponseWriter, r *http.Requ
 	io.WriteString(w, "will disconnect from Wi-Fi network shortly\n")
 
 	go func() {
-		if err := removeNetworkFromWPAConfig(currentSSID); err != nil {
-			log.Printf("Error removing network from wpa_supplicant.conf: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			io.WriteString(w, "failed to remove network from configuration\n")
-			return
+		// if ssid is bushnet/Bushnet don't remove from wpa_supplicant.conf
+		if currentSSID != "bushnet" && currentSSID != "Bushnet" {
+			if err := removeNetworkFromWPAConfig(currentSSID); err != nil {
+				log.Printf("Error removing network from wpa_supplicant.conf: %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				io.WriteString(w, "failed to remove network from configuration\n")
+				return
+			}
 		}
 
 		if err := exec.Command("wpa_cli", "-i", "wlan0", "disconnect").Run(); err != nil {
@@ -1164,7 +1214,7 @@ func (api *ManagementAPI) DisconnectFromWifi(w http.ResponseWriter, r *http.Requ
 		}
 		if currentSSID == "" {
 			log.Printf("No current Wi-Fi network, restarting hotspot")
-			api.ManageHotspot()
+			go api.ManageHotspot()
 		}
 
 		log.Printf("Successfully deleted Wi-Fi network: %s", currentSSID)
@@ -1368,4 +1418,187 @@ func getServiceLogs(service string, lines int) ([]string, error) {
 		return logLines[:len(logLines)-1], nil
 	}
 	return logLines, nil
+}
+
+//func (api *ManagementAPI) GetWifiNetworks(w http.ResponseWriter, r *http.Request) {
+//	networks, err := netmanagerclient.ListSavedWifiNetworks()
+//	if err != nil {
+//		serverError(&w, err)
+//		return
+//	}
+//	w.WriteHeader(http.StatusOK)
+//	json.NewEncoder(w).Encode(networks)
+//}
+
+func (api *ManagementAPI) PostWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	ssid := r.FormValue("ssid")
+	if ssid == "" {
+		badRequest(&w, errors.New("ssid field was empty"))
+		return
+	}
+	psk := r.FormValue("psk")
+	if psk == "" {
+		badRequest(&w, errors.New("psk field was empty"))
+		return
+	}
+	if err := netmanagerclient.AddWifiNetwork(ssid, psk); err != nil {
+		if _, ok := err.(netmanagerclient.InputError); ok {
+			badRequest(&w, err)
+			return
+		}
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *ManagementAPI) DeleteWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	ssid := r.FormValue("ssid")
+	if ssid == "" {
+		badRequest(&w, errors.New("ssid field was empty"))
+		return
+	}
+	if err := netmanagerclient.RemoveWifiNetwork(ssid); err != nil {
+		if _, ok := err.(netmanagerclient.InputError); ok {
+			badRequest(&w, err)
+			return
+		}
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *ManagementAPI) ScanWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	networks, err := netmanagerclient.ScanWiFiNetworks()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(networks)
+}
+
+func (api *ManagementAPI) EnableWifi(w http.ResponseWriter, r *http.Request) {
+	if err := netmanagerclient.EnableWifi(false); err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *ManagementAPI) EnableHotspot(w http.ResponseWriter, r *http.Request) {
+	go func() {
+		// TODO Wait before enabling hotspot to give time for response
+		time.Sleep(time.Second)
+		if err := netmanagerclient.EnableHotspot(true); err != nil {
+			log.Println(err)
+		}
+	}()
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *ManagementAPI) GetConnectionStatus(w http.ResponseWriter, r *http.Request) {
+	state, err := netmanagerclient.ReadState()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+
+	data := map[string]interface{}{
+		"state": state,
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(data)
+}
+
+// RecordAudio creates a mock audio file
+func (api *ManagementAPI) RecordAudio(w http.ResponseWriter, r *http.Request) {
+	// Create the audio folder if it doesn't exist
+	audioFolderPath := goconfig.ThermalRecorder{}.OutputDir + "/audio"
+	if _, err := os.Stat(audioFolderPath); os.IsNotExist(err) {
+		err := os.Mkdir(audioFolderPath, 0755)
+		if err != nil {
+			log.Printf("Error creating audio folder: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			io.WriteString(w, "Failed to create audio folder\n")
+			return
+		}
+	}
+
+	// Create a new file within the audio folder
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+	audioFilePrefix := "audio" + strconv.Itoa(random.Intn(1000000))
+	audioFileSuffix := ".wav"
+	filePath := audioFolderPath + "/" + audioFilePrefix + audioFileSuffix
+	file, err := os.Create(filePath)
+	if err != nil {
+		log.Printf("Error creating audio file: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Failed to create audio file\n")
+		return
+	}
+	defer file.Close()
+
+	// Write some mock data to the file
+	_, err = file.WriteString("This is a mock audio file.")
+	if err != nil {
+		log.Printf("Error writing to audio file: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Failed to write to audio file\n")
+		return
+	}
+
+	// Send a success response
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, "Audio file created successfully\n")
+}
+
+// GetAudioFiles returns a list of audio files
+func (api *ManagementAPI) GetAudioFiles(w http.ResponseWriter, r *http.Request) {
+	// Get the list of audio files
+	audioFolderPath := goconfig.ThermalRecorder{}.OutputDir + "/audio"
+	files, err := os.ReadDir(audioFolderPath)
+	if err != nil {
+		log.Printf("Error reading audio folder: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Failed to read audio folder\n")
+		return
+	}
+
+	// Send the list of audio files as a JSON response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(files)
+}
+
+// DownloadAudioFile downloads an audio file
+func (api *ManagementAPI) DownloadAudioFile(w http.ResponseWriter, r *http.Request) {
+	// Get the file name from the request
+	fileName := mux.Vars(r)["fileName"]
+	if fileName == "" {
+		log.Printf("Error getting file name from request: %v", fileName)
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, "Failed to get file name from request\n")
+		return
+	}
+
+	// Open the file
+	audioFolderPath := goconfig.ThermalRecorder{}.OutputDir + "/audio"
+	filePath := audioFolderPath + "/" + fileName
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Printf("Error opening audio file: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Failed to open audio file\n")
+		return
+	}
+	defer file.Close()
+
+	// Set the response headers
+	w.Header().Set("Content-Disposition", "attachment; filename="+fileName)
+	w.Header().Set("Content-Type", r.Header.Get("Content-Type"))
+
+	// Send the file as a response
+	w.WriteHeader(http.StatusOK)
+	io.Copy(w, file)
 }

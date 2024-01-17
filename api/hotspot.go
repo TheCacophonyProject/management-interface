@@ -62,6 +62,7 @@ func startAccessPoint(_ string) error {
 }
 
 func stopAccessPoint() error {
+	println("Stopping Access Point")
 	return exec.Command("systemctl", "stop", "hostapd").Start()
 }
 
@@ -79,14 +80,15 @@ var dhcp_config_default = []string{
 	"slaac private",
 	"interface usb0",
 	"metric 300",
-	"interface wlan0",
-	"metric 200",
 }
 
 var dhcp_config_lines = []string{
 	"interface wlan0",
+	"metric 200",
 	"static ip_address=" + router_ip + "/24",
 	"nohook wpa_supplicant",
+	"nohook lookup-hostname, waitip, waitipv6 wlan0",
+	"nohook lookup-hostname, waitip, waitipv6 eth0",
 }
 
 func createDHCPConfig() (bool, error) {
@@ -197,6 +199,7 @@ func startDNS() error {
 }
 
 func stopDNS() error {
+	println("Stopping DNS")
 	return exec.Command("systemctl", "stop", "dnsmasq").Start()
 }
 

@@ -1,0 +1,7 @@
+go 1.20
+
+use (
+	./ // This indicates that the current module (management-interface) is part of the workspace
+)
+
+replace github.com/TheCacophonyProject/rpi-net-manager => ../rpi-net-manager

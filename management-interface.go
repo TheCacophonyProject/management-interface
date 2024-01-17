@@ -40,6 +40,7 @@ import (
 	"github.com/TheCacophonyProject/audiobait/v3/audiofilelibrary"
 	"github.com/TheCacophonyProject/audiobait/v3/playlist"
 	goconfig "github.com/TheCacophonyProject/go-config"
+	"github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
 
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
@@ -614,32 +615,31 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 		Networks          []wifiNetwork
 		Error             string
 	}
-	var err error
-	if r.Method == http.MethodPost {
-		if err := r.ParseForm(); err != nil {
-			log.Printf("WifiNetworkHandler error parsing form: %s", err)
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		deleteID := r.FormValue("deleteID")
-		if deleteID != "" {
-			err = deleteNetwork(deleteID)
-		} else {
-			ssid := r.FormValue("ssid")
-			if ssid == "" {
-				ssid = r.FormValue("ssid-select")
-			}
-			password := r.FormValue("password")
-			err = addWPANetwork(ssid, password)
-		}
-	}
-
 	wifiProps := wifiProperties{}
+
+	wifiNetworks, err := netmanagerclient.ListSavedWifiNetworks()
 	if err != nil {
+		log.Println(err)
 		wifiProps.Error = err.Error()
 	}
-	wifiProps.Networks, err = parseWPASupplicantConfig()
-	wifiProps.AvailableNetworks, err = listAvailableWifiNetworkSSIDs()
+	wifiProps.Networks = []wifiNetwork{}
+	for _, network := range wifiNetworks {
+		if network.SSID == "" || network.SSID == "bushnet" || network.SSID == "Bushnet" {
+			continue
+		}
+		wifiProps.Networks = append(wifiProps.Networks, wifiNetwork{SSID: network.SSID})
+	}
+
+	availableWifiNetworks, err := netmanagerclient.ScanWiFiNetworks()
+	wifiProps.AvailableNetworks = []string{}
+	if err != nil {
+		log.Println(err)
+		wifiProps.Error = err.Error()
+	}
+	for _, network := range availableWifiNetworks {
+		wifiProps.AvailableNetworks = append(wifiProps.AvailableNetworks, network.SSID)
+	}
+
 	if wifiProps.Error == "" && err != nil {
 		wifiProps.Error = err.Error()
 	}
@@ -673,7 +673,6 @@ func AboutHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config)
 	type aboutResponse struct {
 		RaspberryPiSerialNumber string
 		SaltMinionID            string
-		Group                   string
 		DeviceID                int
 		LastSaltUpdate          string
 		SaltNodegroup           string
@@ -694,7 +693,6 @@ func AboutHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config)
 	resp := aboutResponse{
 		RaspberryPiSerialNumber: getRaspberryPiSerialNumber(),
 		SaltMinionID:            getSaltMinionID(),
-		Group:                   device.Group,
 		DeviceID:                device.ID,
 		LastSaltUpdate:          getLastSaltUpdate(),
 		SaltNodegroup:           readFile("/etc/cacophony/salt-nodegroup"),
