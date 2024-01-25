@@ -670,9 +670,11 @@ func AboutHandlerGen(conf *goconfig.Config) func(http.ResponseWriter, *http.Requ
 
 // AboutHandler shows the currently installed packages on the device.
 func AboutHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config) {
+
 	type aboutResponse struct {
 		RaspberryPiSerialNumber string
 		SaltMinionID            string
+		Group                   string
 		DeviceID                int
 		LastSaltUpdate          string
 		SaltNodegroup           string
@@ -693,6 +695,7 @@ func AboutHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config)
 	resp := aboutResponse{
 		RaspberryPiSerialNumber: getRaspberryPiSerialNumber(),
 		SaltMinionID:            getSaltMinionID(),
+		Group:                   device.Group,
 		DeviceID:                device.ID,
 		LastSaltUpdate:          getLastSaltUpdate(),
 		SaltNodegroup:           readFile("/etc/cacophony/salt-nodegroup"),

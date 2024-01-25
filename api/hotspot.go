@@ -188,7 +188,7 @@ func createDNSConfig(ip_range string) error {
 	file_name := "/etc/dnsmasq.conf"
 	config_lines := []string{
 		"interface=wlan0",
-		"dhcp-range=" + ip_range + ",12h",
+		"dhcp-range=" + ip_range + ",255.255.255.0,12h",
 		"domain=wlan",
 	}
 	return createConfigFile(file_name, config_lines)

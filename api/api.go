@@ -34,6 +34,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -125,6 +126,19 @@ func (api *ManagementAPI) GetVersion(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(data)
 }
 
+func readFile(file string) string {
+	if runtime.GOOS == "windows" {
+		return ""
+	}
+
+	// The /etc/salt/minion_id file contains the ID.
+	out, err := os.ReadFile(file)
+	if err != nil {
+		return ""
+	}
+	return string(out)
+}
+
 // GetDeviceInfo returns information about this device
 func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) {
 	var device goconfig.Device
@@ -140,6 +154,7 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 		GroupName  string `json:"groupname"`
 		Devicename string `json:"devicename"`
 		DeviceID   int    `json:"deviceID"`
+		SaltID     string `json:"saltID"`
 		Type       string `json:"type"`
 	}
 	info := deviceInfo{
@@ -147,6 +162,7 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 		GroupName:  device.Group,
 		Devicename: device.Name,
 		DeviceID:   device.ID,
+		SaltID:     strings.TrimSpace(readFile("/etc/salt/minion_id")),
 		Type:       getDeviceType(),
 	}
 	w.WriteHeader(http.StatusOK)
@@ -1004,19 +1020,22 @@ func streamWifiState(ctx context.Context, ssid string) bool {
 
 // connectToWifi connects to a Wi-Fi network using wpa_cli
 func connectToWifi(ssid string, passkey string) error {
-	// Add ssid to wpa_supplicant.conf then reconfigure
-	if err := netmanagerclient.AddWifiNetwork(ssid, passkey); err != nil {
+	if err := addNetworkToWPAConfig(ssid, passkey); err != nil {
+		log.Printf("Error adding Wi-Fi network to config: %v", err)
 		return err
 	}
 
 	// Reload the wpa_supplicant config
-	if err := netmanagerclient.ReconfigureWifi(); err != nil {
+	if err := exec.Command("wpa_cli", "-i", "wlan0", "reconfigure").Run(); err != nil {
+		log.Printf("Error reconfiguring Wi-Fi: %v", err)
 		// Remove the network from the config
 		if err := removeNetworkFromWPAConfig(ssid); err != nil {
+			log.Printf("Error removing Wi-Fi network: %v", err)
 			return err
 		}
 		return err
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -1058,7 +1077,6 @@ network={
 	ssid="%s"
 	psk="%s"
 	key_mgmt=WPA-PSK
-	priority=1
 }`, string(content), ssid, passkey)
 
 	return os.WriteFile(configFile, []byte(newContent), 0644)
