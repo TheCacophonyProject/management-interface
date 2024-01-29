@@ -159,6 +159,7 @@ func main() {
 	apiRouter.HandleFunc("/enable-wifi", apiObj.EnableWifi).Methods("POST")
 	apiRouter.HandleFunc("/enable-hotspot", apiObj.EnableHotspot).Methods("POST")
 	apiRouter.HandleFunc("/wifi-status", apiObj.GetConnectionStatus).Methods("GET")
+	apiRouter.HandleFunc("/upload-logs", apiObj.UploadLogs).Methods("PUT")
 
 	apiRouter.Use(basicAuth)
 

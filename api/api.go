@@ -1031,3 +1031,25 @@ func (api *ManagementAPI) GetConnectionStatus(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(data)
 }
+
+func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {
+	if err := exec.Command("cp", "/var/log/syslog", "/tmp/syslog").Run(); err != nil {
+		log.Printf("Error copying syslog: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	if err := exec.Command("gzip", "/tmp/syslog", "-f").Run(); err != nil {
+		log.Printf("Error compressing syslog: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	if err := exec.Command("salt-call", "cp.push", "/tmp/syslog.gz").Run(); err != nil {
+		log.Printf("Error pushing syslog with salt: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
