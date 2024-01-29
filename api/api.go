@@ -1050,6 +1050,10 @@ func connectToWifi(ssid string, passkey string) error {
 
 	log.Printf("Successfully connected to Wi-Fi SSID: %s", ssid)
 	// restart dhcp client
+	// remove static ip from dhcpcd.conf
+	if err := exec.Command("sed", "-i", "/static ip_address=/d", "/etc/dhcpcd.conf").Run(); err != nil {
+		log.Printf("Error removing static ip from dhcpcd.conf: %v", err)
+	}
 	if err := exec.Command("systemctl", "restart", "dhcpcd").Run(); err != nil {
 		log.Printf("Error restarting DHCP client: %v", err)
 	}
@@ -1074,9 +1078,8 @@ func addNetworkToWPAConfig(ssid string, passkey string) error {
 	// Append the network to the config
 	newContent := fmt.Sprintf(`%s
 network={
-	ssid="%s"
-	psk="%s"
-	key_mgmt=WPA-PSK
+    ssid="%s"
+    psk="%s"
 }`, string(content), ssid, passkey)
 
 	return os.WriteFile(configFile, []byte(newContent), 0644)
@@ -1205,6 +1208,10 @@ func (api *ManagementAPI) DisconnectFromWifi(w http.ResponseWriter, r *http.Requ
 				w.WriteHeader(http.StatusInternalServerError)
 				io.WriteString(w, "failed to remove network from configuration\n")
 				return
+			}
+		} else {
+			if err := RestartDHCP(); err != nil {
+				log.Printf("Error restarting DHCP client: %v", err)
 			}
 		}
 

@@ -80,15 +80,12 @@ var dhcp_config_default = []string{
 	"slaac private",
 	"interface usb0",
 	"metric 300",
+	"interface wlan0",
+	"metric 200",
 }
 
 var dhcp_config_lines = []string{
-	"interface wlan0",
-	"metric 200",
 	"static ip_address=" + router_ip + "/24",
-	"nohook wpa_supplicant",
-	"nohook lookup-hostname, waitip, waitipv6 wlan0",
-	"nohook lookup-hostname, waitip, waitipv6 eth0",
 }
 
 func createDHCPConfig() (bool, error) {
@@ -141,7 +138,7 @@ func startDHCP() error {
 	return exec.Command("systemctl", "start", "dhcpcd").Run()
 }
 
-func restartDHCP() error {
+func RestartDHCP() error {
 	// Only restart if config has changed
 	configModified, err := writeLines("/etc/dhcpcd.conf", dhcp_config_default)
 	if err != nil {
@@ -173,12 +170,12 @@ func checkIsConnectedToNetwork() (string, error) {
 func checkIsConnectedToNetworkWithRetries() (string, error) {
 	var err error
 	var ssid string
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 5; i++ {
 		ssid, err = checkIsConnectedToNetwork()
 		if ssid != "" {
 			return ssid, nil
 		}
-		time.Sleep(time.Second)
+		time.Sleep(time.Second * 5)
 	}
 	return ssid, err
 }
@@ -188,7 +185,7 @@ func createDNSConfig(ip_range string) error {
 	file_name := "/etc/dnsmasq.conf"
 	config_lines := []string{
 		"interface=wlan0",
-		"dhcp-range=" + ip_range + ",255.255.255.0,12h",
+		"dhcp-range=" + ip_range + ",12h",
 		"domain=wlan",
 	}
 	return createConfigFile(file_name, config_lines)
@@ -241,13 +238,18 @@ func isHotspotRunning() bool {
 func initilseHotspot() error {
 	ssid := "bushnet"
 	log.Printf("Setting DHCP to default...")
-	if err := restartDHCP(); err != nil {
+	if err := RestartDHCP(); err != nil {
 		log.Printf("Error restarting dhcpcd: %s", err)
 	}
 	// Check if already connected to a network
+	if val, err := exec.Command("iwgetid", "wlan0", "-r").Output(); err != nil {
+		log.Printf("Error checking if connected to network: %s", err)
+	} else {
+		log.Printf("Wlan0 is connected to: %s", val)
+	}
 	// If not connected to a network, start hotspot
 	log.Printf("Checking if connected to network...")
-	if network, err := checkIsConnectedToNetwork(); err == nil {
+	if network, err := checkIsConnectedToNetworkWithRetries(); err == nil {
 		// Check if the hotspot is already running
 		return fmt.Errorf("already connected to a network: %s", network)
 	}
@@ -283,7 +285,7 @@ func stopHotspot() error {
 	if err := stopDNS(); err != nil {
 		return err
 	}
-	if err := restartDHCP(); err != nil {
+	if err := RestartDHCP(); err != nil {
 		return err
 	}
 	return nil
