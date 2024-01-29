@@ -84,6 +84,32 @@ function runSaltUpdate() {
   xmlHttp.send(null);
 }
 
+async function uploadLogs() {
+  $("#upload-logs-button").attr("disabled", true);
+  $("#upload-logs-button").html("Uploading logs...");
+  try {
+    const response = await fetch("/api/upload-logs", {
+      method: "PUT",
+      headers: {
+        "Authorization": "Basic " + btoa("admin:feathers"),
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (response.ok) {
+      alert("Logs uploaded");
+    } else {
+      alert("Error uploading logs");
+      console.error("Error with response:", await response.text());
+    }
+  } catch (error) {
+    alert("Error uploading logs");
+    console.error("Error with uploading logs:", error);
+  }
+  $("#upload-logs-button").attr("disabled", false);
+  $("#upload-logs-button").html("Upload logs");
+}
+
 var runningSaltUpdate = true;
 // Check salt update state. Returns true if it is no longer running
 function checkSaltUpdateState() {

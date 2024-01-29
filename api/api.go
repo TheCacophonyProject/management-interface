@@ -1627,3 +1627,25 @@ func (api *ManagementAPI) DownloadAudioFile(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 	io.Copy(w, file)
 }
+
+func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {
+	if err := exec.Command("cp", "/var/log/syslog", "/tmp/syslog").Run(); err != nil {
+		log.Printf("Error copying syslog: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	if err := exec.Command("gzip", "/tmp/syslog", "-f").Run(); err != nil {
+		log.Printf("Error compressing syslog: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	if err := exec.Command("salt-call", "cp.push", "/tmp/syslog.gz").Run(); err != nil {
+		log.Printf("Error pushing syslog with salt: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
