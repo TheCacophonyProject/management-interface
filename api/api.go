@@ -1493,16 +1493,6 @@ func getServiceLogs(service string, lines int) ([]string, error) {
 	return logLines, nil
 }
 
-//func (api *ManagementAPI) GetWifiNetworks(w http.ResponseWriter, r *http.Request) {
-//	networks, err := netmanagerclient.ListSavedWifiNetworks()
-//	if err != nil {
-//		serverError(&w, err)
-//		return
-//	}
-//	w.WriteHeader(http.StatusOK)
-//	json.NewEncoder(w).Encode(networks)
-//}
-
 func (api *ManagementAPI) PostWifiNetwork(w http.ResponseWriter, r *http.Request) {
 	ssid := r.FormValue("ssid")
 	if ssid == "" {

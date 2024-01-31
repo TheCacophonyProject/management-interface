@@ -641,7 +641,7 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if wifiProps.Error == "" && err != nil {
-		wifiProps.Error = "Error while getting available networks: " + err.Error()
+		wifiProps.Error = "Wifi Error: " + err.Error()
 	}
 
 	tmpl.ExecuteTemplate(w, "wifi-networks.html", wifiProps)
