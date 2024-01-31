@@ -1036,6 +1036,32 @@ func connectToWifi(ssid string, passkey string) error {
 		return err
 	}
 
+	if ssids, err := getSSIDIds(); err == nil {
+		if id, ok := ssids[ssid]; ok {
+			// Connect to the network
+			if err := exec.Command("wpa_cli", "-i", "wlan0", "select_network", id).Run(); err != nil {
+				log.Printf("Error selecting Wi-Fi network: %v", err)
+				// Remove the network from the config
+				if err := removeNetworkFromWPAConfig(ssid); err != nil {
+					log.Printf("Error removing Wi-Fi network: %v", err)
+					return err
+				}
+				return err
+			} else {
+				// reassociate
+				if err := exec.Command("wpa_cli", "-i", "wlan0", "reassociate").Run(); err != nil {
+					log.Printf("Error reassociating Wi-Fi network: %v", err)
+					// Remove the network from the config
+					if err := removeNetworkFromWPAConfig(ssid); err != nil {
+						log.Printf("Error removing Wi-Fi network: %v", err)
+						return err
+					}
+					return err
+				}
+			}
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -1059,6 +1085,28 @@ func connectToWifi(ssid string, passkey string) error {
 	}
 
 	return nil
+}
+
+func getSSIDIds() (map[string]string, error) {
+	// Get the list of Wi-Fi networks
+	cmd := exec.Command("wpa_cli", "-i", "wlan0", "list_networks")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the output
+	ssidIds := make(map[string]string)
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines[1:] {
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		ssidIds[fields[1]] = fields[0]
+	}
+
+	return ssidIds, nil
 }
 
 func addNetworkToWPAConfig(ssid string, passkey string) error {

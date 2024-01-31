@@ -620,7 +620,7 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 	wifiNetworks, err := netmanagerclient.ListSavedWifiNetworks()
 	if err != nil {
 		log.Println(err)
-		wifiProps.Error = err.Error()
+		wifiProps.Error = "Error while getting saved networks: " + err.Error()
 	}
 	wifiProps.Networks = []wifiNetwork{}
 	for _, network := range wifiNetworks {
@@ -634,14 +634,14 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 	wifiProps.AvailableNetworks = []string{}
 	if err != nil {
 		log.Println(err)
-		wifiProps.Error = err.Error()
+		wifiProps.Error = "Error while getting available networks: " + err.Error()
 	}
 	for _, network := range availableWifiNetworks {
 		wifiProps.AvailableNetworks = append(wifiProps.AvailableNetworks, network.SSID)
 	}
 
 	if wifiProps.Error == "" && err != nil {
-		wifiProps.Error = err.Error()
+		wifiProps.Error = "Error while getting available networks: " + err.Error()
 	}
 
 	tmpl.ExecuteTemplate(w, "wifi-networks.html", wifiProps)
