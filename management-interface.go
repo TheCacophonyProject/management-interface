@@ -330,7 +330,7 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	wifiProps := wifiProperties{}
 
-	wifiNetworks, err := netmanagerclient.ListSavedWifiNetworks()
+	wifiNetworks, err := netmanagerclient.ListUserSavedWifiNetworks()
 	if err != nil {
 		log.Println(err)
 		wifiProps.Error = err.Error()

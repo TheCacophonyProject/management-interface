@@ -941,7 +941,7 @@ func getServiceLogs(service string, lines int) ([]string, error) {
 }
 
 func (api *ManagementAPI) GetWifiNetworks(w http.ResponseWriter, r *http.Request) {
-	networks, err := netmanagerclient.ListSavedWifiNetworks()
+	networks, err := netmanagerclient.ListUserSavedWifiNetworks()
 	if err != nil {
 		serverError(&w, err)
 		return
