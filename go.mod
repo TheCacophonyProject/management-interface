@@ -19,7 +19,7 @@ require (
 )
 
 require (
-	github.com/TheCacophonyProject/rpi-net-manager v0.2.1-deb12
+	github.com/TheCacophonyProject/rpi-net-manager v0.2.3-deb12
 	github.com/TheCacophonyProject/trap-controller v0.0.0-20230227002937-262a1adfaa47
 	golang.org/x/text v0.14.0
 )
