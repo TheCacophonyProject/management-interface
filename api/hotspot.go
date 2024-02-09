@@ -78,8 +78,6 @@ var dhcp_config_default = []string{
 	"option interface_mtu",
 	"require dhcp_server_identifier",
 	"slaac private",
-	"interface usb0",
-	"metric 300",
 	"interface wlan0",
 	"metric 200",
 }

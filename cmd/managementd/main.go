@@ -157,6 +157,8 @@ func main() {
 	apiRouter.HandleFunc("/network/interfaces", apiObj.GetNetworkInterfaces).Methods("GET")
 	apiRouter.HandleFunc("/network/wifi", apiObj.GetWifiNetworks).Methods("GET")
 	apiRouter.HandleFunc("/network/wifi", apiObj.ConnectToWifi).Methods("POST")
+	apiRouter.HandleFunc("/network/wifi/saved", apiObj.GetSavedWifiNetworks).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi/forget", apiObj.ForgetWifiNetwork).Methods("DELETE")
 	apiRouter.HandleFunc("/network/wifi/current", apiObj.GetCurrentWifiNetwork).Methods("GET")
 	apiRouter.HandleFunc("/network/wifi/current", apiObj.DisconnectFromWifi).Methods("DELETE")
 	apiRouter.HandleFunc("/wifi-check", apiObj.CheckWifiInternetConnection).Methods("GET")

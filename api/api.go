@@ -1249,24 +1249,18 @@ func (api *ManagementAPI) DisconnectFromWifi(w http.ResponseWriter, r *http.Requ
 	io.WriteString(w, "will disconnect from Wi-Fi network shortly\n")
 
 	go func() {
-		// if ssid is bushnet/Bushnet don't remove from wpa_supplicant.conf
-		if currentSSID != "bushnet" && currentSSID != "Bushnet" {
-			if err := removeNetworkFromWPAConfig(currentSSID); err != nil {
-				log.Printf("Error removing network from wpa_supplicant.conf: %v", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				io.WriteString(w, "failed to remove network from configuration\n")
-				return
-			}
-		} else {
-			if err := RestartDHCP(); err != nil {
-				log.Printf("Error restarting DHCP client: %v", err)
-			}
-		}
-
 		if err := exec.Command("wpa_cli", "-i", "wlan0", "disconnect").Run(); err != nil {
 			log.Printf("Error disconnecting from Wi-Fi network: %v", err)
 			// Handle the error
 		}
+		if ssids, err := getSSIDIds(); err == nil {
+			if id, ok := ssids[currentSSID]; ok {
+				if err := exec.Command("wpa_cli", "-i", "wlan0", "disable_network", id).Run(); err != nil {
+					log.Printf("Error disabling Wi-Fi network: %v", err)
+				}
+			}
+		}
+
 		// Instruct wpa_supplicant to reconfigure
 		cmd := exec.Command("wpa_cli", "-i", "wlan0", "reconfigure")
 		if _, err := cmd.CombinedOutput(); err != nil {
@@ -1279,6 +1273,9 @@ func (api *ManagementAPI) DisconnectFromWifi(w http.ResponseWriter, r *http.Requ
 		if err := exec.Command("wpa_cli", "-i", "wlan0", "reconnect").Run(); err != nil {
 			log.Printf("Error reconnecting to Wi-Fi network: %v", err)
 			// Handle the error
+		}
+		if err := RestartDHCP(); err != nil {
+			log.Printf("Error restarting DHCP client: %v", err)
 		}
 		// if no current network, then restart hotspot
 		currentSSID, err := checkIsConnectedToNetwork()
@@ -1294,6 +1291,30 @@ func (api *ManagementAPI) DisconnectFromWifi(w http.ResponseWriter, r *http.Requ
 		w.WriteHeader(http.StatusOK)
 		io.WriteString(w, "deleted Wi-Fi network\n")
 	}()
+}
+
+func (api *ManagementAPI) ForgetWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	// Parse request for SSID
+	var wifiDetails struct {
+		SSID string `json:"ssid"`
+	}
+
+	// Decode the JSON body
+	if err := json.NewDecoder(r.Body).Decode(&wifiDetails); err != nil {
+		log.Printf("Error decoding request: %v", err)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Forget the network
+	if err := netmanagerclient.RemoveWifiNetwork(wifiDetails.SSID); err != nil {
+		log.Printf("Error removing Wi-Fi network: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to remove Wi-Fi network\n")
+	}
+	log.Printf("Will forget Wi-Fi network: %s", wifiDetails.SSID)
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, "will forget Wi-Fi network shortly\n")
 }
 
 func getLastKey(m map[string]string) string {
@@ -1573,6 +1594,16 @@ func (api *ManagementAPI) GetConnectionStatus(w http.ResponseWriter, r *http.Req
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(data)
+}
+
+func (api *ManagementAPI) GetSavedWifiNetworks(w http.ResponseWriter, r *http.Request) {
+	networks, err := netmanagerclient.ListSavedWifiNetworks()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(networks)
 }
 
 // RecordAudio creates a mock audio file
