@@ -3,6 +3,7 @@ authHeaders.append("Authorization", "Basic YWRtaW46ZmVhdGhlcnM=");
 
 window.onload = async function () {
   readAutoUpdate();
+  updateSaltState();
 };
 
 async function setAutoUpdate(autoUpdate) {
@@ -108,6 +109,38 @@ async function uploadLogs() {
   }
   $("#upload-logs-button").attr("disabled", false);
   $("#upload-logs-button").html("Upload logs");
+}
+
+async function updateSaltState() {
+  try {
+    const response = await fetch("/api/salt-update", {
+      method: "GET",
+      headers: {
+        "Authorization": "Basic " + btoa("admin:feathers"),
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (response.ok) {
+      var jsonString = await response.text();
+
+      var data = JSON.parse(jsonString);
+
+      document.getElementById("running-salt-command").textContent = data.RunningUpdate ? "Yes" : "No";
+      document.getElementById("running-salt-arguements").textContent = data.RunningArgs ? data.RunningArgs.join(", ") : "None";
+      document.getElementById("previous-run-arguments").textContent = data.LastCallArgs ? data.LastCallArgs.join(", ") : "None";
+      document.getElementById("previous-output").textContent = data.LastCallOut;
+      document.getElementById("previous-success").textContent = data.LastCallSuccess ? "Yes" : "No";
+      document.getElementById("previous-nodegroup").textContent = data.LastCallNodegroup;
+
+    } else {
+      alert("Error updating salt");
+      console.error("Error with response:", await response.text());
+    }
+  } catch (error) {
+    alert("Error updating salt");
+    console.error("Error with fetching salt update:", error);
+  }
 }
 
 var runningSaltUpdate = true;
