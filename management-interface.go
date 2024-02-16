@@ -316,7 +316,7 @@ func NetworkHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type wifiNetwork struct {
-	SSID      string
+	ID        string
 	NetworkID int
 }
 
@@ -337,10 +337,10 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	wifiProps.Networks = []wifiNetwork{}
 	for _, network := range wifiNetworks {
-		if network.SSID == "" || network.SSID == "bushnet" || network.SSID == "Bushnet" {
+		if network.ID == "" || network.ID == "bushnet" || network.ID == "Bushnet" || network.ID == "BushnetHotspot" {
 			continue
 		}
-		wifiProps.Networks = append(wifiProps.Networks, wifiNetwork{SSID: network.SSID})
+		wifiProps.Networks = append(wifiProps.Networks, wifiNetwork{ID: network.ID})
 	}
 
 	availableWifiNetworks, err := netmanagerclient.ScanWiFiNetworks()

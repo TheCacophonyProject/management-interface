@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os/exec"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -166,6 +167,10 @@ func main() {
 	apiRouter.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			netmanagerclient.KeepHotspotOnFor(60 * 5)
+			out, err := exec.Command("stay-on-for", "300").CombinedOutput() // Stops camera from going to sleep for 300 seconds
+			if err != nil {
+				log.Printf("error running stay-on-for: %s, error: %s", string(out), err)
+			}
 			next.ServeHTTP(w, r)
 		})
 	})
