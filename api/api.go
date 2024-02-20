@@ -107,11 +107,13 @@ func (s *ManagementAPI) StopHotspotTimer() {
 }
 
 func (server *ManagementAPI) ManageHotspot() {
-	if err := netmanagerclient.EnableHotspot(false); err != nil {
+	if err := initilseHotspot(); err != nil {
 		log.Println("Failed to initialise hotspot:", err)
 		if err := stopHotspot(); err != nil {
 			log.Println("Failed to stop hotspot:", err)
 		}
+	} else {
+		server.StartHotspotTimer()
 	}
 }
 
@@ -966,21 +968,26 @@ func (api *ManagementAPI) ConnectToWifi(w http.ResponseWriter, r *http.Request) 
 	}
 
 	log.Printf("Attempting to connect to Wi-Fi SSID: %s", wifiDetails.SSID)
-	if err := netmanagerclient.AddWifiNetwork(wifiDetails.SSID, wifiDetails.Password); err != nil {
+	// Connect to the specified Wi-Fi network using wpa_cli
+	if err := connectToWifi(wifiDetails.SSID, wifiDetails.Password); err != nil {
 		log.Printf("Error connecting to Wi-Fi: %v", err)
 		http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+		go api.ManageHotspot()
 		return
 	}
-
-	if err := netmanagerclient.EnableWifi(true); err != nil {
-		log.Printf("Error enabling Wi-Fi: %v", err)
-		http.Error(w, "Failed to enable Wi-Fi: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
+	// Disconnect from the wifi to send the response
+	//	log.Println("Disconnecting from Wi-Fi")
+	//	cmd := exec.Command("wpa_cli", "-i", "wlan0", "disconnect")
+	//	if err := cmd.Run(); err != nil {
+	//		log.Printf("Error disconnecting from Wi-Fi: %v", err)
+	//	}
 	log.Println("Connected to Wi-Fi successfully")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Connected to Wi-Fi successfully"))
+	//if err := connectToWifi(wifiDetails.SSID, wifiDetails.Password); err != nil {
+	//	log.Printf("Error connecting to Wi-Fi: %v", err)
+	//	http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+	//}
 }
 
 func streamWifiState(ctx context.Context, ssid string) bool {
@@ -1162,26 +1169,26 @@ func removeNetworkFromWPAConfig(ssid string) error {
 	return os.WriteFile(configFile, []byte(strings.Join(newLines, "\n")), 0644)
 }
 
-//func (api *ManagementAPI) GetWifiNetworks(w http.ResponseWriter, r *http.Request) {
-//	// Execute the command to scan for Wi-Fi networks
-//	log.Println("Scanning for Wi-Fi networks")
-//	cmd := exec.Command("iwlist", "wlan0", "scan")
-//	output, err := cmd.Output()
-//	if err != nil {
-//		log.Printf("Error scanning for Wi-Fi networks: %v", err)
-//		w.WriteHeader(http.StatusInternalServerError)
-//		io.WriteString(w, "failed to scan for Wi-Fi networks\n")
-//		return
-//	}
-//
-//	// Parse the output to extract network information
-//	networks := parseWiFiScanOutput(string(output))
-//	log.Printf("Found %d Wi-Fi networks", len(networks))
-//
-//	// Send the list of networks as a JSON response
-//	w.WriteHeader(http.StatusOK)
-//	json.NewEncoder(w).Encode(networks)
-//}
+func (api *ManagementAPI) GetWifiNetworks(w http.ResponseWriter, r *http.Request) {
+	// Execute the command to scan for Wi-Fi networks
+	log.Println("Scanning for Wi-Fi networks")
+	cmd := exec.Command("iwlist", "wlan0", "scan")
+	output, err := cmd.Output()
+	if err != nil {
+		log.Printf("Error scanning for Wi-Fi networks: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to scan for Wi-Fi networks\n")
+		return
+	}
+
+	// Parse the output to extract network information
+	networks := parseWiFiScanOutput(string(output))
+	log.Printf("Found %d Wi-Fi networks", len(networks))
+
+	// Send the list of networks as a JSON response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(networks)
+}
 
 func parseWiFiScanOutput(output string) []map[string]string {
 	var networks []map[string]string
@@ -1228,25 +1235,61 @@ func reloadWPAConfig() error {
 }
 
 func (api *ManagementAPI) DisconnectFromWifi(w http.ResponseWriter, r *http.Request) {
-	currentSSID, err := getCurrentWifiNetwork()
+	// Parse request for SSID
+	currentSSID, err := checkIsConnectedToNetwork()
 	if err != nil {
 		log.Printf("Error getting current Wi-Fi network: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "failed to get current Wi-Fi network\n")
 		return
 	}
+	// Respond to client before actually disconnecting
+	log.Printf("Will disconnect from Wi-Fi network")
 	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, "disconnecting from Wi-Fi network\n")
-	if err != nil {
-		log.Fatalf("Error getting state changes: %v", err)
-	}
+	io.WriteString(w, "will disconnect from Wi-Fi network shortly\n")
+
 	go func() {
-		if err := netmanagerclient.DisconnectWifiNetwork(currentSSID); err != nil {
-			log.Printf("Error removing Wi-Fi network: %v", err)
+		if err := exec.Command("wpa_cli", "-i", "wlan0", "disconnect").Run(); err != nil {
+			log.Printf("Error disconnecting from Wi-Fi network: %v", err)
+			// Handle the error
+		}
+		if ssids, err := getSSIDIds(); err == nil {
+			if id, ok := ssids[currentSSID]; ok {
+				if err := exec.Command("wpa_cli", "-i", "wlan0", "disable_network", id).Run(); err != nil {
+					log.Printf("Error disabling Wi-Fi network: %v", err)
+				}
+			}
+		}
+
+		// Instruct wpa_supplicant to reconfigure
+		cmd := exec.Command("wpa_cli", "-i", "wlan0", "reconfigure")
+		if _, err := cmd.CombinedOutput(); err != nil {
+			log.Printf("Error reconfiguring Wi-Fi network: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			io.WriteString(w, "failed to remove Wi-Fi network\n")
+			io.WriteString(w, "failed to reconfigure Wi-Fi network\n")
 			return
 		}
+		// Reconnect to a network
+		if err := exec.Command("wpa_cli", "-i", "wlan0", "reconnect").Run(); err != nil {
+			log.Printf("Error reconnecting to Wi-Fi network: %v", err)
+			// Handle the error
+		}
+		if err := RestartDHCP(); err != nil {
+			log.Printf("Error restarting DHCP client: %v", err)
+		}
+		// if no current network, then restart hotspot
+		currentSSID, err := checkIsConnectedToNetwork()
+		if err != nil {
+			log.Printf("Error getting current Wi-Fi network: %v", err)
+		}
+		if currentSSID == "" {
+			log.Printf("No current Wi-Fi network, restarting hotspot")
+			go api.ManageHotspot()
+		}
+
+		log.Printf("Successfully deleted Wi-Fi network: %s", currentSSID)
+		w.WriteHeader(http.StatusOK)
+		io.WriteString(w, "deleted Wi-Fi network\n")
 	}()
 }
 
