@@ -20,7 +20,6 @@ package api
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,7 +32,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -84,35 +82,45 @@ func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string) (*Ma
 	}, nil
 }
 
-func (s *ManagementAPI) StartHotspotTimer() {
-	s.hotspotTimer = time.NewTicker(5 * time.Minute)
-	go func() {
-		s.router.Use(func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				s.hotspotTimer.Reset(5 * time.Minute)
-				next.ServeHTTP(w, r)
-			})
-		})
-		<-s.hotspotTimer.C
-		if err := stopHotspot(); err != nil {
-			log.Println("Failed to stop hotspot:", err)
-		}
-	}()
-}
-
 func (s *ManagementAPI) StopHotspotTimer() {
 	if s.hotspotTimer != nil {
 		s.hotspotTimer.Stop()
 	}
 }
 
+func checkIsConnectedToNetworkWithRetries() (string, error) {
+	// Try to get the current network name
+	var ssid string
+	var err error
+	for i := 0; i < 5; i++ {
+		ssid, err = getCurrentWifiNetwork()
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	return ssid, err
+}
+
 func (server *ManagementAPI) ManageHotspot() {
-	if err := netmanagerclient.EnableHotspot(false); err != nil {
+	// Check if we are connected to a network
+	ssid, err := checkIsConnectedToNetworkWithRetries()
+	if err != nil {
+		log.Printf("Error checking if connected to network: %v", err)
+	}
+	if ssid != "" {
+		log.Printf("Connected to network: %s", ssid)
+		return
+	}
+
+	if err := netmanagerclient.EnableHotspot(true); err != nil {
 		log.Println("Failed to initialise hotspot:", err)
-		if err := stopHotspot(); err != nil {
+		if err := netmanagerclient.EnableWifi(true); err != nil {
 			log.Println("Failed to stop hotspot:", err)
 		}
+		return
 	}
+	netmanagerclient.KeepHotspotOnFor(60 * 5)
 }
 
 func (api *ManagementAPI) GetVersion(w http.ResponseWriter, r *http.Request) {
@@ -855,38 +863,26 @@ func getCurrentWifiNetwork() (string, error) {
 }
 
 // CheckInternetConnection checks if a specified network interface has internet access
-func CheckInternetConnection(interfaceName string) (bool, error) {
-	interfaces, err := net.Interfaces()
+func CheckInternetConnection(interfaceName string) bool {
+	iface, err := net.InterfaceByName(interfaceName)
 	if err != nil {
-		return false, err
+		fmt.Println("Error getting interface details:", err)
+		return false
 	}
-	var foundInterface net.Interface
-	for _, iface := range interfaces {
-		if iface.Name == interfaceName {
-			foundInterface = iface
-			break
-		}
+	args := []string{"-I", iface.Name, "-c", "3", "-n", "-W", "15", "1.1.1.1"}
+
+	if err := exec.Command("ping", args...).Run(); err != nil {
+		fmt.Println("Error pinging:", err)
+		return false
 	}
-	if foundInterface.Flags&net.FlagUp == 0 {
-		return false, fmt.Errorf("interface %s is down", interfaceName)
-	}
-	_, err = net.LookupHost("www.google.com")
-	if err != nil {
-		return false, nil // Internet is not reachable
-	}
-	return true, nil
+	return true
+
 }
 
 func (api *ManagementAPI) CheckModemInternetConnection(w http.ResponseWriter, r *http.Request) {
 	// Check if connected to modem
 	log.Println("Checking modem connection")
-	connected, err := CheckInternetConnection("usb0")
-	if err != nil {
-		log.Printf("Error checking modem connection: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "failed to check modem connection\n")
-		return
-	}
+	connected := CheckInternetConnection("usb0")
 	log.Printf("Modem connection: %v", connected)
 
 	// Send the current network as a JSON response
@@ -898,13 +894,7 @@ func (api *ManagementAPI) CheckModemInternetConnection(w http.ResponseWriter, r 
 func (api *ManagementAPI) CheckWifiInternetConnection(w http.ResponseWriter, r *http.Request) {
 	// Check if connected to Wi-Fi
 	log.Println("Checking Wi-Fi connection")
-	connected, err := CheckInternetConnection("wlan0")
-	if err != nil {
-		log.Printf("Error checking Wi-Fi connection: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "failed to check Wi-Fi connection\n")
-		return
-	}
+	connected := CheckInternetConnection("wlan0")
 	log.Printf("Wi-Fi connection: %v", connected)
 
 	// Send the current network as a JSON response
@@ -929,29 +919,6 @@ func (api *ManagementAPI) GetCurrentWifiNetwork(w http.ResponseWriter, r *http.R
 	json.NewEncoder(w).Encode(map[string]string{"SSID": currentNetwork})
 }
 
-const (
-	connectionCheckTimeout  = 30 * time.Second
-	connectionCheckInterval = 5 * time.Second
-)
-
-// waitForWifiConnection checks if the device has connected to the specified SSID
-func (api *ManagementAPI) waitForWifiConnection(ssid string) bool {
-	timeout := time.After(connectionCheckTimeout)
-	tick := time.NewTicker(connectionCheckInterval)
-	defer tick.Stop()
-
-	for {
-		select {
-		case <-timeout:
-			return false // Timed out
-		case <-tick.C:
-			if currentSSID, _ := getCurrentWifiNetwork(); currentSSID == ssid {
-				return true // Successfully connected
-			}
-		}
-	}
-}
-
 func (api *ManagementAPI) ConnectToWifi(w http.ResponseWriter, r *http.Request) {
 	var wifiDetails struct {
 		SSID     string `json:"ssid"`
@@ -964,267 +931,37 @@ func (api *ManagementAPI) ConnectToWifi(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	// Get currently saved Wi-Fi networks
+	_, saved := netmanagerclient.FindNetworkBySSID(wifiDetails.SSID)
 
-	log.Printf("Attempting to connect to Wi-Fi SSID: %s", wifiDetails.SSID)
-	if err := netmanagerclient.AddWifiNetwork(wifiDetails.SSID, wifiDetails.Password); err != nil {
-		log.Printf("Error connecting to Wi-Fi: %v", err)
-		http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := netmanagerclient.EnableWifi(true); err != nil {
-		log.Printf("Error enabling Wi-Fi: %v", err)
-		http.Error(w, "Failed to enable Wi-Fi: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	log.Println("Connected to Wi-Fi successfully")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Connected to Wi-Fi successfully"))
-}
-
-func streamWifiState(ctx context.Context, ssid string) bool {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			// Check the Wi-Fi connection status
-			statusCmd := exec.Command("wpa_cli", "-i", "wlan0", "status")
-			statusOut, err := statusCmd.Output()
-			if err != nil {
-				log.Printf("Error checking Wi-Fi status: %v", err)
-				continue
-			}
-
-			// Parse the status output
-			status := strings.TrimSpace(string(statusOut))
-			if strings.Contains(status, "ssid="+ssid) && strings.Contains(status, "wpa_state=COMPLETED") {
-				// Connected to the specified SSID
-				return true
-			}
-		case <-ctx.Done():
-			// Timeout
-			return false
+	// Find network in saved networks array
+	if !saved {
+		log.Printf("Attempting to connect to Wi-Fi SSID: %s", wifiDetails.SSID)
+		if err := netmanagerclient.AddWifiNetwork(wifiDetails.SSID, wifiDetails.Password); err != nil {
+			log.Printf("Error connecting to Wi-Fi: %v", err)
+			http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+			return
 		}
-	}
-}
 
-// connectToWifi connects to a Wi-Fi network using wpa_cli
-func connectToWifi(ssid string, passkey string) error {
-	if err := addNetworkToWPAConfig(ssid, passkey); err != nil {
-		log.Printf("Error adding Wi-Fi network to config: %v", err)
-		return err
-	}
-
-	// Reload the wpa_supplicant config
-	if err := exec.Command("wpa_cli", "-i", "wlan0", "reconfigure").Run(); err != nil {
-		log.Printf("Error reconfiguring Wi-Fi: %v", err)
-		// Remove the network from the config
-		if err := removeNetworkFromWPAConfig(ssid); err != nil {
-			log.Printf("Error removing Wi-Fi network: %v", err)
-			return err
+		if err := netmanagerclient.EnableWifi(true); err != nil {
+			log.Printf("Error enabling Wi-Fi: %v", err)
+			http.Error(w, "Failed to enable Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+			return
 		}
-		return err
-	}
 
-	if ssids, err := getSSIDIds(); err == nil {
-		if id, ok := ssids[ssid]; ok {
-			// Connect to the network
-			if err := exec.Command("wpa_cli", "-i", "wlan0", "select_network", id).Run(); err != nil {
-				log.Printf("Error selecting Wi-Fi network: %v", err)
-				// Remove the network from the config
-				if err := removeNetworkFromWPAConfig(ssid); err != nil {
-					log.Printf("Error removing Wi-Fi network: %v", err)
-					return err
-				}
-				return err
-			} else {
-				// reassociate
-				if err := exec.Command("wpa_cli", "-i", "wlan0", "reassociate").Run(); err != nil {
-					log.Printf("Error reassociating Wi-Fi network: %v", err)
-					// Remove the network from the config
-					if err := removeNetworkFromWPAConfig(ssid); err != nil {
-						log.Printf("Error removing Wi-Fi network: %v", err)
-						return err
-					}
-					return err
-				}
-			}
+		log.Println("Connected to Wi-Fi successfully")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Connected to Wi-Fi successfully"))
+	} else {
+		if err := netmanagerclient.ConnectWifiNetwork(wifiDetails.SSID); err != nil {
+			log.Printf("Error connecting to Wi-Fi: %v", err)
+			http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+			return
 		}
+		log.Printf("Wi-Fi network already saved: %s", wifiDetails.SSID)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Wi-Fi network already saved"))
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	if connected := streamWifiState(ctx, ssid); !connected {
-		// Remove the network from the config
-		if err := netmanagerclient.RemoveWifiNetwork(ssid); err != nil {
-			log.Printf("Error removing Wi-Fi network: %v", err)
-			return err
-		}
-		return errors.New("failed to connect to Wi-Fi within the timeout")
-	}
-
-	log.Printf("Successfully connected to Wi-Fi SSID: %s", ssid)
-	// restart dhcp client
-	// remove static ip from dhcpcd.conf
-	if err := exec.Command("sed", "-i", "/static ip_address=/d", "/etc/dhcpcd.conf").Run(); err != nil {
-		log.Printf("Error removing static ip from dhcpcd.conf: %v", err)
-	}
-	if err := exec.Command("systemctl", "restart", "dhcpcd").Run(); err != nil {
-		log.Printf("Error restarting DHCP client: %v", err)
-	}
-
-	return nil
-}
-
-func getSSIDIds() (map[string]string, error) {
-	// Get the list of Wi-Fi networks
-	cmd := exec.Command("wpa_cli", "-i", "wlan0", "list_networks")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
-
-	// Parse the output
-	ssidIds := make(map[string]string)
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines[1:] {
-		if line == "" {
-			continue
-		}
-		fields := strings.Fields(line)
-		ssidIds[fields[1]] = fields[0]
-	}
-
-	return ssidIds, nil
-}
-
-func addNetworkToWPAConfig(ssid string, passkey string) error {
-	configFile := "/etc/wpa_supplicant/wpa_supplicant.conf"
-
-	// Read the current config file
-	content, err := os.ReadFile(configFile)
-	if err != nil {
-		return err
-	}
-
-	// Check if the network is already in the config
-	if strings.Contains(string(content), fmt.Sprintf("ssid=\"%s\"", ssid)) {
-		return nil
-	}
-
-	// Append the network to the config
-	newContent := fmt.Sprintf(`%s
-network={
-    ssid="%s"
-    psk="%s"
-}`, string(content), ssid, passkey)
-
-	return os.WriteFile(configFile, []byte(newContent), 0644)
-}
-
-func removeNetworkFromWPAConfig(ssid string) error {
-	configFile := "/etc/wpa_supplicant/wpa_supplicant.conf"
-
-	// Read the current config file
-	content, err := os.ReadFile(configFile)
-	if err != nil {
-		return err
-	}
-
-	lines := strings.Split(string(content), "\n")
-	var newLines []string
-	var blockLines []string
-	inBlock := false
-
-	for _, line := range lines {
-		if strings.Contains(line, "network={") {
-			inBlock = true
-			blockLines = []string{line}
-		} else if inBlock {
-			blockLines = append(blockLines, line)
-			if strings.Contains(line, "}") {
-				// Check the whole block for the SSID
-				if !strings.Contains(strings.Join(blockLines, "\n"), fmt.Sprintf("ssid=\"%s\"", ssid)) {
-					newLines = append(newLines, blockLines...)
-				}
-				inBlock = false
-				blockLines = nil
-			}
-		} else {
-			newLines = append(newLines, line)
-		}
-	}
-
-	return os.WriteFile(configFile, []byte(strings.Join(newLines, "\n")), 0644)
-}
-
-//func (api *ManagementAPI) GetWifiNetworks(w http.ResponseWriter, r *http.Request) {
-//	// Execute the command to scan for Wi-Fi networks
-//	log.Println("Scanning for Wi-Fi networks")
-//	cmd := exec.Command("iwlist", "wlan0", "scan")
-//	output, err := cmd.Output()
-//	if err != nil {
-//		log.Printf("Error scanning for Wi-Fi networks: %v", err)
-//		w.WriteHeader(http.StatusInternalServerError)
-//		io.WriteString(w, "failed to scan for Wi-Fi networks\n")
-//		return
-//	}
-//
-//	// Parse the output to extract network information
-//	networks := parseWiFiScanOutput(string(output))
-//	log.Printf("Found %d Wi-Fi networks", len(networks))
-//
-//	// Send the list of networks as a JSON response
-//	w.WriteHeader(http.StatusOK)
-//	json.NewEncoder(w).Encode(networks)
-//}
-
-func parseWiFiScanOutput(output string) []map[string]string {
-	var networks []map[string]string
-	var currentNetwork map[string]string
-
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		if strings.Contains(line, "Cell") {
-			if currentNetwork != nil {
-				networks = append(networks, currentNetwork)
-			}
-			currentNetwork = make(map[string]string)
-		} else if strings.Contains(line, "ESSID:") {
-			ssid := strings.Split(line, "\"")[1]
-			currentNetwork["SSID"] = ssid
-		} else if strings.Contains(line, "Quality=") {
-			quality := regexp.MustCompile("Quality=([0-9]+/[0-9]+)").FindStringSubmatch(line)[1]
-			signalLevel := regexp.MustCompile("Signal level=(-?[0-9]+ dBm)").FindStringSubmatch(line)[1]
-			currentNetwork["Quality"] = quality
-			currentNetwork["Signal Level"] = signalLevel
-		} else if strings.Contains(line, "Encryption key:on") {
-			currentNetwork["Security"] = "On"
-		} else if strings.Contains(line, "IE: IEEE 802.11i/WPA2") {
-			currentNetwork["Security"] = "WPA2"
-		} else if strings.Contains(line, "IE: WPA Version 1") {
-			currentNetwork["Security"] = "WPA"
-		} else if strings.Contains(line, "IE: Unknown") && currentNetwork["Security"] == "" {
-			// Default to 'Unknown' if no other security information is found
-			currentNetwork["Security"] = "Unknown"
-		}
-	}
-
-	// Append the last network if not empty
-	if currentNetwork != nil {
-		networks = append(networks, currentNetwork)
-	}
-
-	return networks
-}
-
-func reloadWPAConfig() error {
-	cmd := exec.Command("wpa_cli", "reconfigure")
-	return cmd.Run()
 }
 
 func (api *ManagementAPI) DisconnectFromWifi(w http.ResponseWriter, r *http.Request) {
@@ -1241,7 +978,7 @@ func (api *ManagementAPI) DisconnectFromWifi(w http.ResponseWriter, r *http.Requ
 		log.Fatalf("Error getting state changes: %v", err)
 	}
 	go func() {
-		if err := netmanagerclient.DisconnectWifiNetwork(currentSSID); err != nil {
+		if err := netmanagerclient.DisconnectWifiNetwork(currentSSID, true); err != nil {
 			log.Printf("Error removing Wi-Fi network: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			io.WriteString(w, "failed to remove Wi-Fi network\n")
@@ -1263,15 +1000,17 @@ func (api *ManagementAPI) ForgetWifiNetwork(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Forget the network
-	if err := netmanagerclient.RemoveWifiNetwork(wifiDetails.SSID); err != nil {
-		log.Printf("Error removing Wi-Fi network: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "failed to remove Wi-Fi network\n")
-	}
 	log.Printf("Will forget Wi-Fi network: %s", wifiDetails.SSID)
 	w.WriteHeader(http.StatusOK)
 	io.WriteString(w, "will forget Wi-Fi network shortly\n")
+	go func() {
+		currentSSID, _ := getCurrentWifiNetwork()
+		// Forget the network
+		currentlyConnetedTo := currentSSID == wifiDetails.SSID
+		if err := netmanagerclient.RemoveWifiNetwork(wifiDetails.SSID, currentlyConnetedTo, currentlyConnetedTo); err != nil {
+			log.Printf("Error removing Wi-Fi network: %v", err)
+		}
+	}()
 }
 
 func getLastKey(m map[string]string) string {
@@ -1472,7 +1211,7 @@ func getServiceLogs(service string, lines int) ([]string, error) {
 }
 
 func (api *ManagementAPI) GetWifiNetworks(w http.ResponseWriter, r *http.Request) {
-	networks, err := netmanagerclient.ListUserSavedWifiNetworks()
+	networks, err := netmanagerclient.ScanWiFiNetworks()
 	if err != nil {
 		serverError(&w, err)
 		return
@@ -1509,7 +1248,7 @@ func (api *ManagementAPI) DeleteWifiNetwork(w http.ResponseWriter, r *http.Reque
 		badRequest(&w, errors.New("ssid field was empty"))
 		return
 	}
-	if err := netmanagerclient.RemoveWifiNetwork(ssid); err != nil {
+	if err := netmanagerclient.RemoveWifiNetwork(ssid, false, false); err != nil {
 		if _, ok := err.(netmanagerclient.InputError); ok {
 			badRequest(&w, err)
 			return
@@ -1561,6 +1300,70 @@ func (api *ManagementAPI) GetConnectionStatus(w http.ResponseWriter, r *http.Req
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(data)
+}
+
+func (api *ManagementAPI) SaveWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	var wifiDetails struct {
+		SSID     string `json:"ssid"`
+		Password string `json:"password"`
+	}
+
+	// Decode the JSON body
+	if err := json.NewDecoder(r.Body).Decode(&wifiDetails); err != nil {
+		log.Printf("Error decoding request: %v", err)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Get currently saved Wi-Fi networks
+	_, saved := netmanagerclient.FindNetworkBySSID(wifiDetails.SSID)
+
+	if !saved {
+		log.Printf("Attempting to connect to Wi-Fi SSID: %s", wifiDetails.SSID)
+		if err := netmanagerclient.AddWifiNetwork(wifiDetails.SSID, wifiDetails.Password); err != nil {
+			log.Printf("Error connecting to Wi-Fi: %v", err)
+			http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		scanWifis, err := netmanagerclient.ScanWiFiNetworks()
+
+		if err != nil {
+			log.Printf("Error scanning Wi-Fi networks: %v", err)
+			http.Error(w, "Failed to scan Wi-Fi networks: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var found bool
+		for _, wifi := range scanWifis {
+			if wifi.SSID == wifiDetails.SSID {
+				found = true
+				break
+			}
+		}
+
+		if found {
+			if err := netmanagerclient.ConnectWifiNetwork(wifiDetails.SSID); err != nil {
+				log.Printf("Error connecting to Wi-Fi: %v", err)
+				http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		log.Println("Added Wi-Fi successfully")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Connected to Wi-Fi successfully"))
+	} else {
+		if err := netmanagerclient.ConnectWifiNetwork(wifiDetails.SSID); err != nil {
+			log.Printf("Error connecting to Wi-Fi: %v", err)
+			http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("Wi-Fi network already saved: %s", wifiDetails.SSID)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Wi-Fi network already saved"))
+	}
 }
 
 func (api *ManagementAPI) GetSavedWifiNetworks(w http.ResponseWriter, r *http.Request) {

@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os/exec"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -38,6 +39,7 @@ import (
 	"github.com/TheCacophonyProject/go-cptv/cptvframe"
 	managementinterface "github.com/TheCacophonyProject/management-interface"
 	"github.com/TheCacophonyProject/management-interface/api"
+	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
 )
 
 const (
@@ -157,6 +159,8 @@ func main() {
 	apiRouter.HandleFunc("/network/interfaces", apiObj.GetNetworkInterfaces).Methods("GET")
 	apiRouter.HandleFunc("/network/wifi", apiObj.GetWifiNetworks).Methods("GET")
 	apiRouter.HandleFunc("/network/wifi", apiObj.ConnectToWifi).Methods("POST")
+	apiRouter.HandleFunc("/network/wifi/save", apiObj.SaveWifiNetwork).Methods("POST")
+	apiRouter.HandleFunc("/network/wifi/saved", apiObj.GetSavedWifiNetworks).Methods("GET")
 	apiRouter.HandleFunc("/network/wifi/saved", apiObj.GetSavedWifiNetworks).Methods("GET")
 	apiRouter.HandleFunc("/network/wifi/forget", apiObj.ForgetWifiNetwork).Methods("DELETE")
 	apiRouter.HandleFunc("/network/wifi/current", apiObj.GetCurrentWifiNetwork).Methods("GET")
@@ -173,7 +177,17 @@ func main() {
 	apiRouter.HandleFunc("/upload-logs", apiObj.UploadLogs).Methods("PUT")
 
 	apiRouter.Use(basicAuth)
-	go apiObj.ManageHotspot()
+
+	apiRouter.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			netmanagerclient.KeepHotspotOnFor(60 * 5)
+			out, err := exec.Command("stay-on-for", "300").CombinedOutput() // Stops camera from going to sleep for 300 seconds
+			if err != nil {
+				log.Printf("error running stay-on-for: %s, error: %s", string(out), err)
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
