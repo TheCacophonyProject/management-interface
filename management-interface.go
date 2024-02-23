@@ -19,10 +19,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package managementinterface
 
 import (
-	"bufio"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -32,7 +29,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -95,7 +91,7 @@ func getRaspberryPiSerialNumber() string {
 		return ""
 	}
 	defer file.Close()
-	out, err := ioutil.ReadAll(file)
+	out, err := io.ReadAll(file)
 	if err != nil {
 		return ""
 	}
@@ -315,297 +311,9 @@ func NetworkHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "network.html", state)
 }
 
-// getNetworkSSID gets the ssid from the wpa_supplicant configuration with the specified id
-func getNetworkSSID(networkID string) (string, error) {
-	out, err := exec.Command("wpa_cli", "get_network", networkID, "ssid").Output()
-	if err != nil {
-		return "", fmt.Errorf("error executing wpa_cli get_network %s - error %s output %s", networkID, err, out)
-	}
-
-	stdOut := string(out)
-	scanner := bufio.NewScanner(strings.NewReader(stdOut))
-	scanner.Scan() // skip 1st line interface line
-	scanner.Scan()
-	ssid := scanner.Text()
-	return ssid, err
-}
-
-// deleteNetwork removes the network from the wpa_supplicant configuration with specified id.
-func deleteNetwork(id string) error {
-	// check if is bushnet
-	ssid, err := getNetworkSSID(id)
-	if err != nil {
-		return err
-	}
-	return DeleteNetworkBySSID(ssid)
-}
-
-func DeleteNetworkBySSID(ssid string) error {
-	// check if is bushnet
-	if strings.ToLower(ssid) == "\"bushnet\"" {
-		return errors.New("error bushnet cannot be deleted")
-	}
-
-	// remove network
-	cmd := exec.Command("wpa_cli")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return fmt.Errorf("error getting stdin pipe from cmd -error %s", err)
-	}
-	defer stdin.Close()
-	io.WriteString(stdin, fmt.Sprintf("remove_network %s\n", ssid))
-	io.WriteString(stdin, "quit\n")
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("error deleting wpa network -error %s", err)
-	}
-	errOccured := hasErrorOccured(string(out))
-	if errOccured {
-		reloadWPAConfig()
-		err = errors.New("error deleting network")
-		return err
-	}
-
-	// save and reload config
-	err = saveWPAConfig()
-	if err != nil {
-		return err
-	}
-	err = reloadWPAConfig()
-	if err != nil { // probably wont happen
-		return err
-	}
-	return nil
-}
-
-// doesWpaNetworkExist checks for a network with the specified ssid in the wpa_supplicant configuration.
-func doesWPANetworkExist(ssid string) (bool, error) {
-	networks, err := parseWPASupplicantConfig()
-	if err != nil {
-		return false, err
-	}
-	for _, v := range networks {
-		if strings.ToLower(v.ID) == strings.ToLower(ssid) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-var dhcp_config_default = []string{
-	"hostname",
-	"clientid",
-	"persistent",
-	"option rapid_commit",
-	"option domain_name_servers, domain_name, domain_search, host_name",
-	"option classless_static_routes",
-	"option interface_mtu",
-	"require dhcp_server_identifier",
-	"slaac private",
-}
-
-func writeLines(file_path string, lines []string) error {
-	file, err := os.Create(file_path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	w := bufio.NewWriter(file)
-	for _, line := range lines {
-		_, _ = fmt.Fprintln(w, line)
-	}
-	return w.Flush()
-}
-
-func restartNetwork() error {
-	if err := writeLines("/etc/dhcpcd.conf", dhcp_config_default); err != nil {
-		return err
-	}
-	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
-		return err
-	}
-	if err := exec.Command("systemctl", "restart", "dhcpcd").Run(); err != nil {
-		return err
-	}
-	return exec.Command("systemctl", "restart", "networking").Run()
-}
-
-// addWPANetwork adds a new wpa network in the wpa_supplication configuration
-// with specified ssid and password (if it doesn't already exist)
-func addWPANetwork(ssid string, password string) error {
-	if ssid == "" {
-		return errors.New("SSID must have a value")
-	} else if strings.ToLower(ssid) == "bushnet" {
-		return errors.New("SSID cannot be bushnet")
-	}
-	if err := restartNetwork(); err != nil {
-		return err
-	}
-
-	networkExists, err := doesWPANetworkExist(ssid)
-	if err != nil {
-		log.Println(err)
-	}
-	if networkExists {
-		return fmt.Errorf("SSID %s already exists", ssid)
-	}
-
-	networkID, err := addNewNetwork()
-	if err != nil {
-		return err
-	}
-
-	err = setWPANetworkDetails(ssid, password, networkID)
-	if err != nil {
-		return err
-	}
-
-	err = saveWPAConfig()
-	reloadErr := reloadWPAConfig()
-	if err == nil { // probably wont happen
-		err = reloadErr
-	}
-	return err
-}
-
-// addNewNetwork adds a new network in the wpa_supplication configuration and returns the new network id
-func addNewNetwork() (int, error) {
-	out, err := exec.Command("wpa_cli", "add_network").Output()
-	networkID := -1
-
-	if err != nil {
-		return networkID, fmt.Errorf("error executing wpa_cli add_network - error %s output %s", err, out)
-	}
-	stdOut := string(out)
-
-	// get the networkid of the new networks from stdOut
-	scanner := bufio.NewScanner(strings.NewReader(stdOut))
-	scanner.Scan() // skip interface line
-	if scanner.Scan() {
-		line := scanner.Text()
-		networkID, err = strconv.Atoi(line)
-		if err != nil {
-			return -1, fmt.Errorf("could not find network id - error %s from stdout %s", err, stdOut)
-		}
-	}
-	return networkID, err
-}
-
-// setWPANetworkDetails sets the ssid and password of the specified networkID in the wpa_supplication configuration
-func setWPANetworkDetails(ssid string, password string, networkID int) error {
-	cmd := exec.Command("wpa_cli")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return fmt.Errorf("error getting stdin pipe from cmd: %s", err)
-	}
-
-	defer stdin.Close()
-	io.WriteString(stdin, fmt.Sprintf("set_network %d ssid \"%s\"\n", networkID, ssid))
-	io.WriteString(stdin, fmt.Sprintf("set_network %d psk \"%s\"\n", networkID, password))
-	io.WriteString(stdin, fmt.Sprintf("enable_network %d\n", networkID))
-	io.WriteString(stdin, "quit\n")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("error adding wpa network -error %s", err)
-	}
-
-	errOccured := hasErrorOccured(string(out))
-	if errOccured {
-		reloadWPAConfig()
-		err = errors.New("error setting new network")
-	}
-	return err
-}
-
-// reloadWPAConfig executes wpa_cli reconfigure
-func reloadWPAConfig() error {
-	out, err := exec.Command("wpa_cli", "reconfigure").Output()
-	if err != nil {
-		return fmt.Errorf("error reloading config - error %s output %s", err, out)
-	}
-
-	errOccured := hasErrorOccured(string(out))
-	if errOccured {
-		err = errors.New("error reloading config")
-	}
-	return err
-}
-
-// hasErrorOccured checks string for FAIL text
-func hasErrorOccured(stdOut string) bool {
-	errorOccured := strings.Contains(stdOut, "\nFAIL\n")
-	return errorOccured
-}
-
-// saveWPAConfig executes wpa_cli save config
-func saveWPAConfig() error {
-	out, err := exec.Command("wpa_cli", "save", "config").Output()
-	if err != nil {
-		return fmt.Errorf("error saving config - error %s output %s", err, out)
-	}
-	errOccured := hasErrorOccured(string(out))
-	if errOccured {
-		err = errors.New("error saving config")
-	}
-	return err
-}
-
 type wifiNetwork struct {
 	ID        string
 	NetworkID int
-}
-
-func listAvailableWifiNetworkSSIDs() ([]string, error) {
-	cmd := "iw wlan0 scan | egrep 'SSID'"
-	out, err := exec.Command("bash", "-c", cmd).Output()
-	ssids := []string{}
-	if err != nil {
-		return ssids, fmt.Errorf("error listing available networks: %v", err)
-	}
-	networkList := string(out)
-	scanner := bufio.NewScanner(strings.NewReader(networkList))
-	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.Split(line, ":")
-		if len(parts) > 1 {
-			if strings.ToLower(parts[1]) != "bushnet" {
-				ssids = append(ssids, strings.TrimSpace(parts[1]))
-			}
-		}
-	}
-	return ssids, err
-}
-
-// parseWPASupplicantConfig uses wpa_cli list_networks to get all networks in the wpa_supplicant configuration
-func parseWPASupplicantConfig() ([]wifiNetwork, error) {
-	out, err := exec.Command("wpa_cli", "list_networks").Output()
-	networks := []wifiNetwork{}
-
-	if err != nil {
-		return networks, fmt.Errorf("error listing networks: %v", err)
-	}
-	networkList := string(out)
-	scanner := bufio.NewScanner(strings.NewReader(networkList))
-	scanner.Scan() // skip interface listing
-	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.Split(line, "\t")
-		if len(parts) > 2 {
-			if id, err := strconv.Atoi(parts[0]); err == nil {
-				if strings.ToLower(parts[1]) != "bushnet" {
-					wNetwork := wifiNetwork{ID: parts[1], NetworkID: id}
-					networks = append(networks, wNetwork)
-				}
-			} else {
-				err = fmt.Errorf("error parsing network_id %s for line %s", err, line)
-			}
-		}
-	}
-
-	sort.Slice(networks, func(i, j int) bool { return networks[i].ID < networks[j].ID })
-	return networks, err
 }
 
 // WifiNetworkHandler show the wireless networks listed in the wpa_supplicant configuration
