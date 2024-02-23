@@ -39,7 +39,7 @@ import (
 	"github.com/TheCacophonyProject/go-cptv/cptvframe"
 	managementinterface "github.com/TheCacophonyProject/management-interface"
 	"github.com/TheCacophonyProject/management-interface/api"
-	"github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
+	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
 )
 
 const (
@@ -47,13 +47,15 @@ const (
 	socketTimeout = 7 * time.Second
 )
 
-var haveClients = make(chan bool)
-var version = "<not set>"
-var sockets = make(map[int64]*WebsocketRegistration)
-var socketsLock sync.RWMutex
-var cameraInfo map[string]interface{}
-var lastFrame *FrameData
-var currentFrame = -1
+var (
+	haveClients  = make(chan bool)
+	version      = "<not set>"
+	sockets      = make(map[int64]*WebsocketRegistration)
+	socketsLock  sync.RWMutex
+	cameraInfo   map[string]interface{}
+	lastFrame    *FrameData
+	currentFrame = -1
+)
 
 // Set up and handle page requests.
 func main() {
@@ -109,19 +111,20 @@ func main() {
 	router.HandleFunc("/battery-csv", managementinterface.DownloadBatteryCSV).Methods("GET")
 
 	// API
-	apiObj, err := api.NewAPI(config.config, version)
-
+	apiRouter := router.PathPrefix("/api").Subrouter()
+	apiObj, err := api.NewAPI(apiRouter, config.config, version)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
-	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.HandleFunc("/device-info", apiObj.GetDeviceInfo).Methods("GET")
 	apiRouter.HandleFunc("/recordings", apiObj.GetRecordings).Methods("GET")
 	apiRouter.HandleFunc("/recording/{id}", apiObj.GetRecording).Methods("GET")
 	apiRouter.HandleFunc("/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
 	apiRouter.HandleFunc("/camera/snapshot", apiObj.TakeSnapshot).Methods("PUT")
 	apiRouter.HandleFunc("/camera/snapshot-recording", apiObj.TakeSnapshotRecording).Methods("PUT")
+	apiRouter.HandleFunc("/audio/record", apiObj.RecordAudio).Methods("POST")
+	apiRouter.HandleFunc("/audio/files", apiObj.GetAudioFiles).Methods("GET")
 	apiRouter.HandleFunc("/signal-strength", apiObj.GetSignalStrength).Methods("GET")
 	apiRouter.HandleFunc("/reregister", apiObj.Reregister).Methods("POST")
 	apiRouter.HandleFunc("/reboot", apiObj.Reboot).Methods("POST")
@@ -153,6 +156,17 @@ func main() {
 	apiRouter.HandleFunc("/battery", apiObj.GetBattery).Methods("GET")
 	apiRouter.HandleFunc("/test-videos", apiObj.GetTestVideos).Methods("GET")
 	apiRouter.HandleFunc("/play-test-video", apiObj.PlayTestVideo).Methods("POST")
+	apiRouter.HandleFunc("/network/interfaces", apiObj.GetNetworkInterfaces).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi", apiObj.GetWifiNetworks).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi", apiObj.ConnectToWifi).Methods("POST")
+	apiRouter.HandleFunc("/network/wifi/save", apiObj.SaveWifiNetwork).Methods("POST")
+	apiRouter.HandleFunc("/network/wifi/saved", apiObj.GetSavedWifiNetworks).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi/saved", apiObj.GetSavedWifiNetworks).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi/forget", apiObj.ForgetWifiNetwork).Methods("DELETE")
+	apiRouter.HandleFunc("/network/wifi/current", apiObj.GetCurrentWifiNetwork).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi/current", apiObj.DisconnectFromWifi).Methods("DELETE")
+	apiRouter.HandleFunc("/wifi-check", apiObj.CheckWifiInternetConnection).Methods("GET")
+	apiRouter.HandleFunc("/modem-check", apiObj.CheckModemInternetConnection).Methods("GET")
 	apiRouter.HandleFunc("/wifi-networks", apiObj.GetWifiNetworks).Methods("GET")
 	apiRouter.HandleFunc("/wifi-networks", apiObj.PostWifiNetwork).Methods("POST")
 	apiRouter.HandleFunc("/wifi-networks", apiObj.DeleteWifiNetwork).Methods("Delete")
@@ -178,7 +192,6 @@ func main() {
 	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, router))
-
 }
 
 func basicAuth(next http.Handler) http.Handler {
@@ -359,7 +372,6 @@ type FrameData struct {
 }
 
 func GetFrame() *FrameData {
-
 	conn, err := dbus.SystemBus()
 	if err != nil {
 		return nil
