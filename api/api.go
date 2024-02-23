@@ -1013,14 +1013,6 @@ func (api *ManagementAPI) ForgetWifiNetwork(w http.ResponseWriter, r *http.Reque
 	}()
 }
 
-func getLastKey(m map[string]string) string {
-	var lastKey string
-	for k := range m {
-		lastKey = k
-	}
-	return lastKey
-}
-
 func streamOutput(pipe io.ReadCloser) {
 	scanner := bufio.NewScanner(pipe)
 	for scanner.Scan() {
@@ -1468,20 +1460,34 @@ func (api *ManagementAPI) DownloadAudioFile(w http.ResponseWriter, r *http.Reque
 }
 
 func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {
-	if err := exec.Command("cp", "/var/log/syslog", "/tmp/syslog").Run(); err != nil {
-		log.Printf("Error copying syslog: %v", err)
+	twoWeeksAgo := time.Now().AddDate(0, 0, -14).Format("2006-01-02")
+	journalctlCmd := exec.Command("journalctl", "--since", twoWeeksAgo)
+
+	logFileName := "/tmp/journalctl-logs-last-2-weeks.log"
+	logFile, err := os.Create(logFileName)
+	if err != nil {
+		log.Printf("Failed to create log file: %v", err)
+		serverError(&w, err)
+		return
+	}
+	defer logFile.Close()
+
+	journalctlCmd.Stdout = logFile
+
+	if err := journalctlCmd.Run(); err != nil {
+		log.Printf("Failed to run journalctl command: %v", err)
 		serverError(&w, err)
 		return
 	}
 
-	if err := exec.Command("gzip", "/tmp/syslog", "-f").Run(); err != nil {
-		log.Printf("Error compressing syslog: %v", err)
+	if err := exec.Command("gzip", "-f", logFileName).Run(); err != nil {
+		log.Printf("Failed to compress log file: %v", err)
 		serverError(&w, err)
 		return
 	}
 
-	if err := exec.Command("salt-call", "cp.push", "/tmp/syslog.gz").Run(); err != nil {
-		log.Printf("Error pushing syslog with salt: %v", err)
+	if err := exec.Command("salt-call", "cp.push", logFileName+".gz").Run(); err != nil {
+		log.Printf("Error pushing log file with salt: %v", err)
 		serverError(&w, err)
 		return
 	}
