@@ -386,7 +386,7 @@ func doesWPANetworkExist(ssid string) (bool, error) {
 		return false, err
 	}
 	for _, v := range networks {
-		if strings.ToLower(v.SSID) == strings.ToLower(ssid) {
+		if strings.ToLower(v.ID) == strings.ToLower(ssid) {
 			return true, nil
 		}
 	}
@@ -553,7 +553,7 @@ func saveWPAConfig() error {
 }
 
 type wifiNetwork struct {
-	SSID      string
+	ID        string
 	NetworkID int
 }
 
@@ -595,7 +595,7 @@ func parseWPASupplicantConfig() ([]wifiNetwork, error) {
 		if len(parts) > 2 {
 			if id, err := strconv.Atoi(parts[0]); err == nil {
 				if strings.ToLower(parts[1]) != "bushnet" {
-					wNetwork := wifiNetwork{SSID: parts[1], NetworkID: id}
+					wNetwork := wifiNetwork{ID: parts[1], NetworkID: id}
 					networks = append(networks, wNetwork)
 				}
 			} else {
@@ -604,7 +604,7 @@ func parseWPASupplicantConfig() ([]wifiNetwork, error) {
 		}
 	}
 
-	sort.Slice(networks, func(i, j int) bool { return networks[i].SSID < networks[j].SSID })
+	sort.Slice(networks, func(i, j int) bool { return networks[i].ID < networks[j].ID })
 	return networks, err
 }
 
@@ -624,10 +624,10 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	wifiProps.Networks = []wifiNetwork{}
 	for _, network := range wifiNetworks {
-		if network.SSID == "" || network.SSID == "bushnet" || network.SSID == "Bushnet" {
+		if network.ID == "" || network.ID == "bushnet" || network.ID == "Bushnet" || network.ID == "BushnetHotspot" {
 			continue
 		}
-		wifiProps.Networks = append(wifiProps.Networks, wifiNetwork{SSID: network.SSID})
+		wifiProps.Networks = append(wifiProps.Networks, wifiNetwork{ID: network.ID})
 	}
 
 	availableWifiNetworks, err := netmanagerclient.ScanWiFiNetworks()
