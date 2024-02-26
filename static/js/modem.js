@@ -15,6 +15,10 @@ async function getState() {
     
 
     if (response.modem != null) {
+      // No GPS data at the moment
+      $("#gpsData").hide();
+      $("#noGPS").hide();
+      /*
       if (typeof(response.GPS) == 'string') {
         $("#noGPS").show();
         $("#gpsData").hide();
@@ -29,6 +33,7 @@ async function getState() {
         $("#gpsCourse").html(response.GPS.course)
         $("#gpsSpeed").html(response.GPS.speed)
       }
+      */
       $("#modemData").show();
       $("#connectedTime").html(response.modem.connectedTime);
       $("#manufacturer").html(response.modem.manufacturer);
