@@ -157,7 +157,7 @@ func main() {
 	apiRouter.HandleFunc("/test-videos", apiObj.GetTestVideos).Methods("GET")
 	apiRouter.HandleFunc("/play-test-video", apiObj.PlayTestVideo).Methods("POST")
 	apiRouter.HandleFunc("/network/interfaces", apiObj.GetNetworkInterfaces).Methods("GET")
-	apiRouter.HandleFunc("/network/wifi", apiObj.GetWifiNetworks).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi", apiObj.ScanWifiNetwork).Methods("GET")
 	apiRouter.HandleFunc("/network/wifi", apiObj.ConnectToWifi).Methods("POST")
 	apiRouter.HandleFunc("/network/wifi/save", apiObj.SaveWifiNetwork).Methods("POST")
 	apiRouter.HandleFunc("/network/wifi/saved", apiObj.GetSavedWifiNetworks).Methods("GET")

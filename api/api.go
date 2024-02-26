@@ -876,7 +876,6 @@ func CheckInternetConnection(interfaceName string) bool {
 		return false
 	}
 	return true
-
 }
 
 func (api *ManagementAPI) CheckModemInternetConnection(w http.ResponseWriter, r *http.Request) {
@@ -1327,7 +1326,6 @@ func (api *ManagementAPI) SaveWifiNetwork(w http.ResponseWriter, r *http.Request
 		}
 
 		scanWifis, err := netmanagerclient.ScanWiFiNetworks()
-
 		if err != nil {
 			log.Printf("Error scanning Wi-Fi networks: %v", err)
 			http.Error(w, "Failed to scan Wi-Fi networks: "+err.Error(), http.StatusInternalServerError)
@@ -1367,7 +1365,7 @@ func (api *ManagementAPI) SaveWifiNetwork(w http.ResponseWriter, r *http.Request
 }
 
 func (api *ManagementAPI) GetSavedWifiNetworks(w http.ResponseWriter, r *http.Request) {
-	networks, err := netmanagerclient.ListSavedWifiNetworks()
+	networks, err := netmanagerclient.ListUserSavedWifiNetworks()
 	if err != nil {
 		serverError(&w, err)
 		return
