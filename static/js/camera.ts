@@ -96,6 +96,7 @@ window.onload = function () {
   document.getElementById("trigger-trap")!.onclick = triggerTrap;
   document.getElementById("take-snapshot-recording")!.onclick =
     takeTestRecording;
+    takeTestRecording;
   cameraConnection = new CameraConnection(
     window.location.hostname,
     window.location.port,
@@ -104,22 +105,28 @@ window.onload = function () {
   );
 };
 
-async function takeTestRecording() {
   document.getElementById("take-snapshot-recording")!.innerText =
     "Making a test recording";
   document
     .getElementById("take-snapshot-recording")!
     .setAttribute("disabled", "true");
-  console.log("making a test recording");
+    "Making a test recording";
   fetch("/api/camera/snapshot-recording", {
     method: "PUT",
-    headers: {
+    .setAttribute("disabled", "true");
       Authorization: "Basic YWRtaW46ZmVhdGhlcnM=",
     },
   })
     .then((response) => console.log(response))
     .then((data) => console.log(data))
     .catch((error) => console.error(error));
+  })
+  await new Promise((r) => setTimeout(r, 3000));
+  document
+    .getElementById("take-snapshot-recording")!
+    .removeAttribute("disabled");
+  document.getElementById("take-snapshot-recording")!.innerText =
+    "Take test recording";
   //TODO handle errors better and check that recording was made properly instead of just waiting..
   await new Promise((r) => setTimeout(r, 3000));
   document
@@ -197,13 +204,13 @@ function drawRectWithText(
 
 async function processFrame(frame: Frame) {
   const canvas = document.getElementById("frameCanvas") as HTMLCanvasElement;
-
-  const trackCanvas = document.getElementById(
-    "trackCanvas"
+  if (canvas.width != frame.frameInfo.Camera.ResX) {
+    canvas.width = frame.frameInfo.Camera.ResX;
+    trackCanvas.width = frame.frameInfo.Camera.ResX;
   ) as HTMLCanvasElement;
-  if (canvas == null) {
-    return;
-  }
+  if (canvas.height != frame.frameInfo.Camera.ResY) {
+    canvas.height = frame.frameInfo.Camera.ResY;
+    trackCanvas.height = frame.frameInfo.Camera.ResY;
   if (canvas.width != frame.frameInfo.Camera.ResX) {
     canvas.width = frame.frameInfo.Camera.ResX;
     trackCanvas.width = frame.frameInfo.Camera.ResX;
@@ -214,25 +221,25 @@ async function processFrame(frame: Frame) {
   }
   const context = canvas.getContext("2d") as CanvasRenderingContext2D;
   const imgData = context.getImageData(
+  if (irCamera) {
     0,
-    0,
-    frame.frameInfo.Camera.ResX,
+  } else {
     frame.frameInfo.Camera.ResY
   );
-  //  gp hack to see if ir camera, dbus from python makes dictionary have to be all int type
-  let irCamera = frame.frameInfo.Camera.ResX >= 640;
-  if (irCamera) {
-    document.getElementById("trigger-trap")!.style.display = "";
+  let max = 0;
+  let min = 0;
+  let range = 0;
+  if (!irCamera) {
   } else {
     document.getElementById("trigger-trap")!.style.display = "none";
   }
   let max = 0;
   let min = 0;
   let range = 0;
-  if (!irCamera) {
-    max = Math.max(...frame.frame);
-    min = Math.min(...frame.frame);
-    range = max - min;
+    let pix = 0;
+    if (irCamera) {
+      pix = frame.frame[i];
+    } else {
   }
   let maxI = 0;
   for (let i = 0; i < frame.frame.length; i++) {
@@ -262,6 +269,7 @@ async function processFrame(frame: Frame) {
       for (const track of frame.frameInfo.Tracks) {
         let what = null;
         if (track.predictions && track.predictions.length > 0) {
+      }
           what = track.predictions[0].label;
         }
         drawRectWithText(
