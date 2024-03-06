@@ -101,7 +101,7 @@ func (s *ManagementAPI) StopHotspotTimer() {
 }
 
 func (server *ManagementAPI) ManageHotspot() {
-	if err := initilseHotspot(); err != nil {
+	if err := initializeHotspot(); err != nil {
 		log.Println("Failed to initialise hotspot:", err)
 		if err := stopHotspot(); err != nil {
 			log.Println("Failed to stop hotspot:", err)
@@ -834,9 +834,6 @@ func (api *ManagementAPI) ConnectToWifi(w http.ResponseWriter, r *http.Request) 
 		return
 	} else {
 		log.Printf("Successfully connected to Wi-Fi SSID: %s", wifiDetails.SSID)
-		if err := exec.Command("systemctl", "restart", "dhcpcd").Run(); err != nil {
-			log.Printf("Error restarting DHCP client: %v", err)
-		}
 		log.Println("Connected to Wi-Fi successfully")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Connected to Wi-Fi successfully"))
@@ -1100,7 +1097,7 @@ func (api *ManagementAPI) DisconnectFromWifi(w http.ResponseWriter, r *http.Requ
 			// Handle the error
 		}
 
-		if err := RestartDHCP(); err != nil {
+		if err := restartDHCP(); err != nil {
 			log.Printf("Error restarting DHCP client: %v", err)
 		}
 		// if no current network, then restart hotspot
@@ -1143,7 +1140,7 @@ func (api *ManagementAPI) ForgetWifiNetwork(w http.ResponseWriter, r *http.Reque
 				w.WriteHeader(http.StatusInternalServerError)
 				io.WriteString(w, "failed to remove Wi-Fi network\n")
 			}
-			if err := RestartDHCP(); err != nil {
+			if err := restartDHCP(); err != nil {
 				log.Printf("Error restarting DHCP client: %v", err)
 			}
 			// if no current network, then restart hotspot
@@ -1157,8 +1154,6 @@ func (api *ManagementAPI) ForgetWifiNetwork(w http.ResponseWriter, r *http.Reque
 			}
 		}()
 	} else {
-		// Remove the network using wpa_cli
-		// Get the list of Wi-Fi networks
 		ssids, err := getSSIDIds()
 		if err != nil {
 			log.Printf("Error getting Wi-Fi networks: %v", err)

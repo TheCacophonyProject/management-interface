@@ -11,24 +11,41 @@ import (
 	"time"
 )
 
-// refactor createAPConfig to remove duplication
-func createAPConfig(name string) error {
-	file_name := "/etc/hostapd/hostapd.conf"
-	config_lines := []string{
+const (
+	routerIP        = "192.168.4.1"
+	hotspotSSID     = "bushnet"
+	hotspotPassword = "feathers"
+)
+
+var dhcpConfigDefault = []string{
+	"hostname",
+	"clientid",
+	"persistent",
+	"option rapid_commit",
+	"option domain_name_servers, domain_name, domain_search, host_name",
+	"option classless_static_routes",
+	"option interface_mtu",
+	"require dhcp_server_identifier",
+	"slaac private",
+}
+
+func createAPConfig() error {
+	fileName := "/etc/hostapd/hostapd.conf"
+	configLines := []string{
 		"country_code=NZ",
 		"interface=wlan0",
-		"ssid=" + name,
+		fmt.Sprintf("ssid=%s", hotspotSSID),
 		"hw_mode=g",
 		"channel=7",
 		"macaddr_acl=0",
 		"ignore_broadcast_ssid=0",
 		"wpa=2",
-		"wpa_passphrase=feathers",
+		fmt.Sprintf("wpa_passphrase=%s", hotspotPassword),
 		"wpa_key_mgmt=WPA-PSK",
 		"wpa_pairwise=TKIP",
 		"rsn_pairwise=CCMP",
 	}
-	return createConfigFile(file_name, config_lines)
+	return createConfigFile(fileName, configLines)
 }
 
 func isInterfaceUp(interfaceName string) bool {
@@ -41,8 +58,8 @@ func isInterfaceUp(interfaceName string) bool {
 }
 
 func waitForInterface(interfaceName string, timeout time.Duration) error {
-	end := time.Now().Add(timeout)
-	for time.Now().Before(end) {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
 		if isInterfaceUp(interfaceName) {
 			return nil
 		}
@@ -51,153 +68,90 @@ func waitForInterface(interfaceName string, timeout time.Duration) error {
 	return fmt.Errorf("interface %s did not come up within the specified timeout", interfaceName)
 }
 
-func startAccessPoint(_ string) error {
-	err := exec.Command("systemctl", "restart", "hostapd").Run()
-	if err != nil {
+func startAccessPoint() error {
+	if err := exec.Command("systemctl", "restart", "hostapd").Run(); err != nil {
 		return err
 	}
-	// Wait for wlan0 to be up before proceeding
 	return waitForInterface("wlan0", 30*time.Second)
 }
 
 func stopAccessPoint() error {
-	return exec.Command("systemctl", "stop", "hostapd").Start()
+	return exec.Command("systemctl", "stop", "hostapd").Run()
 }
 
-const router_ip = "192.168.4.1"
+func createDHCPConfig(isHotspot bool) error {
+	filePath := "/etc/dhcpcd.conf"
+	configLines := dhcpConfigDefault
 
-var dhcp_config_default = []string{
-	"hostname",
-	"clientid",
-	"persistent",
-	"noipv6",
-	"option rapid_commit",
-	"option domain_name_servers, domain_name, domain_search, host_name",
-	"option classless_static_routes",
-	"option interface_mtu",
-	"require dhcp_server_identifier",
-	"slaac private",
-	"interface usb0",
-	"metric 300",
-	"interface wlan0",
-	"metric 200",
-}
-
-var dhcp_config_lines = []string{
-	"interface wlan0",
-	"static ip_address=" + router_ip + "/24",
-}
-
-func createDHCPConfig() (bool, error) {
-	file_path := "/etc/dhcpcd.conf"
-
-	// append to dhcpcd.conf if lines don't already exist
-	config_lines := append(dhcp_config_default, dhcp_config_lines...)
-	return writeLines(file_path, config_lines)
-}
-
-func writeLines(file_path string, lines []string) (bool, error) {
-	// Check if file already exists with the same config.
-	if _, err := os.Stat(file_path); err == nil {
-		currentContent, err := os.ReadFile(file_path)
-		if err != nil {
-			return false, err
-		}
-		newContent := strings.Join(lines, "\n") + "\n"
-		if string(currentContent) == newContent {
-			return false, nil
-		}
+	if isHotspot {
+		configLines = append(configLines, "interface wlan0", fmt.Sprintf("static ip_address=%s/24", routerIP))
 	}
 
-	file, err := os.Create(file_path)
+	return writeLines(filePath, configLines)
+}
+
+func writeLines(filePath string, lines []string) error {
+	file, err := os.Create(filePath)
 	if err != nil {
-		return false, err
+		return err
 	}
 	defer file.Close()
 
-	w := bufio.NewWriter(file)
+	writer := bufio.NewWriter(file)
 	for _, line := range lines {
-		_, _ = fmt.Fprintln(w, line)
+		fmt.Fprintln(writer, line)
 	}
-	if err := w.Flush(); err != nil {
-		return false, err
-	}
-
-	return true, nil
+	return writer.Flush()
 }
 
-func startDHCP() error {
-	// modify /etc/dhcpcd.conf
-	configModified, err := createDHCPConfig()
-	if err != nil {
-		return err
-	}
-	if configModified {
-		return exec.Command("systemctl", "restart", "dhcpcd").Run()
-	}
-	return exec.Command("systemctl", "start", "dhcpcd").Run()
-}
-
-func RestartDHCP() error {
-	// Only restart if config has changed
-	configModified, err := writeLines("/etc/dhcpcd.conf", dhcp_config_default)
-	if err != nil {
-		return err
-	}
-
+func restartDHCP() error {
 	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
 		return err
 	}
-	if configModified {
-		return exec.Command("systemctl", "restart", "dhcpcd").Run()
-	}
-	return exec.Command("systemctl", "start", "dhcpcd").Run()
+	return exec.Command("systemctl", "restart", "dhcpcd").Run()
 }
 
 func checkIsConnectedToNetwork() (string, error) {
-	if val, err := exec.Command("iwgetid", "wlan0", "-r").Output(); err != nil {
+	output, err := exec.Command("iwgetid", "wlan0", "-r").Output()
+	if err != nil {
 		return "", err
-	} else {
-		network := strings.TrimSpace(string(val))
-		if network == "" {
-			return "", fmt.Errorf("not connected to a network")
-		} else {
-			return string(network), nil
-		}
 	}
+	network := strings.TrimSpace(string(output))
+	if network == "" {
+		return "", fmt.Errorf("not connected to a network")
+	}
+	return network, nil
 }
 
 func checkIsConnectedToNetworkWithRetries() (string, error) {
+	var network string
 	var err error
-	var ssid string
 	for i := 0; i < 3; i++ {
-		ssid, err = checkIsConnectedToNetwork()
-		if ssid != "" {
-			return ssid, nil
+		network, err = checkIsConnectedToNetwork()
+		if err == nil {
+			return network, nil
 		}
-		time.Sleep(time.Second * 2)
+		time.Sleep(2 * time.Second)
 	}
-	return ssid, err
+	return "", err
 }
 
-func createDNSConfig(ip_range string) error {
-	// DNSMASQ config
-	file_name := "/etc/dnsmasq.conf"
-	config_lines := []string{
+func createDNSConfig(ipRange string) error {
+	fileName := "/etc/dnsmasq.conf"
+	configLines := []string{
 		"interface=wlan0",
-		"dhcp-range=" + ip_range + ",12h",
+		fmt.Sprintf("dhcp-range=%s,12h", ipRange),
 		"domain=wlan",
 	}
-	return createConfigFile(file_name, config_lines)
+	return createConfigFile(fileName, configLines)
 }
 
 func startDNS() error {
-	return exec.Command("systemctl", "restart", "dnsmasq").Start()
+	return exec.Command("systemctl", "restart", "dnsmasq").Run()
 }
 
 func stopDNS() error {
-	println("Stopping DNS")
-	return exec.Command("systemctl", "stop", "dnsmasq").Start()
+	return exec.Command("systemctl", "stop", "dnsmasq").Run()
 }
 
 func createConfigFile(name string, config []string) error {
@@ -207,107 +161,103 @@ func createConfigFile(name string, config []string) error {
 	}
 	defer file.Close()
 
-	w := bufio.NewWriter(file)
+	writer := bufio.NewWriter(file)
 	for _, line := range config {
-		_, err = fmt.Fprintln(w, line)
-		if err != nil {
-			return err
-		}
+		fmt.Fprintln(writer, line)
 	}
-	err = w.Flush()
-	if err != nil {
-		return err
-	}
-	return nil
+	return writer.Flush()
 }
 
-func enableBushnet() error {
-	// Wpa_cli
-	ssids, err := getSSIDIds()
+func enableNetwork(ssid string) error {
+	output, err := exec.Command("wpa_cli", "list_networks").Output()
 	if err != nil {
 		return err
 	}
-	if len(ssids) == 0 {
-		return fmt.Errorf("no networks found")
-	}
-	// Enable bushnet using wpa_cli and it's id
-	// Get id of bushnet and Bushnet
-	if bushnetId, ok := ssids["bushnet"]; ok {
-		if err := exec.Command("wpa_cli", "enable_network", bushnetId).Run(); err != nil {
-			return err
-		}
-	}
 
-	if BushnetId, ok := ssids["Bushnet"]; ok {
-		if err := exec.Command("wpa_cli", "enable_network", BushnetId).Run(); err != nil {
-			return err
+	networks := parseNetworks(string(output))
+	for id, network := range networks {
+		if network == ssid {
+			return exec.Command("wpa_cli", "enable_network", id).Run()
 		}
 	}
 
 	return nil
 }
 
-// Setup Hotspot and stop after 5 minutes using a new goroutine
-func initilseHotspot() error {
-	ssid := "bushnet"
-	log.Printf("Setting DHCP to default...")
-	if err := EnableAllSavedNetworks(); err != nil {
-		log.Printf("Error enabling all saved networks: %s", err)
+func parseNetworks(output string) map[string]string {
+	networks := make(map[string]string)
+	lines := strings.Split(output, "\n")
+	for _, line := range lines[1:] {
+		fields := strings.Fields(line)
+		if len(fields) > 1 {
+			networks[fields[0]] = fields[1]
+		}
 	}
-	// Ensure bushnet and Bushnet are enabled
-	if err := enableBushnet(); err != nil {
-		log.Printf("Error enabling bushnet: %s", err)
+	return networks
+}
+
+func initializeHotspot() error {
+	log.Printf("Initializing hotspot...")
+
+	if err := enableNetwork("bushnet"); err != nil {
+		log.Printf("Failed to enable bushnet network: %v", err)
 	}
 
-	if err := RestartDHCP(); err != nil {
-		log.Printf("Error restarting dhcpcd: %s", err)
+	if err := enableNetwork("Bushnet"); err != nil {
+		log.Printf("Failed to enable Bushnet network: %v", err)
 	}
-	// Check if already connected to a network
-	if val, err := exec.Command("iwgetid", "wlan0", "-r").Output(); err != nil {
-		log.Printf("Error checking if connected to network: %s", err)
-	} else {
-		log.Printf("Wlan0 is connected to: %s", val)
+
+	network, err := checkIsConnectedToNetworkWithRetries()
+	if err == nil {
+		return fmt.Errorf("already connected to network: %s", network)
 	}
-	// If not connected to a network, start hotspot
-	log.Printf("Checking if connected to network...")
-	if network, err := checkIsConnectedToNetworkWithRetries(); err == nil {
-		// Check if the hotspot is already running
-		return fmt.Errorf("already connected to a network: %s", network)
+	if err := createDHCPConfig(true); err != nil {
+		return fmt.Errorf("failed to create DHCP config: %v", err)
 	}
-	log.Printf("Starting Hotspot...")
-	log.Printf("Creating Configs...")
-	if err := createAPConfig(ssid); err != nil {
-		return err
+
+	if err := restartDHCP(); err != nil {
+		return fmt.Errorf("failed to restart DHCP: %v", err)
 	}
+
+	if err := createAPConfig(); err != nil {
+		return fmt.Errorf("failed to create AP config: %v", err)
+	}
+
 	if err := createDNSConfig("192.168.4.2,192.168.4.20"); err != nil {
-		return err
+		return fmt.Errorf("failed to create DNS config: %v", err)
 	}
 
-	log.Printf("Starting Access Point...")
-	if err := startAccessPoint(ssid); err != nil {
-		return err
+	if err := startAccessPoint(); err != nil {
+		return fmt.Errorf("failed to start access point: %v", err)
 	}
-	log.Printf("Starting DNS...")
+
 	if err := startDNS(); err != nil {
-		return err
+		return fmt.Errorf("failed to start DNS: %v", err)
 	}
-	log.Printf("Starting DHCP...")
-	if err := startDHCP(); err != nil {
-		return err
-	}
+
+	log.Printf("Hotspot initialized successfully")
 	return nil
 }
 
 func stopHotspot() error {
-	log.Printf("Stopping Hotspot")
+	log.Printf("Stopping hotspot...")
+
 	if err := stopAccessPoint(); err != nil {
-		return err
+		return fmt.Errorf("failed to stop access point: %v", err)
 	}
+
 	if err := stopDNS(); err != nil {
-		return err
+		return fmt.Errorf("failed to stop DNS: %v", err)
 	}
-	if err := RestartDHCP(); err != nil {
-		return err
+
+	if err := createDHCPConfig(false); err != nil {
+		return fmt.Errorf("failed to create DHCP config: %v", err)
 	}
+
+	if err := restartDHCP(); err != nil {
+		return fmt.Errorf("failed to restart DHCP: %v", err)
+	}
+
+	log.Printf("Hotspot stopped successfully")
 	return nil
 }
