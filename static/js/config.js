@@ -56,9 +56,9 @@ function loadConfig() {
       if (response.values.modemd.ConnectionTimeout != 0) {
         $("#input-connection-timeout").val(formatDuration(response.values.modemd.ConnectionTimeout));
       }
-      $("#input-do-tracking").prop('checked', response.values.thermalMotion.doTracking);
-      $("#input-run-classifier").prop('checked', response.values.thermalMotion.runClassifier);
-      $("#input-tracking-events").prop('checked', response.values.thermalMotion.trackingEvents);
+      $("#input-do-tracking").prop('checked', response.values.thermalMotion.DoTracking);
+      $("#input-run-classifier").prop('checked', response.values.thermalMotion.RunClassifier);
+      $("#input-tracking-events").prop('checked', response.values.thermalMotion.TrackingEvents);
     } else {
       console.log("error with getting device details");
     }
