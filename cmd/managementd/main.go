@@ -127,6 +127,7 @@ func main() {
 	apiRouter.HandleFunc("/audio/files", apiObj.GetAudioFiles).Methods("GET")
 	apiRouter.HandleFunc("/signal-strength", apiObj.GetSignalStrength).Methods("GET")
 	apiRouter.HandleFunc("/reregister", apiObj.Reregister).Methods("POST")
+	apiRouter.HandleFunc("/reregister-authorized", apiObj.ReregisterAuthorized).Methods("POST")
 	apiRouter.HandleFunc("/reboot", apiObj.Reboot).Methods("POST")
 	apiRouter.HandleFunc("/config", apiObj.GetConfig).Methods("GET")
 	apiRouter.HandleFunc("/config", apiObj.SetConfig).Methods("POST")

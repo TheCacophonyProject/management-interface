@@ -145,6 +145,19 @@ func readFile(file string) string {
 	return string(out)
 }
 
+// Return the time of the last salt update.
+func getLastSaltUpdate() string {
+	timeStr := strings.TrimSpace(readFile("/etc/cacophony/last-salt-update"))
+	if timeStr == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, timeStr)
+	if err != nil {
+		return ""
+	}
+	return t.Format("2006-01-02 15:04:05")
+}
+
 // GetDeviceInfo returns information about this device
 func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) {
 	var device goconfig.Device
@@ -156,20 +169,22 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 	}
 
 	type deviceInfo struct {
-		ServerURL  string `json:"serverURL"`
-		GroupName  string `json:"groupname"`
-		Devicename string `json:"devicename"`
-		DeviceID   int    `json:"deviceID"`
-		SaltID     string `json:"saltID"`
-		Type       string `json:"type"`
+		ServerURL   string `json:"serverURL"`
+		GroupName   string `json:"groupname"`
+		Devicename  string `json:"devicename"`
+		DeviceID    int    `json:"deviceID"`
+		SaltID      string `json:"saltID"`
+		LastUpdated string `json:"lastUpdated"`
+		Type        string `json:"type"`
 	}
 	info := deviceInfo{
-		ServerURL:  device.Server,
-		GroupName:  device.Group,
-		Devicename: device.Name,
-		DeviceID:   device.ID,
-		SaltID:     strings.TrimSpace(readFile("/etc/salt/minion_id")),
-		Type:       getDeviceType(),
+		ServerURL:   device.Server,
+		GroupName:   device.Group,
+		Devicename:  device.Name,
+		DeviceID:    device.ID,
+		SaltID:      strings.TrimSpace(readFile("/etc/salt/minion_id")),
+		LastUpdated: getLastSaltUpdate(),
+		Type:        getDeviceType(),
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(info)
@@ -313,6 +328,51 @@ func (api *ManagementAPI) Reregister(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, err.Error())
 		return
 	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// Reregister can change the devices name and group
+func (api *ManagementAPI) ReregisterAuthorized(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Group          string `json:"newGroup"`
+		Name           string `json:"newName"`
+		AuthorizedUser string `json:"authorizedUser"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		badRequest(&w, err)
+		return
+	}
+
+	if req.Group == "" && req.Name == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, "must set name or group\n")
+		return
+	}
+	apiClient, err := goapi.New()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, fmt.Sprintf("failed to get api client for device: %s", err.Error()))
+		return
+	}
+	if req.Group == "" {
+		req.Group = apiClient.GroupName()
+	}
+	if req.Name == "" {
+		req.Name = apiClient.DeviceName()
+	}
+
+	if err := apiClient.ReRegisterByAuthorized(req.Name, req.Group, randString(20), req.AuthorizedUser); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, err.Error())
+		return
+	}
+
+	if err := api.config.Reload(); err != nil {
+		serverError(&w, err)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
