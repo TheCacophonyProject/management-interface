@@ -424,16 +424,16 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	configValues := map[string]interface{}{
-		toCamelCase(goconfig.AudioKey):            &goconfig.Audio{},
-		toCamelCase(goconfig.GPIOKey):             &goconfig.GPIO{},
-		toCamelCase(goconfig.LeptonKey):           &goconfig.Lepton{},
-		toCamelCase(goconfig.ModemdKey):           &goconfig.Modemd{},
-		toCamelCase(goconfig.PortsKey):            &goconfig.Ports{},
-		toCamelCase(goconfig.TestHostsKey):        &goconfig.TestHosts{},
-		toCamelCase(goconfig.ThermalMotionKey):    &goconfig.ThermalMotion{},
-		toCamelCase(goconfig.ThermalRecorderKey):  &goconfig.ThermalRecorder{},
-		toCamelCase(goconfig.ThermalThrottlerKey): &goconfig.ThermalThrottler{},
-		toCamelCase(goconfig.WindowsKey):          &goconfig.Windows{},
+		goconfig.AudioKey:            &goconfig.Audio{},
+		goconfig.GPIOKey:             &goconfig.GPIO{},
+		goconfig.LeptonKey:           &goconfig.Lepton{},
+		goconfig.ModemdKey:           &goconfig.Modemd{},
+		goconfig.PortsKey:            &goconfig.Ports{},
+		goconfig.TestHostsKey:        &goconfig.TestHosts{},
+		goconfig.ThermalMotionKey:    &goconfig.ThermalMotion{},
+		goconfig.ThermalRecorderKey:  &goconfig.ThermalRecorder{},
+		goconfig.ThermalThrottlerKey: &goconfig.ThermalThrottler{},
+		goconfig.WindowsKey:          &goconfig.Windows{},
 	}
 
 	for section, sectionStruct := range configValues {
@@ -442,6 +442,12 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	configValuesCC := map[string]interface{}{}
+	for k, v := range configValues {
+		configValuesCC[toCamelCase(k)] = v
+	}
+	configValues = configValuesCC
 
 	valuesAndDefaults := map[string]interface{}{
 		"values":   configValues,
