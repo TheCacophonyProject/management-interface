@@ -379,7 +379,6 @@ func GetFrame() *FrameData {
 
 	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
 	f := &FrameData{&cptvframe.Frame{}, nil}
-	start := time.Now()
 
 	c := recorder.Call("org.cacophony.thermalrecorder.TakeSnapshot", 0, currentFrame)
 	if c.Err != nil {
@@ -387,8 +386,6 @@ func GetFrame() *FrameData {
 		return nil
 	}
 	val := c.Body[0].([]interface{})
-	elapsed := time.Since(start)
-	log.Printf("Snapshot took %s", elapsed)
 
 	tel := val[1].([]interface{})
 	f.Frame.Pix = val[0].([][]uint16)
