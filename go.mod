@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/TheCacophonyProject/audiobait/v3 v3.0.1
 	github.com/TheCacophonyProject/event-reporter v1.3.2-0.20200210010421-ca3fcb76a231
-	github.com/TheCacophonyProject/go-api v1.0.4
+	github.com/TheCacophonyProject/go-api v1.1.0
 	github.com/TheCacophonyProject/go-config v1.9.4
 	github.com/TheCacophonyProject/go-cptv v0.0.0-20201215230510-ae7134e91a71
 	github.com/TheCacophonyProject/lepton3 v0.0.0-20211005194419-22311c15d6ee
