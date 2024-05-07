@@ -32,7 +32,7 @@ export enum CameraConnectionState {
 }
 
 const UUID = new Date().getTime();
-const showTracks = false;
+
 interface CameraStats {
   skippedFramesServer: number;
   skippedFramesClient: number;
@@ -69,22 +69,22 @@ function restartCameraViewing() {
 }
 
 async function triggerTrap() {
-  document.getElementById("trigger-trap")!.innerText = "Triggering trap";
+  document.getElementById("trigger-trap")!.innerText = 'Triggering trap';
   document.getElementById("trigger-trap")!.setAttribute("disabled", "true");
   console.log("triggering trap");
-  fetch("/api/trigger-trap", {
-    method: "PUT",
-    headers: {
-      Authorization: "Basic YWRtaW46ZmVhdGhlcnM=",
-    },
-  })
-    .then((response) => console.log(response))
-    .then((data) => console.log(data))
-    .catch((error) => console.error(error));
+  fetch('/api/trigger-trap', {
+    method: 'PUT',
+  headers: {
+    'Authorization': 'Basic YWRtaW46ZmVhdGhlcnM='
+  }})
+
+  .then(response => console.log(response))
+  .then(data => console.log(data))
+  .catch(error => console.error(error))
   //TODO handle errors better and check that recording was made properly instead of just waiting..
-  await new Promise((r) => setTimeout(r, 3000));
+  await new Promise(r => setTimeout(r, 3000));
   document.getElementById("trigger-trap")!.removeAttribute("disabled");
-  document.getElementById("trigger-trap")!.innerText = "Trigger trap";
+  document.getElementById("trigger-trap")!.innerText = 'Trigger trap';
 }
 
 window.onload = function () {
@@ -94,46 +94,34 @@ window.onload = function () {
   }
   document.getElementById("snapshot-restart")!.onclick = restartCameraViewing;
   document.getElementById("trigger-trap")!.onclick = triggerTrap;
-  document.getElementById("take-snapshot-recording")!.onclick =
-    takeTestRecording;
-    takeTestRecording;
+  document.getElementById("take-snapshot-recording")!.onclick = takeTestRecording;
+  document.getElementById("play-test-video")!.onclick = playTestVideo;
   cameraConnection = new CameraConnection(
     window.location.hostname,
     window.location.port,
     processFrame,
     onConnectionStateChange
   );
+  updateTestVideos();
 };
 
-  document.getElementById("take-snapshot-recording")!.innerText =
-    "Making a test recording";
-  document
-    .getElementById("take-snapshot-recording")!
-    .setAttribute("disabled", "true");
-    "Making a test recording";
-  fetch("/api/camera/snapshot-recording", {
-    method: "PUT",
-    .setAttribute("disabled", "true");
-      Authorization: "Basic YWRtaW46ZmVhdGhlcnM=",
-    },
-  })
-    .then((response) => console.log(response))
-    .then((data) => console.log(data))
-    .catch((error) => console.error(error));
-  })
-  await new Promise((r) => setTimeout(r, 3000));
-  document
-    .getElementById("take-snapshot-recording")!
-    .removeAttribute("disabled");
-  document.getElementById("take-snapshot-recording")!.innerText =
-    "Take test recording";
+async function takeTestRecording() {
+  document.getElementById("take-snapshot-recording")!.innerText = 'Making a test recording';
+  document.getElementById("take-snapshot-recording")!.setAttribute("disabled", "true");
+  console.log("making a test recording");
+  fetch('/api/camera/snapshot-recording', {
+    method: 'PUT',
+  headers: {
+    'Authorization': 'Basic YWRtaW46ZmVhdGhlcnM='
+  }})
+
+  .then(response => console.log(response))
+  .then(data => console.log(data))
+  .catch(error => console.error(error))
   //TODO handle errors better and check that recording was made properly instead of just waiting..
-  await new Promise((r) => setTimeout(r, 3000));
-  document
-    .getElementById("take-snapshot-recording")!
-    .removeAttribute("disabled");
-  document.getElementById("take-snapshot-recording")!.innerText =
-    "Take test recording";
+  await new Promise(r => setTimeout(r, 3000));
+  document.getElementById("take-snapshot-recording")!.removeAttribute("disabled");
+  document.getElementById("take-snapshot-recording")!.innerText = 'Take test recording';
 }
 
 function stopSnapshots(message: string) {
@@ -204,50 +192,50 @@ function drawRectWithText(
 
 async function processFrame(frame: Frame) {
   const canvas = document.getElementById("frameCanvas") as HTMLCanvasElement;
-  if (canvas.width != frame.frameInfo.Camera.ResX) {
-    canvas.width = frame.frameInfo.Camera.ResX;
-    trackCanvas.width = frame.frameInfo.Camera.ResX;
+
+  const trackCanvas = document.getElementById(
+    "trackCanvas"
   ) as HTMLCanvasElement;
-  if (canvas.height != frame.frameInfo.Camera.ResY) {
-    canvas.height = frame.frameInfo.Camera.ResY;
-    trackCanvas.height = frame.frameInfo.Camera.ResY;
-  if (canvas.width != frame.frameInfo.Camera.ResX) {
-    canvas.width = frame.frameInfo.Camera.ResX;
-    trackCanvas.width = frame.frameInfo.Camera.ResX;
+  if (canvas == null) {
+    return;
   }
-  if (canvas.height != frame.frameInfo.Camera.ResY) {
-    canvas.height = frame.frameInfo.Camera.ResY;
-    trackCanvas.height = frame.frameInfo.Camera.ResY;
+  if( canvas.width !=  frame.frameInfo.Camera.ResX){
+    canvas.width =     frame.frameInfo.Camera.ResX
+    trackCanvas.width =     frame.frameInfo.Camera.ResX
+  }
+  if(canvas.height !=  frame.frameInfo.Camera.ResY){
+    canvas.height =     frame.frameInfo.Camera.ResY
+    trackCanvas.height =     frame.frameInfo.Camera.ResY
   }
   const context = canvas.getContext("2d") as CanvasRenderingContext2D;
   const imgData = context.getImageData(
-  if (irCamera) {
     0,
-  } else {
+    0,
+    frame.frameInfo.Camera.ResX,
     frame.frameInfo.Camera.ResY
   );
-  let max = 0;
-  let min = 0;
-  let range = 0;
-  if (!irCamera) {
-  } else {
+  //  gp hack to see if ir camera, dbus from python makes dictionary have to be all int type
+  let irCamera = frame.frameInfo.Camera.ResX >= 640;
+  if(irCamera){
+    document.getElementById("trigger-trap")!.style.display = "";
+  }else{
     document.getElementById("trigger-trap")!.style.display = "none";
   }
-  let max = 0;
-  let min = 0;
-  let range = 0;
-    let pix = 0;
-    if (irCamera) {
-      pix = frame.frame[i];
-    } else {
+  let max=0;
+  let min=0;
+  let range=0;
+  if (!irCamera){
+    max = Math.max(...frame.frame);
+    min = Math.min(...frame.frame);
+    range = max - min;
   }
   let maxI = 0;
   for (let i = 0; i < frame.frame.length; i++) {
-    let pix = 0;
-    if (irCamera) {
-      pix = frame.frame[i];
-    } else {
-      pix = Math.min(255, ((frame.frame[i] - min) / range) * 255.0);
+    let pix = 0
+    if(irCamera){
+      pix = frame.frame[i]
+    }else{
+       pix = Math.min(255, ((frame.frame[i] - min) / range) * 255.0);
     }
     let index = i * 4;
     imgData.data[index] = pix;
@@ -258,29 +246,24 @@ async function processFrame(frame: Frame) {
   }
   context.putImageData(imgData, 0, 0);
 
-  if (showTracks) {
-    const trackContext = trackCanvas.getContext(
-      "2d"
-    ) as CanvasRenderingContext2D;
-    trackContext.clearRect(0, 0, trackCanvas.width, trackCanvas.height);
+  const trackContext = trackCanvas.getContext("2d") as CanvasRenderingContext2D;
+  trackContext.clearRect(0, 0, trackCanvas.width, trackCanvas.height);
 
-    let index = 0;
-    if (frame.frameInfo.Tracks) {
-      for (const track of frame.frameInfo.Tracks) {
-        let what = null;
-        if (track.predictions && track.predictions.length > 0) {
+  let index = 0;
+  if (frame.frameInfo.Tracks) {
+    for (const track of frame.frameInfo.Tracks) {
+      let what = null;
+      if (track.predictions && track.predictions.length > 0) {
+        what = track.predictions[0].label;
       }
-          what = track.predictions[0].label;
-        }
-        drawRectWithText(
-          trackContext,
-          frame.frameInfo.Camera,
-          track.positions[track.positions.length - 1],
-          what,
-          index
-        );
-        index += 1;
-      }
+      drawRectWithText(
+        trackContext,
+        frame.frameInfo.Camera,
+        track.positions[track.positions.length - 1],
+        what,
+        index
+      );
+      index += 1;
     }
   }
   document.getElementById(
@@ -429,4 +412,56 @@ export class CameraConnection {
     }
     return null;
   }
+}
+
+function updateTestVideos(): void {
+  fetch("/api/test-videos",
+    {
+      method: "GET",
+      headers : {
+        "Authorization": "Basic " + btoa("admin:feathers"),
+      }
+    })
+    .then(response => response.json())
+    .then((videos: string[]) => {
+      if (videos.length === 0) {
+        return;
+      }
+      document.getElementById("test-videos")!.style.display = "block"
+      const dropdown = document.getElementById("test-video-options") as HTMLSelectElement;
+      videos.forEach(video => {
+        const option = document.createElement("option");
+        option.value = video;
+        option.innerText = video;
+        dropdown.appendChild(option);
+      })
+    })
+    .catch(error => {
+      console.error("Error fetching test videos:", error);
+    });
+}
+
+function playTestVideo(): void {
+  const dropdown = document.getElementById("test-video-options") as HTMLSelectElement;
+  const selectedVideo: string = dropdown.value;
+
+  if (selectedVideo && selectedVideo !== "Select Video Option") {
+    sendVideoRequest(selectedVideo);
+  } else {
+    alert("Please select a video option first!");
+  }
+}
+
+function sendVideoRequest(videoName: string): void {
+  fetch("/api/play-test-video", {
+    method: "POST",
+    headers: {
+      "Authorization": "Basic " + btoa("admin:feathers"),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ video: videoName })
+  })
+  .catch(error => {
+    console.error("Error playing test video:", error);
+  });
 }

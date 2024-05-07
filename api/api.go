@@ -33,6 +33,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -44,6 +45,8 @@ import (
 	saltrequester "github.com/TheCacophonyProject/salt-updater"
 	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/TheCacophonyProject/event-reporter/eventclient"
 	"github.com/TheCacophonyProject/trap-controller/trapdbusclient"
@@ -121,12 +124,29 @@ func (api *ManagementAPI) GetVersion(w http.ResponseWriter, r *http.Request) {
 }
 
 func readFile(file string) string {
+	if runtime.GOOS == "windows" {
+		return ""
+	}
+
 	// The /etc/salt/minion_id file contains the ID.
 	out, err := os.ReadFile(file)
 	if err != nil {
 		return ""
 	}
 	return string(out)
+}
+
+// Return the time of the last salt update.
+func getLastSaltUpdate() string {
+	timeStr := strings.TrimSpace(readFile("/etc/cacophony/last-salt-update"))
+	if timeStr == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, timeStr)
+	if err != nil {
+		return ""
+	}
+	return t.Format("2006-01-02 15:04:05")
 }
 
 // GetDeviceInfo returns information about this device
@@ -140,20 +160,22 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 	}
 
 	type deviceInfo struct {
-		ServerURL  string `json:"serverURL"`
-		Groupname  string `json:"groupname"`
-		Devicename string `json:"devicename"`
-		DeviceID   int    `json:"deviceID"`
-		SaltID     string `json:"saltID"`
-		Type       string `json:"type"`
+		ServerURL   string `json:"serverURL"`
+		GroupName   string `json:"groupname"`
+		Devicename  string `json:"devicename"`
+		DeviceID    int    `json:"deviceID"`
+		SaltID      string `json:"saltID"`
+		LastUpdated string `json:"lastUpdated"`
+		Type        string `json:"type"`
 	}
 	info := deviceInfo{
-		ServerURL:  device.Server,
-		Groupname:  device.Group,
-		Devicename: device.Name,
-		DeviceID:   device.ID,
-		SaltID:     strings.TrimSpace(readFile("/etc/salt/minion_id")),
-		Type:       getDeviceType(),
+		ServerURL:   device.Server,
+		GroupName:   device.Group,
+		Devicename:  device.Name,
+		DeviceID:    device.ID,
+		SaltID:      strings.TrimSpace(readFile("/etc/salt/minion_id")),
+		LastUpdated: getLastSaltUpdate(),
+		Type:        getDeviceType(),
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(info)
@@ -411,6 +433,12 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	configValuesCC := map[string]interface{}{}
+	for k, v := range configValues {
+		configValuesCC[toCamelCase(k)] = v
+	}
+	configValues = configValuesCC
+
 	valuesAndDefaults := map[string]interface{}{
 		"values":   configValues,
 		"defaults": configDefaults,
@@ -422,6 +450,17 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(jsonString)
+}
+
+func toCamelCase(s string) string {
+	words := strings.FieldsFunc(s, func(r rune) bool {
+		return r == '-' || r == '_'
+	})
+	c := cases.Title(language.English)
+	for i := 1; i < len(words); i++ {
+		words[i] = c.String(words[i])
+	}
+	return strings.Join(words, "")
 }
 
 // ClearConfigSection will delete the config from a section so the default values will be used.
@@ -774,11 +813,10 @@ func CheckInternetConnection(interfaceName string) bool {
 	}
 	return true
 }
-
 func (api *ManagementAPI) CheckModemInternetConnection(w http.ResponseWriter, r *http.Request) {
 	// Check if connected to modem
 	log.Println("Checking modem connection")
-	connected := CheckInternetConnection("eth1")
+	connected := CheckInternetConnection("usb0")
 	log.Printf("Modem connection: %v", connected)
 
 	// Send the current network as a JSON response
