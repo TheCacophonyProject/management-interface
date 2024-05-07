@@ -300,6 +300,50 @@ func (api *ManagementAPI) Reregister(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (api *ManagementAPI) ReregisterAuthorized(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Group          string `json:"newGroup"`
+		Name           string `json:"newName"`
+		AuthorizedUser string `json:"authorizedUser"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		badRequest(&w, err)
+		return
+	}
+
+	if req.Group == "" && req.Name == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, "must set name or group\n")
+		return
+	}
+	apiClient, err := goapi.New()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, fmt.Sprintf("failed to get api client for device: %s", err.Error()))
+		return
+	}
+	if req.Group == "" {
+		req.Group = apiClient.GroupName()
+	}
+	if req.Name == "" {
+		req.Name = apiClient.DeviceName()
+	}
+
+	if err := apiClient.ReRegisterByAuthorized(req.Name, req.Group, randString(20), req.AuthorizedUser); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, err.Error())
+		return
+	}
+
+	if err := api.config.Reload(); err != nil {
+		serverError(&w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // Reboot will reboot the device after a delay so a response can be sent back
 func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 	go func() {
@@ -812,6 +856,9 @@ func (api *ManagementAPI) ConnectToWifi(w http.ResponseWriter, r *http.Request) 
 			log.Printf("Error enabling all saved networks: %v", err)
 		}
 	}
+	if err := stopHotspot(); err != nil {
+		log.Println("Failed to stop hotspot:", err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -833,6 +880,7 @@ func (api *ManagementAPI) ConnectToWifi(w http.ResponseWriter, r *http.Request) 
 		go api.ManageHotspot()
 		return
 	} else {
+		// restart dhcp
 		log.Printf("Successfully connected to Wi-Fi SSID: %s", wifiDetails.SSID)
 		log.Println("Connected to Wi-Fi successfully")
 		w.WriteHeader(http.StatusOK)

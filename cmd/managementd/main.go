@@ -45,13 +45,15 @@ const (
 	socketTimeout = 7 * time.Second
 )
 
-var haveClients = make(chan bool)
-var version = "<not set>"
-var sockets = make(map[int64]*WebsocketRegistration)
-var socketsLock sync.RWMutex
-var cameraInfo map[string]interface{}
-var lastFrame *FrameData
-var currentFrame = -1
+var (
+	haveClients  = make(chan bool)
+	version      = "<not set>"
+	sockets      = make(map[int64]*WebsocketRegistration)
+	socketsLock  sync.RWMutex
+	cameraInfo   map[string]interface{}
+	lastFrame    *FrameData
+	currentFrame = -1
+)
 
 // Set up and handle page requests.
 func main() {
@@ -107,6 +109,7 @@ func main() {
 	apiRouter.HandleFunc("/camera/snapshot-recording", apiObj.TakeSnapshotRecording).Methods("PUT")
 	apiRouter.HandleFunc("/signal-strength", apiObj.GetSignalStrength).Methods("GET")
 	apiRouter.HandleFunc("/reregister", apiObj.Reregister).Methods("POST")
+	apiRouter.HandleFunc("/reregister-authorized", apiObj.ReregisterAuthorized).Methods("POST")
 	apiRouter.HandleFunc("/reboot", apiObj.Reboot).Methods("POST")
 	apiRouter.HandleFunc("/config", apiObj.GetConfig).Methods("GET")
 	apiRouter.HandleFunc("/config", apiObj.SetConfig).Methods("POST")
