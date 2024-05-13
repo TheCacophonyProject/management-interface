@@ -153,6 +153,7 @@ func main() {
 	apiRouter.HandleFunc("/service", apiObj.GetServiceStatus).Methods("GET")
 	apiRouter.HandleFunc("/service-restart", apiObj.RestartService).Methods("POST")
 	apiRouter.HandleFunc("/modem", apiObj.GetModem).Methods("GET")
+	apiRouter.HandleFunc("/modem/apn", apiObj.SetAPN).Methods("POST")
 	apiRouter.HandleFunc("/modem-stay-on-for", apiObj.ModemStayOnFor).Methods("POST")
 	apiRouter.HandleFunc("/battery", apiObj.GetBattery).Methods("GET")
 	apiRouter.HandleFunc("/test-videos", apiObj.GetTestVideos).Methods("GET")
