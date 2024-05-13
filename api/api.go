@@ -1151,6 +1151,34 @@ func (api *ManagementAPI) GetModem(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (api *ManagementAPI) SetAPN(w http.ResponseWriter, r *http.Request) {
+	var apnDetails struct {
+		APN string `json:"apn"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&apnDetails); err != nil {
+		log.Printf("Error decoding request: %v", err)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	log.Printf("Received APN to set: %s", apnDetails.APN)
+
+	// Set APN using modemd dbus service
+	modemDbus, err := getModemDbus()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
+		return
+	}
+	err = modemDbus.Call("org.cacophony.modemd.SetAPN", 0, apnDetails.APN).Store()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to set APN", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func getDeviceType() string {
 	data, err := os.ReadFile("/etc/salt/minion_id")
 	if err != nil {

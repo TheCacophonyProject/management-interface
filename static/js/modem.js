@@ -44,6 +44,7 @@ async function getState() {
       $("#temp").html(response.modem.temp);
       $("#vendor").html(response.modem.vendor);
       $("#voltage").html(response.modem.voltage);
+      $("#apn").html(response.modem.apn);
 
       $("#band").html(response.signal.band);
       $("#provider").html(response.signal.provider);
@@ -86,6 +87,31 @@ function startLogging() {
     clearInterval(intervalId);
     createCSVDownload();
   }, 60000);
+}
+
+async function updateAPN() {
+  const apn = document.getElementById("set-apn-text").value;
+  console.log("Updating APN to", apn);
+
+  var authHeaders = new Headers();
+  authHeaders.append("Authorization", "Basic YWRtaW46ZmVhdGhlcnM=");
+  authHeaders.append("Content-Type", "application/json");
+
+  try {
+      const res = await fetch("/api/modem/apn", {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({ "apn": apn }),
+      });
+
+      if (!res.ok) {
+          throw new Error(`Failed to update APN: ${res.status}`);
+      }
+      console.log("APN updated successfully!");
+  } catch (error) {
+      console.error("Failed to update APN:", error);
+      alert("Failed to update APN: " + error.message);
+  }
 }
 
 async function logSignalData() {
