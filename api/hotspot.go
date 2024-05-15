@@ -68,15 +68,25 @@ func waitForInterface(interfaceName string, timeout time.Duration) error {
 	return fmt.Errorf("interface %s did not come up within the specified timeout", interfaceName)
 }
 
+func runCommand(command string, args ...string) error {
+	cmd := exec.Command(command, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("command %s failed: %w", command, err)
+	}
+	return nil
+}
+
 func startAccessPoint() error {
-	if err := exec.Command("systemctl", "restart", "hostapd").Run(); err != nil {
+	if err := runCommand("systemctl", "restart", "hostapd"); err != nil {
 		return err
 	}
 	return waitForInterface("wlan0", 30*time.Second)
 }
 
 func stopAccessPoint() error {
-	return exec.Command("systemctl", "stop", "hostapd").Run()
+	return runCommand("systemctl", "stop", "hostapd")
 }
 
 func createDHCPConfig(isHotspot bool) error {
@@ -93,28 +103,33 @@ func createDHCPConfig(isHotspot bool) error {
 func writeLines(filePath string, lines []string) error {
 	file, err := os.Create(filePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create file %s: %w", filePath, err)
 	}
 	defer file.Close()
 
 	writer := bufio.NewWriter(file)
 	for _, line := range lines {
-		fmt.Fprintln(writer, line)
+		if _, err := fmt.Fprintln(writer, line); err != nil {
+			return fmt.Errorf("could not write to file %s: %w", filePath, err)
+		}
 	}
-	return writer.Flush()
+	if err := writer.Flush(); err != nil {
+		return fmt.Errorf("could not flush writer for file %s: %w", filePath, err)
+	}
+	return nil
 }
 
 func restartDHCP() error {
-	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
+	if err := runCommand("systemctl", "daemon-reload"); err != nil {
 		return err
 	}
-	return exec.Command("systemctl", "restart", "dhcpcd").Run()
+	return runCommand("systemctl", "restart", "dhcpcd")
 }
 
 func checkIsConnectedToNetwork() (string, error) {
 	output, err := exec.Command("iwgetid", "wlan0", "-r").Output()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("could not get network status: %w", err)
 	}
 	network := strings.TrimSpace(string(output))
 	if network == "" {
@@ -147,41 +162,31 @@ func createDNSConfig(ipRange string) error {
 }
 
 func startDNS() error {
-	return exec.Command("systemctl", "restart", "dnsmasq").Run()
+	return runCommand("systemctl", "restart", "dnsmasq")
 }
 
 func stopDNS() error {
-	return exec.Command("systemctl", "stop", "dnsmasq").Run()
+	return runCommand("systemctl", "stop", "dnsmasq")
 }
 
 func createConfigFile(name string, config []string) error {
-	file, err := os.Create(name)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	writer := bufio.NewWriter(file)
-	for _, line := range config {
-		fmt.Fprintln(writer, line)
-	}
-	return writer.Flush()
+	return writeLines(name, config)
 }
 
 func enableNetwork(ssid string) error {
 	output, err := exec.Command("wpa_cli", "list_networks").Output()
 	if err != nil {
-		return err
+		return fmt.Errorf("could not list networks: %w", err)
 	}
 
 	networks := parseNetworks(string(output))
 	for id, network := range networks {
 		if network == ssid {
-			return exec.Command("wpa_cli", "enable_network", id).Run()
+			return runCommand("wpa_cli", "enable_network", id)
 		}
 	}
 
-	return nil
+	return fmt.Errorf("network %s not found", ssid)
 }
 
 func parseNetworks(output string) map[string]string {
@@ -199,10 +204,10 @@ func parseNetworks(output string) map[string]string {
 func initializeHotspot() error {
 	log.Printf("Initializing hotspot...")
 
+	// Ensure that bushnet and Bushnet networks are enabled
 	if err := enableNetwork("bushnet"); err != nil {
 		log.Printf("Failed to enable bushnet network: %v", err)
 	}
-
 	if err := enableNetwork("Bushnet"); err != nil {
 		log.Printf("Failed to enable Bushnet network: %v", err)
 	}
@@ -211,6 +216,7 @@ func initializeHotspot() error {
 	if err == nil {
 		return fmt.Errorf("already connected to network: %s", network)
 	}
+
 	if err := createDHCPConfig(true); err != nil {
 		return fmt.Errorf("failed to create DHCP config: %v", err)
 	}
