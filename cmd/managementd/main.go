@@ -45,13 +45,15 @@ const (
 	socketTimeout = 7 * time.Second
 )
 
-var haveClients = make(chan bool)
-var version = "<not set>"
-var sockets = make(map[int64]*WebsocketRegistration)
-var socketsLock sync.RWMutex
-var cameraInfo map[string]interface{}
-var lastFrame *FrameData
-var currentFrame = -1
+var (
+	haveClients  = make(chan bool)
+	version      = "<not set>"
+	sockets      = make(map[int64]*WebsocketRegistration)
+	socketsLock  sync.RWMutex
+	cameraInfo   map[string]interface{}
+	lastFrame    *FrameData
+	currentFrame = -1
+)
 
 // Set up and handle page requests.
 func main() {
@@ -93,13 +95,12 @@ func main() {
 	router.HandleFunc("/modem", managementinterface.Modem).Methods("GET")
 
 	// API
-	apiObj, err := api.NewAPI(config.config, version)
-
+	apiRouter := router.PathPrefix("/api").Subrouter()
+	apiObj, err := api.NewAPI(apiRouter, config.config, version)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
-	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.HandleFunc("/device-info", apiObj.GetDeviceInfo).Methods("GET")
 	apiRouter.HandleFunc("/recordings", apiObj.GetRecordings).Methods("GET")
 	apiRouter.HandleFunc("/recording/{id}", apiObj.GetRecording).Methods("GET")
@@ -108,6 +109,7 @@ func main() {
 	apiRouter.HandleFunc("/camera/snapshot-recording", apiObj.TakeSnapshotRecording).Methods("PUT")
 	apiRouter.HandleFunc("/signal-strength", apiObj.GetSignalStrength).Methods("GET")
 	apiRouter.HandleFunc("/reregister", apiObj.Reregister).Methods("POST")
+	apiRouter.HandleFunc("/reregister-authorized", apiObj.ReregisterAuthorized).Methods("POST")
 	apiRouter.HandleFunc("/reboot", apiObj.Reboot).Methods("POST")
 	apiRouter.HandleFunc("/config", apiObj.GetConfig).Methods("GET")
 	apiRouter.HandleFunc("/config", apiObj.SetConfig).Methods("POST")
@@ -133,34 +135,23 @@ func main() {
 	apiRouter.HandleFunc("/service", apiObj.GetServiceStatus).Methods("GET")
 	apiRouter.HandleFunc("/service-restart", apiObj.RestartService).Methods("POST")
 	apiRouter.HandleFunc("/modem", apiObj.GetModem).Methods("GET")
+	apiRouter.HandleFunc("/network/interfaces", apiObj.GetNetworkInterfaces).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi", apiObj.GetWifiNetworks).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi", apiObj.ConnectToWifi).Methods("POST")
+	apiRouter.HandleFunc("/network/wifi/save", apiObj.SaveWifiNetwork).Methods("POST")
+	apiRouter.HandleFunc("/network/wifi/saved", apiObj.GetSavedWifiNetworks).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi/forget", apiObj.ForgetWifiNetwork).Methods("DELETE")
+	apiRouter.HandleFunc("/network/wifi/current", apiObj.GetCurrentWifiNetwork).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi/current", apiObj.DisconnectFromWifi).Methods("DELETE")
+	apiRouter.HandleFunc("/wifi-check", apiObj.CheckWifiInternetConnection).Methods("GET")
+	apiRouter.HandleFunc("/modem-check", apiObj.CheckModemInternetConnection).Methods("GET")
+	apiRouter.HandleFunc("/upload-logs", apiObj.UploadLogs).Methods("PUT")
 	apiRouter.Use(basicAuth)
-
-	go func() {
-		if err := initilseHotspot(); err != nil {
-			if err := stopHotspot(); err != nil {
-				log.Println("Failed to stop hotspot:", err)
-			}
-			log.Println("Failed to initialise hotspot:", err)
-		} else {
-			t := time.NewTimer(5 * time.Minute)
-			apiRouter.Use(func(next http.Handler) http.Handler {
-				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					t.Reset(5 * time.Minute)
-					next.ServeHTTP(w, r)
-				})
-			})
-
-			<-t.C
-			if err := stopHotspot(); err != nil {
-				log.Println("Failed to stop hotspot:", err)
-			}
-		}
-	}()
+	go apiObj.ManageHotspot()
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, router))
-
 }
 
 func basicAuth(next http.Handler) http.Handler {
@@ -341,7 +332,6 @@ type FrameData struct {
 }
 
 func GetFrame() *FrameData {
-
 	conn, err := dbus.SystemBus()
 	if err != nil {
 		return nil

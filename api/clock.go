@@ -21,12 +21,14 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/TheCacophonyProject/rtc-utils/rtc"
+	"github.com/godbus/dbus"
 )
 
 const (
@@ -41,9 +43,14 @@ type clockInfo struct {
 	LowRTCBattery bool
 	RTCIntegrity  bool
 	NTPSynced     bool
+	Timezone      string
 }
 
 func (api *ManagementAPI) GetClock(w http.ResponseWriter, r *http.Request) {
+	if getDeviceType() == "tc2" {
+		api.GetClockTC2(w, r)
+		return
+	}
 	out, err := exec.Command("date", dateCmdFormat).CombinedOutput()
 	if err != nil {
 		serverError(&w, err)
@@ -72,6 +79,7 @@ func (api *ManagementAPI) GetClock(w http.ResponseWriter, r *http.Request) {
 		LowRTCBattery: rtcState.LowBattery,
 		RTCIntegrity:  rtcState.ClockIntegrity,
 		NTPSynced:     ntpSynced,
+		Timezone:      getTimezone(),
 	})
 	if err != nil {
 		serverError(&w, err)
@@ -81,6 +89,19 @@ func (api *ManagementAPI) GetClock(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *ManagementAPI) PostClock(w http.ResponseWriter, r *http.Request) {
+	timezone := r.FormValue("timezone")
+	if timezone != "" {
+		cmd := exec.Command("timedatectl", "set-timezone", timezone)
+		_, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
+	if getDeviceType() == "tc2" {
+		api.PostClockTC2(w, r)
+		return
+	}
 	date, err := time.Parse(timeFormat, r.FormValue("date"))
 	if err != nil {
 		badRequest(&w, err)
@@ -95,4 +116,98 @@ func (api *ManagementAPI) PostClock(w http.ResponseWriter, r *http.Request) {
 	if err := rtc.Write(1); err != nil {
 		serverError(&w, err)
 	}
+}
+
+func getTimezone() string {
+	cmd := exec.Command("timedatectl", "show", "-p", "Timezone", "--value")
+
+	out, err := cmd.Output()
+	if err != nil {
+		fmt.Printf("Error getting timezone: %v\n", err)
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func (api *ManagementAPI) GetClockTC2(w http.ResponseWriter, r *http.Request) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
+		return
+	}
+	rtcDBus := conn.Object("org.cacophony.RTC", "/org/cacophony/RTC")
+
+	var t string
+	var integrity bool
+	err = rtcDBus.Call("org.cacophony.RTC.GetTime", 0).Store(&t, &integrity)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to get rtc status", http.StatusInternalServerError)
+		return
+	}
+	rtcTime, err := time.Parse("2006-01-02T15:04:05Z07:00", t)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to get rtc status", http.StatusInternalServerError)
+		return
+	}
+
+	out, err := exec.Command("date", dateCmdFormat).CombinedOutput()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	systemTime, err := time.Parse(timeFormat, strings.TrimSpace(string(out)))
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+
+	ntpSynced, err := isNTPSynced()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+
+	b, err := json.Marshal(&clockInfo{
+		RTCTimeUTC:   rtcTime.UTC().Format(timeFormat),
+		RTCTimeLocal: rtcTime.Local().Format(timeFormat),
+		SystemTime:   systemTime.Format(timeFormat),
+		RTCIntegrity: integrity,
+		NTPSynced:    ntpSynced,
+		Timezone:     getTimezone(),
+	})
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.Write(b)
+}
+
+func (api *ManagementAPI) PostClockTC2(w http.ResponseWriter, r *http.Request) {
+	date, err := time.Parse(timeFormat, r.FormValue("date"))
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
+		return
+	}
+	rtcDBus := conn.Object("org.cacophony.RTC", "/org/cacophony/RTC")
+	err = rtcDBus.Call("org.cacophony.RTC.SetTime", 0, date.Format("2006-01-02T15:04:05Z07:00")).Store()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to get rtc status", http.StatusInternalServerError)
+		return
+	}
+}
+
+func isNTPSynced() (bool, error) {
+	out, err := exec.Command("timedatectl", "status").Output()
+	return strings.Contains(string(out), "synchronized: yes"), err
 }

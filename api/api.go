@@ -20,16 +20,20 @@ package api
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -41,6 +45,8 @@ import (
 	saltrequester "github.com/TheCacophonyProject/salt-updater"
 	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/TheCacophonyProject/event-reporter/eventclient"
 	"github.com/TheCacophonyProject/trap-controller/trapdbusclient"
@@ -54,22 +60,58 @@ const (
 )
 
 type ManagementAPI struct {
-	cptvDir    string
-	config     *goconfig.Config
-	appVersion string
+	config       *goconfig.Config
+	router       *mux.Router
+	hotspotTimer *time.Ticker
+	cptvDir      string
+	appVersion   string
 }
 
-func NewAPI(config *goconfig.Config, appVersion string) (*ManagementAPI, error) {
+func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string) (*ManagementAPI, error) {
 	thermalRecorder := goconfig.DefaultThermalRecorder()
 	if err := config.Unmarshal(goconfig.ThermalRecorderKey, &thermalRecorder); err != nil {
 		return nil, err
 	}
 
 	return &ManagementAPI{
-		cptvDir:    thermalRecorder.OutputDir,
 		config:     config,
+		router:     router,
+		cptvDir:    thermalRecorder.OutputDir,
 		appVersion: appVersion,
 	}, nil
+}
+
+func (s *ManagementAPI) StartHotspotTimer() {
+	s.hotspotTimer = time.NewTicker(5 * time.Minute)
+	go func() {
+		s.router.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				s.hotspotTimer.Reset(5 * time.Minute)
+				next.ServeHTTP(w, r)
+			})
+		})
+		<-s.hotspotTimer.C
+		if err := stopHotspot(); err != nil {
+			log.Println("Failed to stop hotspot:", err)
+		}
+	}()
+}
+
+func (s *ManagementAPI) StopHotspotTimer() {
+	if s.hotspotTimer != nil {
+		s.hotspotTimer.Stop()
+	}
+}
+
+func (server *ManagementAPI) ManageHotspot() {
+	if err := initializeHotspot(); err != nil {
+		log.Println("Failed to initialise hotspot:", err)
+		if err := stopHotspot(); err != nil {
+			log.Println("Failed to stop hotspot:", err)
+		}
+	} else {
+		server.StartHotspotTimer()
+	}
 }
 
 func (api *ManagementAPI) GetVersion(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +121,32 @@ func (api *ManagementAPI) GetVersion(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(data)
+}
+
+func readFile(file string) string {
+	if runtime.GOOS == "windows" {
+		return ""
+	}
+
+	// The /etc/salt/minion_id file contains the ID.
+	out, err := os.ReadFile(file)
+	if err != nil {
+		return ""
+	}
+	return string(out)
+}
+
+// Return the time of the last salt update.
+func getLastSaltUpdate() string {
+	timeStr := strings.TrimSpace(readFile("/etc/cacophony/last-salt-update"))
+	if timeStr == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, timeStr)
+	if err != nil {
+		return ""
+	}
+	return t.Format("2006-01-02 15:04:05")
 }
 
 // GetDeviceInfo returns information about this device
@@ -92,18 +160,22 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 	}
 
 	type deviceInfo struct {
-		ServerURL  string `json:"serverURL"`
-		Groupname  string `json:"groupname"`
-		Devicename string `json:"devicename"`
-		DeviceID   int    `json:"deviceID"`
-		Type       string `json:"type"`
+		ServerURL   string `json:"serverURL"`
+		GroupName   string `json:"groupname"`
+		Devicename  string `json:"devicename"`
+		DeviceID    int    `json:"deviceID"`
+		SaltID      string `json:"saltID"`
+		LastUpdated string `json:"lastUpdated"`
+		Type        string `json:"type"`
 	}
 	info := deviceInfo{
-		ServerURL:  device.Server,
-		Groupname:  device.Group,
-		Devicename: device.Name,
-		DeviceID:   device.ID,
-		Type:       getDeviceType(),
+		ServerURL:   device.Server,
+		GroupName:   device.Group,
+		Devicename:  device.Name,
+		DeviceID:    device.ID,
+		SaltID:      strings.TrimSpace(readFile("/etc/salt/minion_id")),
+		LastUpdated: getLastSaltUpdate(),
+		Type:        getDeviceType(),
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(info)
@@ -250,6 +322,50 @@ func (api *ManagementAPI) Reregister(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (api *ManagementAPI) ReregisterAuthorized(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Group          string `json:"newGroup"`
+		Name           string `json:"newName"`
+		AuthorizedUser string `json:"authorizedUser"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		badRequest(&w, err)
+		return
+	}
+
+	if req.Group == "" && req.Name == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, "must set name or group\n")
+		return
+	}
+	apiClient, err := goapi.New()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, fmt.Sprintf("failed to get api client for device: %s", err.Error()))
+		return
+	}
+	if req.Group == "" {
+		req.Group = apiClient.GroupName()
+	}
+	if req.Name == "" {
+		req.Name = apiClient.DeviceName()
+	}
+
+	if err := apiClient.ReRegisterByAuthorized(req.Name, req.Group, randString(20), req.AuthorizedUser); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, err.Error())
+		return
+	}
+
+	if err := api.config.Reload(); err != nil {
+		serverError(&w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // Reboot will reboot the device after a delay so a response can be sent back
 func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 	go func() {
@@ -291,7 +407,7 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 		goconfig.ModemdKey:           goconfig.DefaultModemd(),
 		goconfig.PortsKey:            goconfig.DefaultPorts(),
 		goconfig.TestHostsKey:        goconfig.DefaultTestHosts(),
-		goconfig.ThermalMotionKey:    goconfig.DefaultThermalMotion(lepton3.Model35), //TODO don't assume that model 3.5 is being used
+		goconfig.ThermalMotionKey:    goconfig.DefaultThermalMotion(lepton3.Model35), // TODO don't assume that model 3.5 is being used
 		goconfig.ThermalRecorderKey:  goconfig.DefaultThermalRecorder(),
 		goconfig.ThermalThrottlerKey: goconfig.DefaultThermalThrottler(),
 		goconfig.WindowsKey:          goconfig.DefaultWindows(),
@@ -317,6 +433,12 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	configValuesCC := map[string]interface{}{}
+	for k, v := range configValues {
+		configValuesCC[toCamelCase(k)] = v
+	}
+	configValues = configValuesCC
+
 	valuesAndDefaults := map[string]interface{}{
 		"values":   configValues,
 		"defaults": configDefaults,
@@ -328,6 +450,17 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(jsonString)
+}
+
+func toCamelCase(s string) string {
+	words := strings.FieldsFunc(s, func(r rune) bool {
+		return r == '-' || r == '_'
+	})
+	c := cases.Title(language.English)
+	for i := 1; i < len(words); i++ {
+		words[i] = c.String(words[i])
+	}
+	return strings.Join(words, "")
 }
 
 // ClearConfigSection will delete the config from a section so the default values will be used.
@@ -616,6 +749,537 @@ func (api *ManagementAPI) GetServiceStatus(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(serviceStatus)
 }
 
+// Network API
+func (api *ManagementAPI) GetNetworkInterfaces(w http.ResponseWriter, r *http.Request) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		log.Printf("Error getting network interfaces: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to get network interfaces\n")
+		return
+	}
+
+	var result []map[string]interface{}
+	for _, iface := range interfaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			log.Printf("Error getting addresses for interface %s: %v", iface.Name, err)
+			continue // Skip this interface
+		}
+
+		var addrStrings []string
+		for _, addr := range addrs {
+			addrStrings = append(addrStrings, addr.String())
+		}
+
+		result = append(result, map[string]interface{}{
+			"name":       iface.Name,
+			"addresses":  addrStrings,
+			"mtu":        iface.MTU,
+			"macAddress": iface.HardwareAddr.String(),
+			"flags":      iface.Flags.String(),
+		})
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(result)
+}
+
+func getCurrentWifiNetwork() (string, error) {
+	cmd := exec.Command("iwgetid", "wlan0", "-r")
+	output, err := cmd.Output()
+	if err != nil {
+		if len(output) == 0 {
+			return "", nil
+		}
+		return "", err
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
+// CheckInternetConnection checks if a specified network interface has internet access
+func CheckInternetConnection(interfaceName string) bool {
+	iface, err := net.InterfaceByName(interfaceName)
+	if err != nil {
+		fmt.Println("Error getting interface details:", err)
+		return false
+	}
+	args := []string{"-I", iface.Name, "-c", "3", "-n", "-W", "15", "1.1.1.1"}
+
+	if err := exec.Command("ping", args...).Run(); err != nil {
+		fmt.Println("Error pinging:", err)
+		return false
+	}
+	return true
+}
+func (api *ManagementAPI) CheckModemInternetConnection(w http.ResponseWriter, r *http.Request) {
+	// Check if connected to modem
+	log.Println("Checking modem connection")
+	connected := CheckInternetConnection("usb0")
+	log.Printf("Modem connection: %v", connected)
+
+	// Send the current network as a JSON response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]bool{"connected": connected})
+}
+
+// Check Wifi Connection
+func (api *ManagementAPI) CheckWifiInternetConnection(w http.ResponseWriter, r *http.Request) {
+	// Check if connected to Wi-Fi
+	log.Println("Checking Wi-Fi connection")
+	connected := CheckInternetConnection("wlan0")
+	log.Printf("Wi-Fi connection: %v", connected)
+
+	// Send the current network as a JSON response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]bool{"connected": connected})
+}
+
+func (api *ManagementAPI) GetCurrentWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	// Get the current Wi-Fi network
+	log.Println("Getting current Wi-Fi network")
+	currentNetwork, err := getCurrentWifiNetwork()
+	if err != nil {
+		log.Printf("Error getting current Wi-Fi network: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to get current Wi-Fi network\n")
+		return
+	}
+	log.Printf("Current Wi-Fi network: %s", currentNetwork)
+
+	// Send the current network as a JSON response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"SSID": currentNetwork})
+}
+
+func (api *ManagementAPI) ConnectToWifi(w http.ResponseWriter, r *http.Request) {
+	var wifiDetails struct {
+		SSID     string `json:"ssid"`
+		Password string `json:"password"`
+	}
+
+	// Decode the JSON body
+	if err := json.NewDecoder(r.Body).Decode(&wifiDetails); err != nil {
+		log.Printf("Error decoding request: %v", err)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Attempting to connect to Wi-Fi SSID: %s", wifiDetails.SSID)
+
+	if savedId, err := checkIsSavedNetwork(wifiDetails.SSID); err != nil {
+		log.Printf("Error checking if Wi-Fi network is saved: %v", err)
+		if err := connectToWifi(wifiDetails.SSID, wifiDetails.Password); err != nil {
+			log.Printf("Error connecting to Wi-Fi: %v", err)
+			http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+			go api.ManageHotspot()
+			return
+		}
+	} else {
+		log.Printf("Wi-Fi network is saved: %s", wifiDetails.SSID)
+		if err := exec.Command("wpa_cli", "-i", "wlan0", "select_network", savedId).Run(); err != nil {
+			log.Printf("Error enabling Wi-Fi network: %v", err)
+			http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+			go api.ManageHotspot()
+			return
+		}
+		if err := exec.Command("wpa_cli", "-i", "wlan0", "reassociate").Run(); err != nil {
+			log.Printf("Error reassociating Wi-Fi network: %v", err)
+			http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+			go api.ManageHotspot()
+			return
+		}
+		if err := EnableAllSavedNetworks(); err != nil {
+			log.Printf("Error enabling all saved networks: %v", err)
+		}
+	}
+	if err := stopHotspot(); err != nil {
+		log.Println("Failed to stop hotspot:", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if connected := streamWifiState(ctx, wifiDetails.SSID); !connected {
+		if err := removeNetworkFromWPA(wifiDetails.SSID); err != nil {
+			log.Printf("Error removing Wi-Fi network: %v", err)
+		}
+		if err := EnableAllSavedNetworks(); err != nil {
+			log.Printf("Error enabling all saved networks: %v", err)
+		}
+		// Reconfigure the Wi-Fi
+		if err := exec.Command("wpa_cli", "-i", "wlan0", "reconfigure").Run(); err != nil {
+			log.Printf("Error reconfiguring Wi-Fi: %v", err)
+		}
+
+		log.Printf("Failed to connect to Wi-Fi SSID: %s", wifiDetails.SSID)
+		http.Error(w, "Failed to connect to Wi-Fi: timed out", http.StatusInternalServerError)
+		go api.ManageHotspot()
+		return
+	} else {
+		// restart dhcp
+		log.Printf("Successfully connected to Wi-Fi SSID: %s", wifiDetails.SSID)
+		log.Println("Connected to Wi-Fi successfully")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Connected to Wi-Fi successfully"))
+	}
+}
+
+func EnableAllSavedNetworks() error {
+	ssidIds, err := getSSIDIds()
+	if err != nil {
+		return err
+	}
+	for _, id := range ssidIds {
+		if err := exec.Command("wpa_cli", "-i", "wlan0", "enable_network", id).Run(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func streamWifiState(ctx context.Context, ssid string) bool {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			// Check the Wi-Fi connection status
+			statusCmd := exec.Command("wpa_cli", "-i", "wlan0", "status")
+			statusOut, err := statusCmd.Output()
+			if err != nil {
+				log.Printf("Error checking Wi-Fi status: %v", err)
+				continue
+			}
+
+			// Parse the status output
+			status := strings.TrimSpace(string(statusOut))
+			if strings.Contains(status, "ssid="+ssid) && strings.Contains(status, "wpa_state=COMPLETED") {
+				// Connected to the specified SSID
+				return true
+			}
+		case <-ctx.Done():
+			// Timeout
+			return false
+		}
+	}
+}
+
+func saveConfig() error {
+	// Enable all saved networks
+	ssidIds, err := getSSIDIds()
+	if err != nil {
+		return err
+	}
+
+	for _, id := range ssidIds {
+		if err := exec.Command("wpa_cli", "-i", "wlan0", "enable_network", id).Run(); err != nil {
+			return err
+		}
+	}
+
+	// Save the config
+	if err := exec.Command("wpa_cli", "-i", "wlan0", "save_config").Run(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func checkIsSavedNetwork(ssid string) (string, error) {
+	ssidIds, err := getSSIDIds()
+	if err != nil {
+		return "", err
+	}
+	for ssidId, ssidName := range ssidIds {
+		if ssidName == ssid {
+			return ssidId, nil
+		}
+	}
+	return "", errors.New("ssid not found")
+}
+
+// connectToWifi connects to a Wi-Fi network using wpa_cli
+func connectToWifi(ssid string, passkey string) error {
+	output, err := exec.Command("wpa_cli", "-i", "wlan0", "add_network").Output()
+	if err != nil {
+		log.Printf("Error adding Wi-Fi network to config: %v", err)
+		return err
+	}
+
+	id := strings.TrimSpace(string(output))
+
+	if err := exec.Command("wpa_cli", "-i", "wlan0", "set_network", id, "ssid", "\""+ssid+"\"").Run(); err != nil {
+		log.Printf("Error adding Wi-Fi network to config: %v", err)
+		return err
+	}
+
+	if err := exec.Command("wpa_cli", "-i", "wlan0", "set_network", id, "psk", "\""+passkey+"\"").Run(); err != nil {
+		log.Printf("Error adding Wi-Fi network to config: %v", err)
+		return err
+	}
+
+	// Reload the wpa_supplicant config
+	if err := exec.Command("wpa_cli", "-i", "wlan0", "save_config").Run(); err != nil {
+		log.Printf("Error reconfiguring Wi-Fi: %v", err)
+		// Remove the network from the config
+		if err := removeNetworkFromWPA(ssid); err != nil {
+			log.Printf("Error removing Wi-Fi network: %v", err)
+			return err
+		}
+		return err
+	}
+
+	if err := exec.Command("wpa_cli", "-i", "wlan0", "select_network", id).Run(); err != nil {
+		log.Printf("Error enabling Wi-Fi network: %v", err)
+		return err
+	}
+
+	// Reassociate the Wi-Fi
+	if err := exec.Command("wpa_cli", "-i", "wlan0", "reassociate").Run(); err != nil {
+		log.Printf("Error reassociating Wi-Fi: %v", err)
+		return err
+	}
+
+	if err := EnableAllSavedNetworks(); err != nil {
+		log.Printf("Error enabling all saved networks: %v", err)
+	}
+
+	return nil
+}
+
+func getSSIDIds() (map[string]string, error) {
+	// Get the list of Wi-Fi networks
+	cmd := exec.Command("wpa_cli", "-i", "wlan0", "list_networks")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the output
+	ssidIds := make(map[string]string)
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines[1:] {
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		ssidIds[fields[1]] = fields[0]
+	}
+
+	return ssidIds, nil
+}
+
+func removeNetworkFromWPA(ssid string) error {
+	if ssid == "" || ssid == "bushnet" || ssid == "Bushnet" {
+		return nil
+	}
+	ssidIds, err := getSSIDIds()
+	if err != nil {
+		return err
+	}
+
+	id, ok := ssidIds[ssid]
+	if !ok {
+		return nil // Network not found
+	}
+
+	// Remove the network from the config
+	if err := exec.Command("wpa_cli", "-i", "wlan0", "remove_network", id).Run(); err != nil {
+		return err
+	}
+
+	// Save the config
+	if err := saveConfig(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (api *ManagementAPI) GetWifiNetworks(w http.ResponseWriter, r *http.Request) {
+	// Execute the command to scan for Wi-Fi networks
+	log.Println("Scanning for Wi-Fi networks")
+	var output []byte
+	var err error
+	maxRetries := 3
+	retryInterval := time.Second * 2
+
+	for i := 0; i < maxRetries; i++ {
+		cmd := exec.Command("iwlist", "wlan0", "scan")
+		output, err = cmd.Output()
+		if err == nil {
+			break
+		}
+		log.Printf("Error scanning for Wi-Fi networks: %v", err)
+		time.Sleep(retryInterval)
+	}
+
+	if err != nil {
+		log.Printf("Failed to scan for Wi-Fi networks after %d retries", maxRetries)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to scan for Wi-Fi networks\n")
+		return
+	}
+
+	// Parse the output to extract network information
+	networks := parseWiFiScanOutput(string(output))
+	log.Printf("Found %d Wi-Fi networks", len(networks))
+	// Send the list of networks as a JSON response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(networks)
+}
+
+func parseWiFiScanOutput(output string) []map[string]string {
+	var networks []map[string]string
+	var currentNetwork map[string]string
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "Cell") {
+			if currentNetwork != nil {
+				networks = append(networks, currentNetwork)
+			}
+			currentNetwork = make(map[string]string)
+		} else if strings.Contains(line, "ESSID:") {
+			ssid := strings.Split(line, "\"")[1]
+			currentNetwork["SSID"] = ssid
+		} else if strings.Contains(line, "Quality=") {
+			quality := regexp.MustCompile("Quality=([0-9]+/[0-9]+)").FindStringSubmatch(line)[1]
+			signalLevel := regexp.MustCompile("Signal level=(-?[0-9]+ dBm)").FindStringSubmatch(line)[1]
+			currentNetwork["Quality"] = quality
+			currentNetwork["Signal Level"] = signalLevel
+		} else if strings.Contains(line, "Encryption key:on") {
+			currentNetwork["Security"] = "On"
+		} else if strings.Contains(line, "IE: IEEE 802.11i/WPA2") {
+			currentNetwork["Security"] = "WPA2"
+		} else if strings.Contains(line, "IE: WPA Version 1") {
+			currentNetwork["Security"] = "WPA"
+		} else if strings.Contains(line, "IE: Unknown") && currentNetwork["Security"] == "" {
+			// Default to 'Unknown' if no other security information is found
+			currentNetwork["Security"] = "Unknown"
+		}
+	}
+
+	// Append the last network if not empty
+	if currentNetwork != nil {
+		networks = append(networks, currentNetwork)
+	}
+
+	return networks
+}
+
+func (api *ManagementAPI) DisconnectFromWifi(w http.ResponseWriter, r *http.Request) {
+	// Respond to client before actually disconnecting
+	log.Printf("Will disconnect from Wi-Fi network")
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, "will disconnect from Wi-Fi network shortly\n")
+
+	go func() {
+		if err := exec.Command("wpa_cli", "-i", "wlan0", "disconnect").Run(); err != nil {
+			log.Printf("Error disconnecting from Wi-Fi network: %v", err)
+			// Handle the error
+		}
+
+		if err := restartDHCP(); err != nil {
+			log.Printf("Error restarting DHCP client: %v", err)
+		}
+		// if no current network, then restart hotspot
+		currentSSID, err := checkIsConnectedToNetwork()
+		if err != nil {
+			log.Printf("Error getting current Wi-Fi network: %v", err)
+		}
+		if currentSSID == "" {
+			log.Printf("No current Wi-Fi network, restarting hotspot")
+			go api.ManageHotspot()
+		}
+	}()
+}
+
+func (api *ManagementAPI) ForgetWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	// Parse request for SSID
+	var wifiDetails struct {
+		SSID string `json:"ssid"`
+	}
+
+	currentSSID, err := checkIsConnectedToNetwork()
+	if err != nil {
+		log.Printf("Error getting current Wi-Fi network: %v", err)
+	}
+
+	// Decode the JSON body
+	if err := json.NewDecoder(r.Body).Decode(&wifiDetails); err != nil {
+		log.Printf("Error decoding request: %v", err)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if currentSSID == wifiDetails.SSID {
+		log.Printf("Will forget Wi-Fi network: %s", wifiDetails.SSID)
+		w.WriteHeader(http.StatusOK)
+		io.WriteString(w, "will forget Wi-Fi network shortly\n")
+		// Forget the network
+		go func() {
+			if err := removeNetworkFromWPA(wifiDetails.SSID); err != nil {
+				log.Printf("Error removing Wi-Fi network: %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				io.WriteString(w, "failed to remove Wi-Fi network\n")
+			}
+			if err := restartDHCP(); err != nil {
+				log.Printf("Error restarting DHCP client: %v", err)
+			}
+			// if no current network, then restart hotspot
+			currentSSID, err := checkIsConnectedToNetwork()
+			if err != nil {
+				log.Printf("Error getting current Wi-Fi network: %v", err)
+			}
+			if currentSSID == "" {
+				log.Printf("No current Wi-Fi network, restarting hotspot")
+				go api.ManageHotspot()
+			}
+		}()
+	} else {
+		ssids, err := getSSIDIds()
+		if err != nil {
+			log.Printf("Error getting Wi-Fi networks: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			io.WriteString(w, "failed to get Wi-Fi networks\n")
+			return
+		}
+
+		// Find the network ID
+		id, ok := ssids[wifiDetails.SSID]
+		if !ok {
+			log.Printf("Wi-Fi network not found: %s", wifiDetails.SSID)
+			w.WriteHeader(http.StatusNotFound)
+			io.WriteString(w, "Wi-Fi network not found\n")
+			return
+		}
+
+		// Remove the network using wpa_cli
+		cmd := exec.Command("wpa_cli", "-i", "wlan0", "remove_network", id)
+		if err := cmd.Run(); err != nil {
+			log.Printf("Error removing Wi-Fi network: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			io.WriteString(w, "failed to remove Wi-Fi network\n")
+			return
+		}
+
+		// Save the changes
+		if err := saveConfig(); err != nil {
+			log.Printf("Error reloading Wi-Fi config: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			io.WriteString(w, "failed to reload Wi-Fi config\n")
+			return
+		}
+
+		log.Printf("Successfully removed Wi-Fi network: %s", wifiDetails.SSID)
+		w.WriteHeader(http.StatusOK)
+		io.WriteString(w, "successfully removed Wi-Fi network\n")
+	}
+}
+
 func (api *ManagementAPI) GetModem(w http.ResponseWriter, r *http.Request) {
 	// Send dbus call to modem service to get all modem statuses
 	conn, err := dbus.SystemBus()
@@ -756,4 +1420,112 @@ func getServiceLogs(service string, lines int) ([]string, error) {
 		return logLines[:len(logLines)-1], nil
 	}
 	return logLines, nil
+}
+
+func (api *ManagementAPI) SaveWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	var wifiDetails struct {
+		SSID     string `json:"ssid"`
+		Password string `json:"password"`
+	}
+
+	// Decode the JSON body
+	if err := json.NewDecoder(r.Body).Decode(&wifiDetails); err != nil {
+		log.Printf("Error decoding request: %v", err)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, "will save Wi-Fi network shortly\n")
+
+	go func() {
+		// Save the Wi-Fi network using wpa_cli
+		if err := saveWifiNetwork(wifiDetails.SSID, wifiDetails.Password); err != nil {
+			log.Printf("Error saving Wi-Fi network: %v", err)
+			http.Error(w, "Failed to save Wi-Fi network: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}()
+}
+
+func saveWifiNetwork(ssid string, passkey string) error {
+	// add using wpa_cli
+	if output, err := exec.Command("wpa_cli", "-i", "wlan0", "add_network").Output(); err != nil {
+		log.Printf("Error adding Wi-Fi network: %v, %s", err, output)
+		return err
+	}
+	if output, err := exec.Command("wpa_cli", "-i", "wlan0", "set_network", "0", "ssid", "\""+ssid+"\"").Output(); err != nil {
+		log.Printf("Error setting Wi-Fi network SSID: %v, %s", err, output)
+		return err
+	}
+	if output, err := exec.Command("wpa_cli", "-i", "wlan0", "set_network", "0", "psk", "\""+passkey+"\"").Output(); err != nil {
+		log.Printf("Error setting Wi-Fi network PSK: %v, %s", err, output)
+		return err
+	}
+
+	// Save the config
+	if err := saveConfig(); err != nil {
+		log.Printf("Error saving Wi-Fi network: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func parseSavedWiFiNetworks(output string) []string {
+	var networks []string
+	lines := strings.Split(output, "\n")
+	for _, line := range lines[1:] {
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		networks = append(networks, fields[1])
+	}
+	return networks
+}
+
+// Return array of saved wifi networks
+func getSavedWifiNetworks() ([]string, error) {
+	// Get the list of Wi-Fi networks
+	cmd := exec.Command("wpa_cli", "-i", "wlan0", "list_networks")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the output to extract network information
+	networks := parseSavedWiFiNetworks(string(output))
+	return networks, nil
+}
+
+func (api *ManagementAPI) GetSavedWifiNetworks(w http.ResponseWriter, r *http.Request) {
+	networks, err := getSavedWifiNetworks()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(networks)
+}
+
+func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {
+	if err := exec.Command("cp", "/var/log/syslog", "/tmp/syslog").Run(); err != nil {
+		log.Printf("Error copying syslog: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	if err := exec.Command("gzip", "/tmp/syslog", "-f").Run(); err != nil {
+		log.Printf("Error compressing syslog: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	if err := exec.Command("salt-call", "cp.push", "/tmp/syslog.gz").Run(); err != nil {
+		log.Printf("Error pushing syslog with salt: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
