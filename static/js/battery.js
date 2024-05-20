@@ -1,7 +1,7 @@
 "use strict";
 window.onload = function () {
   getState();
-  setInterval(getState, 5000); 
+  setInterval(getState, 5000);
 };
 
 async function getState() {
@@ -12,7 +12,6 @@ async function getState() {
     $("#time").html(response.time);
     $("#mainBattery").html(response.mainBattery);
     $("#rtcBattery").html(response.rtcBattery);
-
   } catch (e) {
     console.log(e);
   }

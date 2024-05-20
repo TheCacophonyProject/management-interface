@@ -1,5 +1,5 @@
 updateSignal();
-setInterval(updateSignal, 5000); 
+setInterval(updateSignal, 5000);
 
 const refreshMillis = 2 * 1000;
 const maxRefreshDelayMillis = 10 * 1000;
@@ -11,7 +11,7 @@ var signalFails = 0;
 
 async function updateSignalTC2() {
   var response = await apiGetJSON("/api/modem");
-  
+
   if (response.simCard) {
     if (response.simCard.simCardStatus == "READY") {
       $("#modem-status").html("");
@@ -40,15 +40,14 @@ async function updateSignalTC2() {
   } else {
     barsStrength = 6;
   }
-  handleSignalSuccess(barsStrength)
-  
+  handleSignalSuccess(barsStrength);
+
   return;
 }
 
-
 async function updateSignal() {
   //TODO Check if device is TC2, just hard coded for now.
-  updateSignalTC2()
+  updateSignalTC2();
   return;
   var xmlHttp = new XMLHttpRequest();
   xmlHttp.open("GET", "/api/signal-strength", true);

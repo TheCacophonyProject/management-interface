@@ -33,7 +33,7 @@ async function getState() {
 
 async function setTime() {
   var now = new Date();
-  var data = { 
+  var data = {
     date: now.toISOString(),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
