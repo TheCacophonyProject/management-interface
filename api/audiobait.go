@@ -56,12 +56,12 @@ func (api *ManagementAPI) PlayAudiobaitSound(w http.ResponseWriter, r *http.Requ
 func (api *ManagementAPI) GetAudiobait(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
-	schedule, err := playlist.LoadScheduleFromDisk(config.DefaultAudio().Dir) //TODO properly get audiofile config
+	schedule, err := playlist.LoadScheduleFromDisk(config.DefaultAudioBait().Dir) //TODO properly get audiofile config
 	if err != nil {
 		serverError(&w, err)
 		return
 	}
-	library, err := audiofilelibrary.OpenLibrary(config.DefaultAudio().Dir)
+	library, err := audiofilelibrary.OpenLibrary(config.DefaultAudioBait().Dir)
 	if err != nil {
 		serverError(&w, err)
 		return

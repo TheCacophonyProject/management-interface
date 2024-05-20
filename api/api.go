@@ -411,7 +411,8 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	configDefaults := map[string]interface{}{
-		goconfig.AudioKey:            goconfig.DefaultAudio(),
+		goconfig.AudioRecordingKey:   goconfig.DefaultAudioRecording(),
+		goconfig.AudioBaitKey:        goconfig.DefaultAudioBait(),
 		goconfig.GPIOKey:             goconfig.DefaultGPIO(),
 		goconfig.LeptonKey:           goconfig.DefaultLepton(),
 		goconfig.ModemdKey:           goconfig.DefaultModemd(),
@@ -424,7 +425,8 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	configValues := map[string]interface{}{
-		goconfig.AudioKey:            &goconfig.Audio{},
+		goconfig.AudioRecordingKey:   &goconfig.AudioRecording{},
+		goconfig.AudioBaitKey:        &goconfig.AudioBait{},
 		goconfig.GPIOKey:             &goconfig.GPIO{},
 		goconfig.LeptonKey:           &goconfig.Lepton{},
 		goconfig.ModemdKey:           &goconfig.Modemd{},
