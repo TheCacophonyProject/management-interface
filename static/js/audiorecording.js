@@ -1,5 +1,6 @@
 "use strict";
 
+let countdown = 0;
 async function getAudioStatus() {
   var xmlHttp = new XMLHttpRequest();
   xmlHttp.open("GET", "/api/audio/audio-status", true);
@@ -8,8 +9,9 @@ async function getAudioStatus() {
   xmlHttp.onload = async function () {
     if (xmlHttp.status == 200) {
       const state = Number(xmlHttp.response);
-      let statusText;
+      let statusText = "";
       if (state == 1) {
+        countdown = 2;
         if (lastState) {
           clearInterval(intervalId);
           lastState = null;
@@ -22,12 +24,19 @@ async function getAudioStatus() {
             "Take Test Recording";
         }
       } else if (state == 2) {
+        countdown = 2;
         lastState = state;
         statusText = "Test Recording Pending";
       } else if (state == 3) {
         lastState = state;
-        statusText = "Taking Test Recording";
+        if (countdown == 0) {
+          statusText = "Taking Test Recording";
+        } else {
+          statusText = `Taking Test Recording in ${countdown}s`;
+          countdown -= 1;
+        }
       } else {
+        countdown = 0;
         statusText = "unknow state";
         clearInterval(intervalId);
         intervalId = null;
@@ -48,6 +57,14 @@ async function getAudioStatus() {
   xmlHttp.send();
 }
 
+function enableRecButton() {
+  if (intervalId) {
+    clearInterval(intervalId);
+  }
+  document.getElementById("audio-test-button").removeAttribute("disabled");
+  document.getElementById("audio-test-button").innerText =
+    "Take Test Recording";
+}
 let intervalId = null;
 let lastState = null;
 async function takeTestRecording() {
@@ -55,7 +72,6 @@ async function takeTestRecording() {
     "Making a test recording";
   document.getElementById("audio-test-button").setAttribute("disabled", "true");
 
-  console.log("making a test recording");
   var xmlHttp = new XMLHttpRequest();
   xmlHttp.open("PUT", "/api/audio/test-recording", true);
   xmlHttp.setRequestHeader("Authorization", "Basic " + btoa("admin:feathers"));
@@ -64,25 +80,20 @@ async function takeTestRecording() {
     if (xmlHttp.status == 200) {
       success = xmlHttp.responseText == '"Asked for a test recording"\n';
       if (!success) {
-        clearInterval(intervalId);
-
-        document
-          .getElementById("audio-test-button")
-          .removeAttribute("disabled");
-        document.getElementById("audio-test-button").innerText =
-          "Take Test Recording";
+        enableRecButton();
+        updateAudioError(xmlHttp);
       } else {
         clearInterval(intervalId);
         intervalId = setInterval(getAudioStatus, 1000);
       }
-      alert(xmlHttp.responseText);
     } else {
-      console.log(xmlHttp);
+      enableRecButton();
       updateAudioError(xmlHttp);
     }
   };
 
   xmlHttp.onerror = async function () {
+    enableRecButton();
     updateAudioError(xmlHttp);
   };
 
@@ -95,13 +106,8 @@ function handleEnableChange(event) {
 }
 
 function updateAudio() {
-  console.log("update Audio Recording");
   var data = {};
   data["enabled"] = $("#enabledCheck").prop("checked");
-
-  //   var formData = new FormData();
-  //   formData.append("section", "audio-recording");
-  //   formData.append("config", JSON.stringify(data));
 
   var xmlHttp = new XMLHttpRequest();
   xmlHttp.open("POST", "/api/audiorecording", true);
@@ -112,7 +118,6 @@ function updateAudio() {
   );
   xmlHttp.onload = async function () {
     if (xmlHttp.status == 200) {
-      alert("updated audiorecording");
       if ($("#enabledCheck").prop("checked")) {
         document
           .getElementById("audio-test-button")
@@ -123,7 +128,6 @@ function updateAudio() {
           .setAttribute("disabled", "true");
       }
     } else {
-      console.log(xmlHttp);
       updateAudioError(xmlHttp);
     }
   };
