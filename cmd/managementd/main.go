@@ -109,6 +109,7 @@ func main() {
 	router.HandleFunc("/modem", managementinterface.Modem).Methods("GET")
 	router.HandleFunc("/battery", managementinterface.Battery).Methods("GET")
 	router.HandleFunc("/battery-csv", managementinterface.DownloadBatteryCSV).Methods("GET")
+	router.HandleFunc("/temperature-csv", managementinterface.DownloadTemperatureCSV).Methods("GET")
 
 	// API
 	apiRouter := router.PathPrefix("/api").Subrouter()

@@ -184,3 +184,7 @@ function pollSaltUpdateState() {
   checkSaltUpdateState();
   setTimeout(pollSaltUpdateState, 3000);
 }
+
+function downloadTemperatureCsv() {
+  window.location.href = "/temperature-csv";
+}
