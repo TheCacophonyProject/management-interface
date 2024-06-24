@@ -30,8 +30,14 @@
             <form id = "audio-recording-form">
                 <div class="form-row">
                     <div class="form-group col-md-6">
-                        <input type="checkbox" class="form-check-input" id="enabledCheck" {{if .AudioRecording.Enabled}} checked {{else}} unchecked {{end}} onclick="handleEnableChange(event)">
-                        <label class="form-check-label" for="enabledCheck">Enabled</label>
+                        <label for="audio-mode-select">Select an Audio Mode</label>
+                        <select name="auio-mode-select" id="audio-mode-select" onchange="handleModeChange()">
+                            <option value="Disabled">Disabled</option>
+                            <option value="AudioOnly">Audio Only</option>
+                            <!-- not released yet -->
+                            <option disabled value="AudioOrThermal">Audio or Thermal</option>
+                            <option disabled value="AudioAndThermal">Audio and Thermal</option>
+                        </select>
                     </div>
                 </div>
             </form>
@@ -39,7 +45,7 @@
             <div class="row">
                 <div class="col w-100" >
                     <div class="col-3">
-                        <button id="audio-test-button" onclick="takeTestRecording(this)" class="btn btn-primary mb-4" {{if .AudioRecording.Enabled}} enabled {{else}} disabled {{end}}>Take Test Recording</button>
+                        <button id="audio-test-button" onclick="takeTestRecording(this)" class="btn btn-primary mb-4" {{if eq .AudioRecording.AudioMode "Disabled"}} disabled {{else}} enabled {{end}}>Take Test Recording</button>
                     </div>
                     <div class="col-3">
                         <label id="audio-test-status"></label>

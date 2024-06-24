@@ -22,39 +22,34 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strconv"
 
 	goconfig "github.com/TheCacophonyProject/go-config"
 	"github.com/godbus/dbus"
 )
 
 func (api *ManagementAPI) GetAudioRecording(w http.ResponseWriter, r *http.Request) {
-	var audioRecording goconfig.AudioRecording
+	audioRecording := goconfig.DefaultAudioRecording()
 	if err := api.config.Unmarshal(goconfig.AudioRecordingKey, &audioRecording); err != nil {
 		serverError(&w, err)
 		return
 	}
 	type AudioRecording struct {
-		Enabled bool `json:"enabled"`
+		AudioMode string `json:"audio-mode"`
 	}
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(AudioRecording{
-		Enabled: audioRecording.Enabled,
+		AudioMode: audioRecording.AudioMode,
 	})
 }
 
 // SetAudioRecording is for specifically writing to audio recording setting.
 func (api *ManagementAPI) SetAudioRecording(w http.ResponseWriter, r *http.Request) {
 	log.Println("update audio recording")
-	enabled, err := strconv.ParseBool(r.FormValue("enabled"))
-	if err != nil {
-		badRequest(&w, err)
-		return
-	}
+	audioMode := r.FormValue("audio-mode")
 
 	audioRecording := goconfig.AudioRecording{
-		Enabled: enabled,
+		AudioMode: audioMode,
 	}
 
 	if err := api.config.Set(goconfig.AudioRecordingKey, &audioRecording); err != nil {

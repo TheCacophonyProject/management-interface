@@ -100,14 +100,13 @@ async function takeTestRecording() {
   xmlHttp.send();
 }
 
-function handleEnableChange(event) {
-  var checkBox = event.target;
+function handleModeChange() {
   updateAudio();
 }
 
 function updateAudio() {
   var data = {};
-  data["enabled"] = $("#enabledCheck").prop("checked");
+  data["audio-mode"] = document.getElementById("audio-mode-select").value;
 
   var xmlHttp = new XMLHttpRequest();
   xmlHttp.open("POST", "/api/audiorecording", true);
@@ -118,7 +117,7 @@ function updateAudio() {
   );
   xmlHttp.onload = async function () {
     if (xmlHttp.status == 200) {
-      if ($("#enabledCheck").prop("checked")) {
+      if (document.getElementById("audio-mode-select").value != "Disabled") {
         document
           .getElementById("audio-test-button")
           .removeAttribute("disabled");

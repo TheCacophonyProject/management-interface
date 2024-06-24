@@ -59,3 +59,5 @@ require (
 )
 
 replace periph.io/x/periph => github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incompatible
+
+replace github.com/TheCacophonyProject/go-config => /home/gp/cacophony/go-config
