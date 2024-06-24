@@ -3,6 +3,9 @@ language: go
 go:
   - "1.20.x"
 
+before_install:
+  - npm install -g typescript
+
 script:
   - go mod tidy
   - git diff --exit-code --quiet || (echo "Please run 'go mod tidy' to clean up the 'go.mod' and 'go.sum' files."; false)
