@@ -565,7 +565,7 @@ type soundInfo struct {
 func Audiobait(w http.ResponseWriter, r *http.Request) {
 	// TODO Rather than generating the HTML like this it should probably use the
 	// audiobait APIs that are now available...
-	playSchedule, err := playlist.LoadScheduleFromDisk(goconfig.DefaultAudio().Dir)
+	playSchedule, err := playlist.LoadScheduleFromDisk(goconfig.DefaultAudioBait().Dir)
 	if err != nil {
 		log.Println(err)
 		tmpl.ExecuteTemplate(w, "audiobait.html", audiobaitResponse{
@@ -573,7 +573,7 @@ func Audiobait(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	library, err := audiofilelibrary.OpenLibrary(goconfig.DefaultAudio().Dir)
+	library, err := audiofilelibrary.OpenLibrary(goconfig.DefaultAudioBait().Dir)
 	if err != nil {
 		log.Println(err)
 		tmpl.ExecuteTemplate(w, "audiobait.html", audiobaitResponse{

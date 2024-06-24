@@ -92,9 +92,9 @@ async function uploadLogs() {
     const response = await fetch("/api/upload-logs", {
       method: "PUT",
       headers: {
-        "Authorization": "Basic " + btoa("admin:feathers"),
-        "Content-Type": "application/json"
-      }
+        Authorization: "Basic " + btoa("admin:feathers"),
+        "Content-Type": "application/json",
+      },
     });
 
     if (response.ok) {
@@ -116,9 +116,9 @@ async function updateSaltState() {
     const response = await fetch("/api/salt-update", {
       method: "GET",
       headers: {
-        "Authorization": "Basic " + btoa("admin:feathers"),
-        "Content-Type": "application/json"
-      }
+        Authorization: "Basic " + btoa("admin:feathers"),
+        "Content-Type": "application/json",
+      },
     });
 
     if (response.ok) {
@@ -126,13 +126,17 @@ async function updateSaltState() {
 
       var data = JSON.parse(jsonString);
 
-      document.getElementById("running-salt-command").textContent = data.RunningUpdate ? "Yes" : "No";
-      document.getElementById("running-salt-arguements").textContent = data.RunningArgs ? data.RunningArgs.join(", ") : "None";
-      document.getElementById("previous-run-arguments").textContent = data.LastCallArgs ? data.LastCallArgs.join(", ") : "None";
+      document.getElementById("running-salt-command").textContent =
+        data.RunningUpdate ? "Yes" : "No";
+      document.getElementById("running-salt-arguements").textContent =
+        data.RunningArgs ? data.RunningArgs.join(", ") : "None";
+      document.getElementById("previous-run-arguments").textContent =
+        data.LastCallArgs ? data.LastCallArgs.join(", ") : "None";
       document.getElementById("previous-output").textContent = data.LastCallOut;
-      document.getElementById("previous-success").textContent = data.LastCallSuccess ? "Yes" : "No";
-      document.getElementById("previous-nodegroup").textContent = data.LastCallNodegroup;
-
+      document.getElementById("previous-success").textContent =
+        data.LastCallSuccess ? "Yes" : "No";
+      document.getElementById("previous-nodegroup").textContent =
+        data.LastCallNodegroup;
     } else {
       alert("Error updating salt");
       console.error("Error with response:", await response.text());

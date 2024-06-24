@@ -97,8 +97,9 @@ func main() {
 	router.HandleFunc("/network", managementinterface.NetworkHandler).Methods("GET")
 	router.HandleFunc("/interface-status/{name:[a-zA-Z0-9-* ]+}", managementinterface.CheckInterfaceHandler).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
-	router.HandleFunc("/location", managementinterface.GenLocationHandler(config.config)).Methods("GET") // Form to view and/or set location manually.
-	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET")                          // Form to view and/or adjust time settings.
+	router.HandleFunc("/audiorecording", managementinterface.GenAudioRecordingHandler(config.config)).Methods("GET") // Form to view and/or set audio recording manually.
+	router.HandleFunc("/location", managementinterface.GenLocationHandler(config.config)).Methods("GET")             // Form to view and/or set location manually.
+	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET")                                      // Form to view and/or adjust time settings.
 	router.HandleFunc("/about", managementinterface.AboutHandlerGen(config.config)).Methods("GET")
 	router.HandleFunc("/advanced", managementinterface.AdvancedMenuHandler).Methods("GET")
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
@@ -178,6 +179,11 @@ func main() {
 	apiRouter.HandleFunc("/enable-hotspot", apiObj.EnableHotspot).Methods("POST")
 	apiRouter.HandleFunc("/wifi-status", apiObj.GetConnectionStatus).Methods("GET")
 	apiRouter.HandleFunc("/upload-logs", apiObj.UploadLogs).Methods("PUT")
+
+	apiRouter.HandleFunc("/audiorecording", apiObj.SetAudioRecording).Methods("POST")
+	apiRouter.HandleFunc("/audiorecording", apiObj.GetAudioRecording).Methods("GET")
+	apiRouter.HandleFunc("/audio/test-recording", apiObj.TakeTestAudioRecording).Methods("PUT")
+	apiRouter.HandleFunc("/audio/audio-status", apiObj.AudioRecordingStatus).Methods("GET")
 
 	apiRouter.Use(basicAuth)
 

@@ -1,7 +1,7 @@
 "use strict";
 window.onload = function () {
   getState();
-  setInterval(getState, 5000); 
+  setInterval(getState, 5000);
 };
 
 async function getState() {
@@ -11,8 +11,7 @@ async function getState() {
 
     $("#timestamp").html(response.timestamp);
     $("#onOffReason").html(response.onOffReason);
-    $("#powered").html(response.powered ? 'True' : 'False');
-    
+    $("#powered").html(response.powered ? "True" : "False");
 
     if (response.modem != null) {
       // No GPS data at the moment
@@ -57,7 +56,6 @@ async function getState() {
     } else {
       $("#modemData").hide();
     }
-
   } catch (e) {
     console.log(e);
   }
@@ -72,12 +70,11 @@ async function turnModemOn() {
   }
 }
 
-
 let logData = [];
 
 function startLogging() {
-  $("#signal-log-button").prop('disabled', true);
-  $("#signal-log-button").css('opacity', '0.5');
+  $("#signal-log-button").prop("disabled", true);
+  $("#signal-log-button").css("opacity", "0.5");
   $("#signal-log-button").text("Logging...");
   const intervalId = setInterval(() => {
     logSignalData();
@@ -98,19 +95,19 @@ async function updateAPN() {
   authHeaders.append("Content-Type", "application/json");
 
   try {
-      const res = await fetch("/api/modem/apn", {
-          method: "POST",
-          headers: authHeaders,
-          body: JSON.stringify({ "apn": apn }),
-      });
+    const res = await fetch("/api/modem/apn", {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({ apn: apn }),
+    });
 
-      if (!res.ok) {
-          throw new Error(`Failed to update APN: ${res.status}`);
-      }
-      console.log("APN updated successfully!");
+    if (!res.ok) {
+      throw new Error(`Failed to update APN: ${res.status}`);
+    }
+    console.log("APN updated successfully!");
   } catch (error) {
-      console.error("Failed to update APN:", error);
-      alert("Failed to update APN: " + error.message);
+    console.error("Failed to update APN:", error);
+    alert("Failed to update APN: " + error.message);
   }
 }
 
@@ -121,7 +118,7 @@ async function logSignalData() {
       logData.push({
         timestamp: new Date().toISOString(),
         band: response.signal.band,
-        strength: response.signal.strength
+        strength: response.signal.strength,
       });
     }
   } catch (e) {
@@ -133,7 +130,7 @@ function createCSVDownload() {
   let csvContent = "data:text/csv;charset=utf-8,";
   csvContent += "Timestamp,Band,Strength\r\n";
 
-  logData.forEach(row => {
+  logData.forEach((row) => {
     let rowString = `${row.timestamp},${row.band},${row.strength}\r\n`;
     csvContent += rowString;
   });
@@ -145,7 +142,7 @@ function createCSVDownload() {
   document.body.appendChild(link); // Required for FF
 
   link.click(); // This will download the file
-  $("#signal-log-button").prop('disabled', false);
-  $("#signal-log-button").css('opacity', '1');
+  $("#signal-log-button").prop("disabled", false);
+  $("#signal-log-button").css("opacity", "1");
   $("#signal-log-button").text("Start Logging");
 }
