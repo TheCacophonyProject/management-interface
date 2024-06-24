@@ -18,7 +18,7 @@ install-typescript:
 	npx tsc
 
 .PHONY: release
-release: install-packr install-typescript
+release: install-packr
 	curl -sL https://git.io/goreleaser | bash
 
 .PHONY: clean
