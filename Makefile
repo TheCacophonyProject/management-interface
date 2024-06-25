@@ -13,8 +13,8 @@ build: install-packr install-typescript
 
 .PHONY: install-typescript
 install-typescript:
-	npm install typescript
-	npm install rollup
+	npm install -g typescript
+	npm install -g rollup
 	npx tsc
 
 .PHONY: release
