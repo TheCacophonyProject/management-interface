@@ -799,12 +799,20 @@ func getLastBatteryReading() (BatteryReading, error) {
 }
 
 func (api *ManagementAPI) GetTestVideos(w http.ResponseWriter, r *http.Request) {
-	recordings, err := os.ReadDir("/var/spool/cptv/test-recordings")
+	recordingNames := []string{}
+	testRecordingsPath := "/var/spool/cptv/test-recordings"
+	_, err := os.Stat(testRecordingsPath)
+	if os.IsNotExist(err) {
+		http.Error(w, "Directory does not exist", http.StatusNotFound)
+		json.NewEncoder(w).Encode(recordingNames)
+		return
+	}
+	recordings, err := os.ReadDir(testRecordingsPath)
 	if err != nil {
 		serverError(&w, err)
 		return
 	}
-	recordingNames := []string{}
+
 	for _, recording := range recordings {
 		if strings.HasSuffix(recording.Name(), ".cptv") {
 			recordingNames = append(recordingNames, recording.Name())
