@@ -13,12 +13,12 @@ build: install-packr install-typescript
 
 .PHONY: install-typescript
 install-typescript:
-	npm install typescript
-	npm install rollup
+	npm install -g typescript
+	npm install -g rollup
 	npx tsc
 
 .PHONY: release
-release: install-packr
+release: install-packr install-typescript
 	curl -sL https://git.io/goreleaser | bash
 
 .PHONY: clean
