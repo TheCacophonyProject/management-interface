@@ -422,8 +422,6 @@ export class CameraConnection {
 }
 
 function updateTestVideos(): void {
-  return
-  /*
   fetch("/api/test-videos", {
     method: "GET",
     headers: {
@@ -449,7 +447,6 @@ function updateTestVideos(): void {
     .catch((error) => {
       console.error("Error fetching test videos:", error);
     });
-    */
 }
 
 function playTestVideo(): void {
