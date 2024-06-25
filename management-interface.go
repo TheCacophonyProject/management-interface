@@ -503,7 +503,7 @@ func DownloadTemperatureCSV(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 
 	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment; filename=battery-readings.csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=temperature.csv")
 
 	_, err = io.Copy(w, file)
 	if err != nil {

@@ -762,9 +762,10 @@ func (api *ManagementAPI) GetServiceStatus(w http.ResponseWriter, r *http.Reques
 }
 
 type BatteryReading struct {
-	Time        string `json:"time"`
-	MainBattery string `json:"mainBattery"`
-	RTCBattery  string `json:"rtcBattery"`
+	Time           string `json:"time"`
+	MainBattery    string `json:"mainBattery"`
+	MainBatteryLow string `json:"mainBatteryLow"`
+	RTCBattery     string `json:"rtcBattery"`
 }
 
 func getLastBatteryReading() (BatteryReading, error) {
@@ -785,14 +786,15 @@ func getLastBatteryReading() (BatteryReading, error) {
 	}
 
 	parts := strings.Split(lastLine, ",")
-	if len(parts) != 3 {
+	if len(parts) != 4 {
 		return BatteryReading{}, errors.New("unexpected format in battery-readings.csv")
 	}
 
 	return BatteryReading{
-		Time:        parts[0],
-		MainBattery: parts[1],
-		RTCBattery:  parts[2],
+		Time:           parts[0],
+		MainBattery:    parts[1],
+		MainBatteryLow: parts[2],
+		RTCBattery:     parts[3],
 	}, nil
 }
 
