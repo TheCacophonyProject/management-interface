@@ -642,6 +642,87 @@ func (api *ManagementAPI) GetModem(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (api *ManagementAPI) GetSaltGrains(w http.ResponseWriter, r *http.Request) {
+
+	file, err := os.Open("/etc/salt/grains")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to open grains file: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	grains := make(map[string]interface{})
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			grains[key] = value
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to parse grains file: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	encoder := json.NewEncoder(w)
+	if err := encoder.Encode(grains); err != nil {
+		http.Error(w, "Failed to encode grains to JSON", http.StatusInternalServerError)
+	}
+}
+
+// SetSaltGrains handles the HTTP request to set the grains from a JSON payload
+func (api *ManagementAPI) SetSaltGrains(w http.ResponseWriter, r *http.Request) {
+	// Read body as a JSON
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// Parse JSON body
+	var grains map[string]string
+	if err := json.Unmarshal(body, &grains); err != nil {
+		http.Error(w, "Failed to parse JSON body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate and set grains
+	var approvedKeyAndValues = map[string][]string{
+		"environment": {"tc2-dev", "tc2-test", "tc2-prod"},
+	}
+	for key, value := range grains {
+		if approvedValues, ok := approvedKeyAndValues[key]; !ok {
+			http.Error(w, fmt.Sprintf("Key %s is not approved for setting grains", key), http.StatusBadRequest)
+			return
+		} else {
+			approved := false
+			for _, approvedValue := range approvedValues {
+				if value == approvedValue {
+					approved = true
+					break
+				}
+			}
+			if !approved {
+				http.Error(w, fmt.Sprintf("Value %s is not approved for key %s", value, key), http.StatusBadRequest)
+				return
+			}
+		}
+
+		cmd := exec.Command("salt-call", "grains.setval", key, value)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			http.Error(w, fmt.Sprintf("failed to set grain: %s, output: %s", err, output), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func getDeviceType() string {
 	data, err := os.ReadFile("/etc/salt/minion_id")
 	if err != nil {
