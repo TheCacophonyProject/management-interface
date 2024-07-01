@@ -3,6 +3,7 @@ authHeaders.append("Authorization", "Basic YWRtaW46ZmVhdGhlcnM=");
 
 window.onload = async function () {
   readAutoUpdate();
+  getEnvironmentState();
 };
 
 async function setAutoUpdate(autoUpdate) {
@@ -22,13 +23,7 @@ async function readAutoUpdate() {
   var res = await fetch("/api/auto-update", { headers: authHeaders });
   if (res.ok) {
     resJson = await res.json();
-    if (resJson.autoUpdate == true) {
-      document.getElementById("auto-update-on").classList.add("active");
-      document.getElementById("auto-update-off").classList.remove("active");
-    } else {
-      document.getElementById("auto-update-on").classList.remove("active");
-      document.getElementById("auto-update-off").classList.add("active");
-    }
+    document.getElementById('auto-update-checkbox').checked = resJson.autoUpdate;
   }
 }
 
@@ -124,4 +119,41 @@ function pollSaltUpdateState() {
   }
   checkSaltUpdateState();
   setTimeout(pollSaltUpdateState, 3000);
+}
+
+function getEnvironmentState() {
+  fetch('/api/salt-grains', {
+    headers: authHeaders
+  })
+  .then(response => response.json())
+  .then(data => {
+      if (data.environment) {
+          document.getElementById('environment-select').value = data.environment;
+      }
+  })
+  .catch(error => console.error('Error fetching environment state:', error));
+}
+
+async function setEnvironment() {
+  $("#set-environment-button").attr("disabled", true);
+  $("#set-environment-button").html("Setting Environment");
+  const selectedEnvironment = document.getElementById('environment-select').value;
+  headers = authHeaders;
+  headers.append('Content-Type', 'application/json');
+  try {
+    var response = await fetch('/api/salt-grains', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ environment: selectedEnvironment })
+    })
+    if (response.ok) {
+      alert('Environment set successfully');
+    } else {
+        alert('Failed to set environment');
+    }
+  } catch (error) {
+    console.error('Error setting environment:', error);
+  }
+  $("#set-environment-button").attr("disabled", false);
+  $("#set-environment-button").html("Set Environment");
 }
