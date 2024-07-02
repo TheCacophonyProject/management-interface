@@ -1,0 +1,5 @@
+.PHONY: deploy-to-pi
+deploy-to-pi: build-arm
+    scp ./cmd/managementd pi@raspberrypi.local:~/managementd
+    ssh pi@raspberrypi.local 'sudo systemctl restart managementd'
+

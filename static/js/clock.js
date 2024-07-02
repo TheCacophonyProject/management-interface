@@ -10,6 +10,7 @@ async function getState() {
     $("#rtc-date-utc").html(response.RTCTimeUTC);
     $("#rtc-date-local").html(response.RTCTimeLocal);
     $("#system-date").html(response.SystemTime);
+    $("#timezone").html(response.Timezone);
     if (response.LowRTCBattery) {
       $("#rtc-battery").html("Low/Empty. Replace soon.");
     } else {
@@ -32,7 +33,10 @@ async function getState() {
 
 async function setTime() {
   var now = new Date();
-  var data = { date: now.toISOString() };
+  var data = {
+    date: now.toISOString(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  };
   try {
     await apiFormURLEncodedPost("/api/clock", data);
     alert("udpated time");

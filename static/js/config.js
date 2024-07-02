@@ -48,14 +48,32 @@ function loadConfig() {
       $("#input-power-on").val(response.values.windows.PowerOn);
       $("#input-power-off").val(response.values.windows.PowerOff);
       if (response.values.modemd.InitialOnDuration != 0) {
-        $("#input-initial-on-duration").val(formatDuration(response.values.modemd.InitialOnDuration));
+        $("#input-initial-on-duration").val(
+          formatDuration(response.values.modemd.InitialOnDuration)
+        );
       }
       if (response.values.modemd.FindModemTimeout != 0) {
-        $("#input-find-modem-timeout").val(formatDuration(response.values.modemd.FindModemTimeout));
+        $("#input-find-modem-timeout").val(
+          formatDuration(response.values.modemd.FindModemTimeout)
+        );
       }
       if (response.values.modemd.ConnectionTimeout != 0) {
-        $("#input-connection-timeout").val(formatDuration(response.values.modemd.ConnectionTimeout));
+        $("#input-connection-timeout").val(
+          formatDuration(response.values.modemd.ConnectionTimeout)
+        );
       }
+      $("#input-do-tracking").prop(
+        "checked",
+        response.values.thermalMotion.DoTracking
+      );
+      $("#input-run-classifier").prop(
+        "checked",
+        response.values.thermalMotion.RunClassifier
+      );
+      $("#input-tracking-events").prop(
+        "checked",
+        response.values.thermalMotion.TrackingEvents
+      );
     } else {
       console.log("error with getting device details");
     }
@@ -153,6 +171,37 @@ function saveModemConfig() {
   formData.append("section", "modemd");
   formData.append("config", JSON.stringify(data));
   xmlHttp.send(formData);
+}
+
+function saveThermalMotionConfig() {
+  var data = {};
+  data["do-tracking"] = $("#input-do-tracking").prop("checked");
+  data["run-classifier"] = $("#input-run-classifier").prop("checked");
+  data["tracking-events"] = $("#input-tracking-events").prop("checked");
+
+  var formData = new FormData();
+  formData.append("section", "thermal-motion");
+  formData.append("config", JSON.stringify(data));
+
+  fetch("/api/config", {
+    method: "POST",
+    headers: {
+      Authorization: "Basic " + btoa("admin:feathers"),
+    },
+    body: formData,
+  })
+    .then((response) => {
+      if (response.ok) {
+        alert("Thermal motion config saved");
+        loadConfig();
+      } else {
+        configError();
+      }
+    })
+    .catch((error) => {
+      console.error("Error:", error);
+      configError();
+    });
 }
 
 function configError() {

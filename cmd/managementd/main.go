@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os/exec"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -38,6 +39,7 @@ import (
 	"github.com/TheCacophonyProject/go-cptv/cptvframe"
 	managementinterface "github.com/TheCacophonyProject/management-interface"
 	"github.com/TheCacophonyProject/management-interface/api"
+	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
 )
 
 const (
@@ -45,13 +47,15 @@ const (
 	socketTimeout = 7 * time.Second
 )
 
-var haveClients = make(chan bool)
-var version = "<not set>"
-var sockets = make(map[int64]*WebsocketRegistration)
-var socketsLock sync.RWMutex
-var cameraInfo map[string]interface{}
-var lastFrame *FrameData
-var currentFrame = -1
+var (
+	haveClients  = make(chan bool)
+	version      = "<not set>"
+	sockets      = make(map[int64]*WebsocketRegistration)
+	socketsLock  sync.RWMutex
+	cameraInfo   map[string]interface{}
+	lastFrame    *FrameData
+	currentFrame = -1
+)
 
 // Set up and handle page requests.
 func main() {
@@ -74,15 +78,28 @@ func main() {
 	static := packr.NewBox("../../static")
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(static)))
 	router.Handle("/ws", websocket.Handler(WebsocketServer))
+	router.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		favicon, err := static.Find("favicon.ico")
+		if err != nil {
+			http.Error(w, "Favicon not found", http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "image/x-icon")
+		w.WriteHeader(http.StatusOK)
+		w.Write(favicon)
+	})
+
 	go sendFrameToSockets()
 	// UI handlers.
 	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
-	router.HandleFunc("/wifi-networks", managementinterface.WifiNetworkHandler).Methods("GET", "POST")
+	router.HandleFunc("/wifi-networks", managementinterface.WifiNetworkHandler).Methods("GET")
 	router.HandleFunc("/network", managementinterface.NetworkHandler).Methods("GET")
 	router.HandleFunc("/interface-status/{name:[a-zA-Z0-9-* ]+}", managementinterface.CheckInterfaceHandler).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
-	router.HandleFunc("/location", managementinterface.GenLocationHandler(config.config)).Methods("GET") // Form to view and/or set location manually.
-	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET")                          // Form to view and/or adjust time settings.
+	router.HandleFunc("/audiorecording", managementinterface.GenAudioRecordingHandler(config.config)).Methods("GET") // Form to view and/or set audio recording manually.
+	router.HandleFunc("/location", managementinterface.GenLocationHandler(config.config)).Methods("GET")             // Form to view and/or set location manually.
+	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET")                                      // Form to view and/or adjust time settings.
 	router.HandleFunc("/about", managementinterface.AboutHandlerGen(config.config)).Methods("GET")
 	router.HandleFunc("/advanced", managementinterface.AdvancedMenuHandler).Methods("GET")
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
@@ -91,23 +108,28 @@ func main() {
 	router.HandleFunc("/config", managementinterface.Config).Methods("GET")
 	router.HandleFunc("/audiobait", managementinterface.Audiobait).Methods("GET")
 	router.HandleFunc("/modem", managementinterface.Modem).Methods("GET")
+	router.HandleFunc("/battery", managementinterface.Battery).Methods("GET")
+	router.HandleFunc("/battery-csv", managementinterface.DownloadBatteryCSV).Methods("GET")
+	router.HandleFunc("/temperature-csv", managementinterface.DownloadTemperatureCSV).Methods("GET")
 
 	// API
-	apiObj, err := api.NewAPI(config.config, version)
-
+	apiRouter := router.PathPrefix("/api").Subrouter()
+	apiObj, err := api.NewAPI(apiRouter, config.config, version)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
-	apiRouter := router.PathPrefix("/api").Subrouter()
 	apiRouter.HandleFunc("/device-info", apiObj.GetDeviceInfo).Methods("GET")
 	apiRouter.HandleFunc("/recordings", apiObj.GetRecordings).Methods("GET")
 	apiRouter.HandleFunc("/recording/{id}", apiObj.GetRecording).Methods("GET")
 	apiRouter.HandleFunc("/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
 	apiRouter.HandleFunc("/camera/snapshot", apiObj.TakeSnapshot).Methods("PUT")
 	apiRouter.HandleFunc("/camera/snapshot-recording", apiObj.TakeSnapshotRecording).Methods("PUT")
+	apiRouter.HandleFunc("/audio/record", apiObj.RecordAudio).Methods("POST")
+	apiRouter.HandleFunc("/audio/files", apiObj.GetAudioFiles).Methods("GET")
 	apiRouter.HandleFunc("/signal-strength", apiObj.GetSignalStrength).Methods("GET")
 	apiRouter.HandleFunc("/reregister", apiObj.Reregister).Methods("POST")
+	apiRouter.HandleFunc("/reregister-authorized", apiObj.ReregisterAuthorized).Methods("POST")
 	apiRouter.HandleFunc("/reboot", apiObj.Reboot).Methods("POST")
 	apiRouter.HandleFunc("/config", apiObj.GetConfig).Methods("GET")
 	apiRouter.HandleFunc("/config", apiObj.SetConfig).Methods("POST")
@@ -135,34 +157,52 @@ func main() {
 	apiRouter.HandleFunc("/modem", apiObj.GetModem).Methods("GET")
 	apiRouter.HandleFunc("/salt-grains", apiObj.GetSaltGrains).Methods("GET")
 	apiRouter.HandleFunc("/salt-grains", apiObj.SetSaltGrains).Methods("POST")
+	apiRouter.HandleFunc("/modem/apn", apiObj.SetAPN).Methods("POST")
+	apiRouter.HandleFunc("/modem-stay-on-for", apiObj.ModemStayOnFor).Methods("POST")
+	apiRouter.HandleFunc("/battery", apiObj.GetBattery).Methods("GET")
+	apiRouter.HandleFunc("/test-videos", apiObj.GetTestVideos).Methods("GET")
+	apiRouter.HandleFunc("/play-test-video", apiObj.PlayTestVideo).Methods("POST")
+	apiRouter.HandleFunc("/network/interfaces", apiObj.GetNetworkInterfaces).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi", apiObj.ScanWifiNetwork).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi", apiObj.ConnectToWifi).Methods("POST")
+	apiRouter.HandleFunc("/network/wifi/save", apiObj.SaveWifiNetwork).Methods("POST")
+	apiRouter.HandleFunc("/network/wifi/saved", apiObj.GetSavedWifiNetworks).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi/saved", apiObj.GetSavedWifiNetworks).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi/forget", apiObj.ForgetWifiNetwork).Methods("DELETE")
+	apiRouter.HandleFunc("/network/wifi/current", apiObj.GetCurrentWifiNetwork).Methods("GET")
+	apiRouter.HandleFunc("/network/wifi/current", apiObj.DisconnectFromWifi).Methods("DELETE")
+	apiRouter.HandleFunc("/wifi-check", apiObj.CheckWifiInternetConnection).Methods("GET")
+	apiRouter.HandleFunc("/modem-check", apiObj.CheckModemInternetConnection).Methods("GET")
+	apiRouter.HandleFunc("/wifi-networks", apiObj.GetWifiNetworks).Methods("GET")
+	apiRouter.HandleFunc("/wifi-networks", apiObj.PostWifiNetwork).Methods("POST")
+	apiRouter.HandleFunc("/wifi-networks", apiObj.DeleteWifiNetwork).Methods("Delete")
+	apiRouter.HandleFunc("/wifi-network-scan", apiObj.ScanWifiNetwork).Methods("GET")
+	apiRouter.HandleFunc("/enable-wifi", apiObj.EnableWifi).Methods("POST")
+	apiRouter.HandleFunc("/enable-hotspot", apiObj.EnableHotspot).Methods("POST")
+	apiRouter.HandleFunc("/wifi-status", apiObj.GetConnectionStatus).Methods("GET")
+	apiRouter.HandleFunc("/upload-logs", apiObj.UploadLogs).Methods("PUT")
+
+	apiRouter.HandleFunc("/audiorecording", apiObj.SetAudioRecording).Methods("POST")
+	apiRouter.HandleFunc("/audiorecording", apiObj.GetAudioRecording).Methods("GET")
+	apiRouter.HandleFunc("/audio/test-recording", apiObj.TakeTestAudioRecording).Methods("PUT")
+	apiRouter.HandleFunc("/audio/audio-status", apiObj.AudioRecordingStatus).Methods("GET")
+
 	apiRouter.Use(basicAuth)
 
-	go func() {
-		if err := initilseHotspot(); err != nil {
-			if err := stopHotspot(); err != nil {
-				log.Println("Failed to stop hotspot:", err)
+	apiRouter.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			netmanagerclient.KeepHotspotOnFor(60 * 5)
+			out, err := exec.Command("stay-on-for", "5").CombinedOutput() // Stops camera from going to sleep for 5 minutes.
+			if err != nil {
+				log.Printf("error running stay-on-for: %s, error: %s", string(out), err)
 			}
-			log.Println("Failed to initialise hotspot:", err)
-		} else {
-			t := time.NewTimer(5 * time.Minute)
-			apiRouter.Use(func(next http.Handler) http.Handler {
-				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					t.Reset(5 * time.Minute)
-					next.ServeHTTP(w, r)
-				})
-			})
-
-			<-t.C
-			if err := stopHotspot(); err != nil {
-				log.Println("Failed to stop hotspot:", err)
-			}
-		}
-	}()
+			next.ServeHTTP(w, r)
+		})
+	})
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, router))
-
 }
 
 func basicAuth(next http.Handler) http.Handler {
@@ -343,7 +383,6 @@ type FrameData struct {
 }
 
 func GetFrame() *FrameData {
-
 	conn, err := dbus.SystemBus()
 	if err != nil {
 		return nil
@@ -351,7 +390,6 @@ func GetFrame() *FrameData {
 
 	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
 	f := &FrameData{&cptvframe.Frame{}, nil}
-	start := time.Now()
 
 	c := recorder.Call("org.cacophony.thermalrecorder.TakeSnapshot", 0, currentFrame)
 	if c.Err != nil {
@@ -359,8 +397,6 @@ func GetFrame() *FrameData {
 		return nil
 	}
 	val := c.Body[0].([]interface{})
-	elapsed := time.Since(start)
-	log.Printf("Snapshot took %s", elapsed)
 
 	tel := val[1].([]interface{})
 	f.Frame.Pix = val[0].([][]uint16)

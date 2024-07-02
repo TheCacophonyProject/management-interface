@@ -1,4 +1,5 @@
 updateSignal();
+setInterval(updateSignal, 5000);
 
 const refreshMillis = 2 * 1000;
 const maxRefreshDelayMillis = 10 * 1000;
@@ -8,7 +9,46 @@ const bars = 5;
 var refreshTime = refreshMillis;
 var signalFails = 0;
 
+async function updateSignalTC2() {
+  var response = await apiGetJSON("/api/modem");
+
+  if (response.simCard) {
+    if (response.simCard.simCardStatus == "READY") {
+      $("#modem-status").html("");
+    } else {
+      $("#modem-status").html("No Sim Card");
+    }
+  } else {
+    $("#modem-status").html("");
+  }
+
+  if (!response.signal) {
+    handleSignalSuccess(0);
+    return;
+  }
+  strength = response.signal.strength;
+
+  barsStrength = 1;
+  if (strength < 9) {
+    barsStrength = 2;
+  } else if (strength < 14) {
+    barsStrength = 3;
+  } else if (strength < 19) {
+    barsStrength = 4;
+  } else if (strength < 30) {
+    barsStrength = 5;
+  } else {
+    barsStrength = 6;
+  }
+  handleSignalSuccess(barsStrength);
+
+  return;
+}
+
 async function updateSignal() {
+  //TODO Check if device is TC2, just hard coded for now.
+  updateSignalTC2();
+  return;
   var xmlHttp = new XMLHttpRequest();
   xmlHttp.open("GET", "/api/signal-strength", true);
   xmlHttp.setRequestHeader("Authorization", "Basic " + btoa("admin:feathers"));

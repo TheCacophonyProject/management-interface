@@ -25,11 +25,14 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -41,35 +44,83 @@ import (
 	saltrequester "github.com/TheCacophonyProject/salt-updater"
 	"github.com/godbus/dbus"
 	"github.com/gorilla/mux"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/TheCacophonyProject/event-reporter/eventclient"
 	"github.com/TheCacophonyProject/trap-controller/trapdbusclient"
+
+	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
 )
 
 const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
-	apiVersion          = 9
+	apiVersion          = 8
 )
 
 type ManagementAPI struct {
-	cptvDir    string
-	config     *goconfig.Config
-	appVersion string
+	config       *goconfig.Config
+	router       *mux.Router
+	hotspotTimer *time.Ticker
+	cptvDir      string
+	appVersion   string
 }
 
-func NewAPI(config *goconfig.Config, appVersion string) (*ManagementAPI, error) {
+func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string) (*ManagementAPI, error) {
 	thermalRecorder := goconfig.DefaultThermalRecorder()
 	if err := config.Unmarshal(goconfig.ThermalRecorderKey, &thermalRecorder); err != nil {
 		return nil, err
 	}
 
 	return &ManagementAPI{
-		cptvDir:    thermalRecorder.OutputDir,
 		config:     config,
+		router:     router,
+		cptvDir:    thermalRecorder.OutputDir,
 		appVersion: appVersion,
 	}, nil
+}
+
+func (s *ManagementAPI) StopHotspotTimer() {
+	if s.hotspotTimer != nil {
+		s.hotspotTimer.Stop()
+	}
+}
+
+func checkIsConnectedToNetworkWithRetries() (string, error) {
+	// Try to get the current network name
+	var ssid string
+	var err error
+	for i := 0; i < 5; i++ {
+		ssid, err = getCurrentWifiNetwork()
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	return ssid, err
+}
+
+func (server *ManagementAPI) ManageHotspot() {
+	// Check if we are connected to a network
+	ssid, err := checkIsConnectedToNetworkWithRetries()
+	if err != nil {
+		log.Printf("Error checking if connected to network: %v", err)
+	}
+	if ssid != "" {
+		log.Printf("Connected to network: %s", ssid)
+		return
+	}
+
+	if err := netmanagerclient.EnableHotspot(true); err != nil {
+		log.Println("Failed to initialise hotspot:", err)
+		if err := netmanagerclient.EnableWifi(true); err != nil {
+			log.Println("Failed to stop hotspot:", err)
+		}
+		return
+	}
+	netmanagerclient.KeepHotspotOnFor(60 * 5)
 }
 
 func (api *ManagementAPI) GetVersion(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +130,32 @@ func (api *ManagementAPI) GetVersion(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(data)
+}
+
+func readFile(file string) string {
+	if runtime.GOOS == "windows" {
+		return ""
+	}
+
+	// The /etc/salt/minion_id file contains the ID.
+	out, err := os.ReadFile(file)
+	if err != nil {
+		return ""
+	}
+	return string(out)
+}
+
+// Return the time of the last salt update.
+func getLastSaltUpdate() string {
+	timeStr := strings.TrimSpace(readFile("/etc/cacophony/last-salt-update"))
+	if timeStr == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, timeStr)
+	if err != nil {
+		return ""
+	}
+	return t.Format("2006-01-02 15:04:05")
 }
 
 // GetDeviceInfo returns information about this device
@@ -92,18 +169,22 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 	}
 
 	type deviceInfo struct {
-		ServerURL  string `json:"serverURL"`
-		Groupname  string `json:"groupname"`
-		Devicename string `json:"devicename"`
-		DeviceID   int    `json:"deviceID"`
-		Type       string `json:"type"`
+		ServerURL   string `json:"serverURL"`
+		GroupName   string `json:"groupname"`
+		Devicename  string `json:"devicename"`
+		DeviceID    int    `json:"deviceID"`
+		SaltID      string `json:"saltID"`
+		LastUpdated string `json:"lastUpdated"`
+		Type        string `json:"type"`
 	}
 	info := deviceInfo{
-		ServerURL:  device.Server,
-		Groupname:  device.Group,
-		Devicename: device.Name,
-		DeviceID:   device.ID,
-		Type:       getDeviceType(),
+		ServerURL:   device.Server,
+		GroupName:   device.Group,
+		Devicename:  device.Name,
+		DeviceID:    device.ID,
+		SaltID:      strings.TrimSpace(readFile("/etc/salt/minion_id")),
+		LastUpdated: getLastSaltUpdate(),
+		Type:        getDeviceType(),
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(info)
@@ -250,6 +331,51 @@ func (api *ManagementAPI) Reregister(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// Reregister can change the devices name and group
+func (api *ManagementAPI) ReregisterAuthorized(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Group          string `json:"newGroup"`
+		Name           string `json:"newName"`
+		AuthorizedUser string `json:"authorizedUser"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		badRequest(&w, err)
+		return
+	}
+
+	if req.Group == "" && req.Name == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, "must set name or group\n")
+		return
+	}
+	apiClient, err := goapi.New()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, fmt.Sprintf("failed to get api client for device: %s", err.Error()))
+		return
+	}
+	if req.Group == "" {
+		req.Group = apiClient.GroupName()
+	}
+	if req.Name == "" {
+		req.Name = apiClient.DeviceName()
+	}
+
+	if err := apiClient.ReRegisterByAuthorized(req.Name, req.Group, randString(20), req.AuthorizedUser); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, err.Error())
+		return
+	}
+
+	if err := api.config.Reload(); err != nil {
+		serverError(&w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // Reboot will reboot the device after a delay so a response can be sent back
 func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 	go func() {
@@ -285,20 +411,22 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	configDefaults := map[string]interface{}{
-		goconfig.AudioKey:            goconfig.DefaultAudio(),
+		goconfig.AudioRecordingKey:   goconfig.DefaultAudioRecording(),
+		goconfig.AudioBaitKey:        goconfig.DefaultAudioBait(),
 		goconfig.GPIOKey:             goconfig.DefaultGPIO(),
 		goconfig.LeptonKey:           goconfig.DefaultLepton(),
 		goconfig.ModemdKey:           goconfig.DefaultModemd(),
 		goconfig.PortsKey:            goconfig.DefaultPorts(),
 		goconfig.TestHostsKey:        goconfig.DefaultTestHosts(),
-		goconfig.ThermalMotionKey:    goconfig.DefaultThermalMotion(lepton3.Model35), //TODO don't assume that model 3.5 is being used
+		goconfig.ThermalMotionKey:    goconfig.DefaultThermalMotion(lepton3.Model35), // TODO don't assume that model 3.5 is being used
 		goconfig.ThermalRecorderKey:  goconfig.DefaultThermalRecorder(),
 		goconfig.ThermalThrottlerKey: goconfig.DefaultThermalThrottler(),
 		goconfig.WindowsKey:          goconfig.DefaultWindows(),
 	}
 
 	configValues := map[string]interface{}{
-		goconfig.AudioKey:            &goconfig.Audio{},
+		goconfig.AudioRecordingKey:   &goconfig.AudioRecording{},
+		goconfig.AudioBaitKey:        &goconfig.AudioBait{},
 		goconfig.GPIOKey:             &goconfig.GPIO{},
 		goconfig.LeptonKey:           &goconfig.Lepton{},
 		goconfig.ModemdKey:           &goconfig.Modemd{},
@@ -317,6 +445,12 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	configValuesCC := map[string]interface{}{}
+	for k, v := range configValues {
+		configValuesCC[toCamelCase(k)] = v
+	}
+	configValues = configValuesCC
+
 	valuesAndDefaults := map[string]interface{}{
 		"values":   configValues,
 		"defaults": configDefaults,
@@ -328,6 +462,17 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(jsonString)
+}
+
+func toCamelCase(s string) string {
+	words := strings.FieldsFunc(s, func(r rune) bool {
+		return r == '-' || r == '_'
+	})
+	c := cases.Title(language.English)
+	for i := 1; i < len(words); i++ {
+		words[i] = c.String(words[i])
+	}
+	return strings.Join(words, "")
 }
 
 // ClearConfigSection will delete the config from a section so the default values will be used.
@@ -616,16 +761,392 @@ func (api *ManagementAPI) GetServiceStatus(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(serviceStatus)
 }
 
-func (api *ManagementAPI) GetModem(w http.ResponseWriter, r *http.Request) {
-	// Send dbus call to modem service to get all modem statuses
+type BatteryReading struct {
+	Time           string `json:"time"`
+	MainBattery    string `json:"mainBattery"`
+	MainBatteryLow string `json:"mainBatteryLow"`
+	RTCBattery     string `json:"rtcBattery"`
+}
+
+func getLastBatteryReading() (BatteryReading, error) {
+	file, err := os.Open("/var/log/battery-readings.csv")
+	if err != nil {
+		return BatteryReading{}, err
+	}
+	defer file.Close()
+
+	var lastLine string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lastLine = scanner.Text()
+	}
+
+	if scanner.Err() != nil {
+		return BatteryReading{}, scanner.Err()
+	}
+
+	parts := strings.Split(lastLine, ",")
+	if len(parts) != 4 {
+		return BatteryReading{}, errors.New("unexpected format in battery-readings.csv")
+	}
+
+	return BatteryReading{
+		Time:           parts[0],
+		MainBattery:    parts[1],
+		MainBatteryLow: parts[2],
+		RTCBattery:     parts[3],
+	}, nil
+}
+
+func (api *ManagementAPI) GetTestVideos(w http.ResponseWriter, r *http.Request) {
+	recordingNames := []string{}
+	testRecordingsPath := "/var/spool/cptv/test-recordings"
+	_, err := os.Stat(testRecordingsPath)
+	if os.IsNotExist(err) {
+		http.Error(w, "Directory does not exist", http.StatusNotFound)
+		json.NewEncoder(w).Encode(recordingNames)
+		return
+	}
+	recordings, err := os.ReadDir(testRecordingsPath)
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+
+	for _, recording := range recordings {
+		if strings.HasSuffix(recording.Name(), ".cptv") {
+			recordingNames = append(recordingNames, recording.Name())
+		}
+	}
+	json.NewEncoder(w).Encode(recordingNames)
+}
+
+type VideoRequest struct {
+	Video string `json:"video"`
+}
+
+func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		parseFormErrorResponse(&w, err)
+		return
+	}
+
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+		return
+	}
+
+	var req VideoRequest
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
+		log.Printf("Failed to parse request body: %s, error: %s", bodyBytes, err)
+		http.Error(w, "Failed to parse request body", http.StatusBadRequest)
+		return
+	}
+
+	videoName := "/var/spool/cptv/test-recordings/" + req.Video
+	log.Printf("Playing %s", videoName)
+
+	out, err := exec.Command("systemctl", "stop", "thermal-recorder").CombinedOutput()
+	if err != nil {
+		log.Fatalf("Failed to run command: %s, %s", err, out)
+	}
+	out, err = exec.Command("systemctl", "stop", "tc2-agent").CombinedOutput()
+	if err != nil {
+		log.Fatalf("Failed to run command: %s, %s", err, out)
+	}
+
+	cmd := exec.Command("/home/pi/classifier/bin/python3", "/home/pi/classifier-pipeline/piclassify.py", "-c", "/home/pi/classifier-pipeline/pi-classifier.yaml", "--file", videoName)
+	log.Println(strings.Join(cmd.Args, " "))
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Fatalf("Failed to create stdout pipe: %s", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		log.Fatalf("Failed to create stderr pipe: %s", err)
+	}
+
+	go streamOutput(stdout)
+	go streamOutput(stderr)
+
+	err = cmd.Start()
+	if err != nil {
+		log.Fatalf("Failed to start command: %s", err)
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		log.Fatalf("Command finished with error: %s", err)
+	}
+
+	out, err = exec.Command("systemctl", "start", "thermal-recorder").CombinedOutput()
+	if err != nil {
+		log.Fatalf("Failed to run command: %s, %s", err, out)
+	}
+	out, err = exec.Command("systemctl", "start", "tc2-agent").CombinedOutput()
+	if err != nil {
+		log.Fatalf("Failed to run command: %s, %s", err, out)
+	}
+}
+
+// Network API
+func (api *ManagementAPI) GetNetworkInterfaces(w http.ResponseWriter, r *http.Request) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		log.Printf("Error getting network interfaces: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to get network interfaces\n")
+		return
+	}
+
+	var result []map[string]interface{}
+	for _, iface := range interfaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			log.Printf("Error getting addresses for interface %s: %v", iface.Name, err)
+			continue // Skip this interface
+		}
+
+		var addrStrings []string
+		for _, addr := range addrs {
+			addrStrings = append(addrStrings, addr.String())
+		}
+
+		result = append(result, map[string]interface{}{
+			"name":       iface.Name,
+			"addresses":  addrStrings,
+			"mtu":        iface.MTU,
+			"macAddress": iface.HardwareAddr.String(),
+			"flags":      iface.Flags.String(),
+		})
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(result)
+}
+
+func getCurrentWifiNetwork() (string, error) {
+	cmd := exec.Command("iwgetid", "wlan0", "-r")
+	output, err := cmd.Output()
+	if err != nil {
+		if len(output) == 0 {
+			return "", nil
+		}
+		return "", err
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
+// CheckInternetConnection checks if a specified network interface has internet access
+func CheckInternetConnection(interfaceName string) bool {
+	iface, err := net.InterfaceByName(interfaceName)
+	if err != nil {
+		fmt.Println("Error getting interface details:", err)
+		return false
+	}
+	args := []string{"-I", iface.Name, "-c", "3", "-n", "-W", "15", "1.1.1.1"}
+
+	if err := exec.Command("ping", args...).Run(); err != nil {
+		fmt.Println("Error pinging:", err)
+		return false
+	}
+	return true
+}
+
+func (api *ManagementAPI) CheckModemInternetConnection(w http.ResponseWriter, r *http.Request) {
+	// Check if connected to modem
+	log.Println("Checking modem connection")
+	connected := CheckInternetConnection("usb0")
+	log.Printf("Modem connection: %v", connected)
+
+	// Send the current network as a JSON response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]bool{"connected": connected})
+}
+
+// Check Wifi Connection
+func (api *ManagementAPI) CheckWifiInternetConnection(w http.ResponseWriter, r *http.Request) {
+	// Check if connected to Wi-Fi
+	log.Println("Checking Wi-Fi connection")
+	connected := CheckInternetConnection("wlan0")
+	log.Printf("Wi-Fi connection: %v", connected)
+
+	// Send the current network as a JSON response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]bool{"connected": connected})
+}
+
+func (api *ManagementAPI) GetCurrentWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	// Get the current Wi-Fi network
+	log.Println("Getting current Wi-Fi network")
+	currentNetwork, err := getCurrentWifiNetwork()
+	if err != nil {
+		log.Printf("Error getting current Wi-Fi network: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to get current Wi-Fi network\n")
+		return
+	}
+	log.Printf("Current Wi-Fi network: %s", currentNetwork)
+
+	// Send the current network as a JSON response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"SSID": currentNetwork})
+}
+
+func (api *ManagementAPI) ConnectToWifi(w http.ResponseWriter, r *http.Request) {
+	var wifiDetails struct {
+		SSID     string `json:"ssid"`
+		Password string `json:"password"`
+	}
+
+	// Decode the JSON body
+	if err := json.NewDecoder(r.Body).Decode(&wifiDetails); err != nil {
+		log.Printf("Error decoding request: %v", err)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	// Get currently saved Wi-Fi networks
+	_, saved := netmanagerclient.FindNetworkBySSID(wifiDetails.SSID)
+
+	// Find network in saved networks array
+	if !saved {
+		log.Printf("Attempting to connect to Wi-Fi SSID: %s", wifiDetails.SSID)
+		if err := netmanagerclient.AddWifiNetwork(wifiDetails.SSID, wifiDetails.Password); err != nil {
+			log.Printf("Error connecting to Wi-Fi: %v", err)
+			http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err := netmanagerclient.EnableWifi(true); err != nil {
+			log.Printf("Error enabling Wi-Fi: %v", err)
+			http.Error(w, "Failed to enable Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		log.Println("Connected to Wi-Fi successfully")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Connected to Wi-Fi successfully"))
+	} else {
+		if err := netmanagerclient.ConnectWifiNetwork(wifiDetails.SSID); err != nil {
+			log.Printf("Error connecting to Wi-Fi: %v", err)
+			http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		log.Printf("Wi-Fi network already saved: %s", wifiDetails.SSID)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Wi-Fi network already saved"))
+	}
+}
+
+func (api *ManagementAPI) DisconnectFromWifi(w http.ResponseWriter, r *http.Request) {
+	currentSSID, err := getCurrentWifiNetwork()
+	if err != nil {
+		log.Printf("Error getting current Wi-Fi network: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "failed to get current Wi-Fi network\n")
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, "disconnecting from Wi-Fi network\n")
+	if err != nil {
+		log.Fatalf("Error getting state changes: %v", err)
+	}
+	go func() {
+		if err := netmanagerclient.DisconnectWifiNetwork(currentSSID, true); err != nil {
+			log.Printf("Error removing Wi-Fi network: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			io.WriteString(w, "failed to remove Wi-Fi network\n")
+			return
+		}
+	}()
+}
+
+func (api *ManagementAPI) ForgetWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	// Parse request for SSID
+	var wifiDetails struct {
+		SSID string `json:"ssid"`
+	}
+
+	// Decode the JSON body
+	if err := json.NewDecoder(r.Body).Decode(&wifiDetails); err != nil {
+		log.Printf("Error decoding request: %v", err)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Will forget Wi-Fi network: %s", wifiDetails.SSID)
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, "will forget Wi-Fi network shortly\n")
+	go func() {
+		currentSSID, _ := getCurrentWifiNetwork()
+		// Forget the network
+		currentlyConnetedTo := currentSSID == wifiDetails.SSID
+		if err := netmanagerclient.RemoveWifiNetwork(wifiDetails.SSID, currentlyConnetedTo, currentlyConnetedTo); err != nil {
+			log.Printf("Error removing Wi-Fi network: %v", err)
+		}
+	}()
+}
+
+func streamOutput(pipe io.ReadCloser) {
+	scanner := bufio.NewScanner(pipe)
+	for scanner.Scan() {
+		log.Println(scanner.Text())
+	}
+}
+
+func (api *ManagementAPI) GetBattery(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		parseFormErrorResponse(&w, err)
+		return
+	}
+	battery, err := getLastBatteryReading()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(battery)
+}
+
+func getModemDbus() (dbus.BusObject, error) {
 	conn, err := dbus.SystemBus()
+	if err != nil {
+		return nil, err
+	}
+	return conn.Object("org.cacophony.modemd", "/org/cacophony/modemd"), nil
+}
+
+func (api *ManagementAPI) ModemStayOnFor(w http.ResponseWriter, r *http.Request) {
+	modemDbus, err := getModemDbus()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
 		return
 	}
 
-	modemDbus := conn.Object("org.cacophony.modemd", "/org/cacophony/modemd")
+	minutes, err := strconv.Atoi(r.FormValue("minutes"))
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+	err = modemDbus.Call("org.cacophony.modemd.StayOnFor", 0, minutes).Store()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to request modem to stay on", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (api *ManagementAPI) GetModem(w http.ResponseWriter, r *http.Request) {
+	// Send dbus call to modem service to get all modem statuses
+	modemDbus, err := getModemDbus()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
+		return
+	}
 
 	var status map[string]interface{}
 	err = modemDbus.Call("org.cacophony.modemd.GetStatus", 0).Store(&status)
@@ -718,6 +1239,32 @@ func (api *ManagementAPI) SetSaltGrains(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, fmt.Sprintf("failed to set grain: %s, output: %s", err, output), http.StatusInternalServerError)
 			return
 		}
+	}
+}
+
+func (api *ManagementAPI) SetAPN(w http.ResponseWriter, r *http.Request) {
+	var apnDetails struct {
+		APN string `json:"apn"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&apnDetails); err != nil {
+		log.Printf("Error decoding request: %v", err)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	log.Printf("Received APN to set: %s", apnDetails.APN)
+
+	// Set APN using modemd dbus service
+	modemDbus, err := getModemDbus()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
+		return
+	}
+	err = modemDbus.Call("org.cacophony.modemd.SetAPN", 0, apnDetails.APN).Store()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to set APN", http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -837,4 +1384,296 @@ func getServiceLogs(service string, lines int) ([]string, error) {
 		return logLines[:len(logLines)-1], nil
 	}
 	return logLines, nil
+}
+
+func (api *ManagementAPI) GetWifiNetworks(w http.ResponseWriter, r *http.Request) {
+	networks, err := netmanagerclient.ListUserSavedWifiNetworks()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(networks)
+}
+
+func (api *ManagementAPI) PostWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	ssid := r.FormValue("ssid")
+	if ssid == "" {
+		badRequest(&w, errors.New("ssid field was empty"))
+		return
+	}
+	psk := r.FormValue("psk")
+	if psk == "" {
+		badRequest(&w, errors.New("psk field was empty"))
+		return
+	}
+	if err := netmanagerclient.AddWifiNetwork(ssid, psk); err != nil {
+		if _, ok := err.(netmanagerclient.InputError); ok {
+			badRequest(&w, err)
+			return
+		}
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *ManagementAPI) DeleteWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	ssid := r.FormValue("ssid")
+	if ssid == "" {
+		badRequest(&w, errors.New("ssid field was empty"))
+		return
+	}
+	if err := netmanagerclient.RemoveWifiNetwork(ssid, false, false); err != nil {
+		if _, ok := err.(netmanagerclient.InputError); ok {
+			badRequest(&w, err)
+			return
+		}
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *ManagementAPI) ScanWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	networks, err := netmanagerclient.ScanWiFiNetworks()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(networks)
+}
+
+func (api *ManagementAPI) EnableWifi(w http.ResponseWriter, r *http.Request) {
+	if err := netmanagerclient.EnableWifi(false); err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *ManagementAPI) EnableHotspot(w http.ResponseWriter, r *http.Request) {
+	go func() {
+		// TODO Wait before enabling hotspot to give time for response
+		time.Sleep(time.Second)
+		if err := netmanagerclient.EnableHotspot(true); err != nil {
+			log.Println(err)
+		}
+	}()
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *ManagementAPI) GetConnectionStatus(w http.ResponseWriter, r *http.Request) {
+	state, err := netmanagerclient.ReadState()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+
+	data := map[string]interface{}{
+		"state": state,
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(data)
+}
+
+func (api *ManagementAPI) SaveWifiNetwork(w http.ResponseWriter, r *http.Request) {
+	var wifiDetails struct {
+		SSID     string `json:"ssid"`
+		Password string `json:"password"`
+	}
+
+	// Decode the JSON body
+	if err := json.NewDecoder(r.Body).Decode(&wifiDetails); err != nil {
+		log.Printf("Error decoding request: %v", err)
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Get currently saved Wi-Fi networks
+	_, saved := netmanagerclient.FindNetworkBySSID(wifiDetails.SSID)
+
+	if !saved {
+		log.Printf("Attempting to connect to Wi-Fi SSID: %s", wifiDetails.SSID)
+		if err := netmanagerclient.AddWifiNetwork(wifiDetails.SSID, wifiDetails.Password); err != nil {
+			log.Printf("Error connecting to Wi-Fi: %v", err)
+			http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		scanWifis, err := netmanagerclient.ScanWiFiNetworks()
+		if err != nil {
+			log.Printf("Error scanning Wi-Fi networks: %v", err)
+			http.Error(w, "Failed to scan Wi-Fi networks: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var found bool
+		for _, wifi := range scanWifis {
+			if wifi.SSID == wifiDetails.SSID {
+				found = true
+				break
+			}
+		}
+
+		if found {
+			if err := netmanagerclient.ConnectWifiNetwork(wifiDetails.SSID); err != nil {
+				log.Printf("Error connecting to Wi-Fi: %v", err)
+				http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		log.Println("Added Wi-Fi successfully")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Connected to Wi-Fi successfully"))
+	} else {
+		if err := netmanagerclient.ConnectWifiNetwork(wifiDetails.SSID); err != nil {
+			log.Printf("Error connecting to Wi-Fi: %v", err)
+			http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("Wi-Fi network already saved: %s", wifiDetails.SSID)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Wi-Fi network already saved"))
+	}
+}
+
+func (api *ManagementAPI) GetSavedWifiNetworks(w http.ResponseWriter, r *http.Request) {
+	networks, err := netmanagerclient.ListUserSavedWifiNetworks()
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(networks)
+}
+
+// RecordAudio creates a mock audio file
+func (api *ManagementAPI) RecordAudio(w http.ResponseWriter, r *http.Request) {
+	// Create the audio folder if it doesn't exist
+	audioFolderPath := goconfig.ThermalRecorder{}.OutputDir + "/audio"
+	if _, err := os.Stat(audioFolderPath); os.IsNotExist(err) {
+		err := os.Mkdir(audioFolderPath, 0755)
+		if err != nil {
+			log.Printf("Error creating audio folder: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			io.WriteString(w, "Failed to create audio folder\n")
+			return
+		}
+	}
+
+	// Create a new file within the audio folder
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+	audioFilePrefix := "audio" + strconv.Itoa(random.Intn(1000000))
+	audioFileSuffix := ".wav"
+	filePath := audioFolderPath + "/" + audioFilePrefix + audioFileSuffix
+	file, err := os.Create(filePath)
+	if err != nil {
+		log.Printf("Error creating audio file: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Failed to create audio file\n")
+		return
+	}
+	defer file.Close()
+
+	// Write some mock data to the file
+	_, err = file.WriteString("This is a mock audio file.")
+	if err != nil {
+		log.Printf("Error writing to audio file: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Failed to write to audio file\n")
+		return
+	}
+
+	// Send a success response
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, "Audio file created successfully\n")
+}
+
+// GetAudioFiles returns a list of audio files
+func (api *ManagementAPI) GetAudioFiles(w http.ResponseWriter, r *http.Request) {
+	// Get the list of audio files
+	audioFolderPath := goconfig.ThermalRecorder{}.OutputDir + "/audio"
+	files, err := os.ReadDir(audioFolderPath)
+	if err != nil {
+		log.Printf("Error reading audio folder: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Failed to read audio folder\n")
+		return
+	}
+
+	// Send the list of audio files as a JSON response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(files)
+}
+
+// DownloadAudioFile downloads an audio file
+func (api *ManagementAPI) DownloadAudioFile(w http.ResponseWriter, r *http.Request) {
+	// Get the file name from the request
+	fileName := mux.Vars(r)["fileName"]
+	if fileName == "" {
+		log.Printf("Error getting file name from request: %v", fileName)
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, "Failed to get file name from request\n")
+		return
+	}
+
+	// Open the file
+	audioFolderPath := goconfig.ThermalRecorder{}.OutputDir + "/audio"
+	filePath := audioFolderPath + "/" + fileName
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Printf("Error opening audio file: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Failed to open audio file\n")
+		return
+	}
+	defer file.Close()
+
+	// Set the response headers
+	w.Header().Set("Content-Disposition", "attachment; filename="+fileName)
+	w.Header().Set("Content-Type", r.Header.Get("Content-Type"))
+
+	// Send the file as a response
+	w.WriteHeader(http.StatusOK)
+	io.Copy(w, file)
+}
+
+func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {
+	twoWeeksAgo := time.Now().AddDate(0, 0, -14).Format("2006-01-02")
+	journalctlCmd := exec.Command("journalctl", "--since", twoWeeksAgo)
+
+	logFileName := "/tmp/journalctl-logs-last-2-weeks.log"
+	logFile, err := os.Create(logFileName)
+	if err != nil {
+		log.Printf("Failed to create log file: %v", err)
+		serverError(&w, err)
+		return
+	}
+	defer logFile.Close()
+
+	journalctlCmd.Stdout = logFile
+
+	if err := journalctlCmd.Run(); err != nil {
+		log.Printf("Failed to run journalctl command: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	if err := exec.Command("gzip", "-f", logFileName).Run(); err != nil {
+		log.Printf("Failed to compress log file: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	if err := exec.Command("salt-call", "cp.push", logFileName+".gz").Run(); err != nil {
+		log.Printf("Error pushing log file with salt: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

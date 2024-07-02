@@ -12,9 +12,9 @@ script:
 
 # Create a release using goreleaser when tests pass and revision is tagged.
 deploy:
-- provider: script
-  skip_cleanup: true
-  script: make release
-  on:
-    tags: true
-    go: "1.20.x"
+  - provider: script
+    skip_cleanup: true
+    script: make release
+    on:
+      tags: true
+      go: "1.20.x"

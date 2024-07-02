@@ -19,10 +19,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package managementinterface
 
 import (
-	"bufio"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -32,7 +29,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -40,6 +36,7 @@ import (
 	"github.com/TheCacophonyProject/audiobait/v3/audiofilelibrary"
 	"github.com/TheCacophonyProject/audiobait/v3/playlist"
 	goconfig "github.com/TheCacophonyProject/go-config"
+	"github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
 
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
@@ -54,7 +51,6 @@ var tmpl *template.Template
 // This does some initialisation.  It parses our html templates up front and
 // finds the location where this executable was started.
 func init() {
-
 	// The name of the device we are running this executable on.
 	deviceName := getDeviceName()
 	tmpl = template.New("")
@@ -85,7 +81,6 @@ func getDeviceName() string {
 
 // Return the serial number for the Raspberr Pi in the device.
 func getRaspberryPiSerialNumber() string {
-
 	if runtime.GOOS == "windows" {
 		return ""
 	}
@@ -96,7 +91,7 @@ func getRaspberryPiSerialNumber() string {
 		return ""
 	}
 	defer file.Close()
-	out, err := ioutil.ReadAll(file)
+	out, err := io.ReadAll(file)
 	if err != nil {
 		return ""
 	}
@@ -166,7 +161,6 @@ func getDiskSpace() (string, error) {
 		return err.Error(), err
 	}
 	return string(out), nil
-
 }
 
 // Return info on memory e.g. memory used, memory available etc.
@@ -190,7 +184,6 @@ func getMemoryStats() (string, error) {
 
 // DiskMemoryHandler shows disk space usage and memory usage
 func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
-
 	diskData, err := getDiskSpace()
 	if err != nil {
 		log.Fatal(err)
@@ -237,12 +230,13 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 		NumMemoryRows  int
 		MemoryDataRows [][]string
 	}
-	outputStruct := table{NumDiskRows: len(outputStrings), DiskDataRows: outputStrings,
-		NumMemoryRows: len(outputStrings2), MemoryDataRows: outputStrings2}
+	outputStruct := table{
+		NumDiskRows: len(outputStrings), DiskDataRows: outputStrings,
+		NumMemoryRows: len(outputStrings2), MemoryDataRows: outputStrings2,
+	}
 
 	// Execute the actual template.
 	tmpl.ExecuteTemplate(w, "disk-memory.html", outputStruct)
-
 }
 
 // IndexHandler is the root handler.
@@ -257,7 +251,6 @@ func AdvancedMenuHandler(w http.ResponseWriter, r *http.Request) {
 
 // Get the IP address for a given interface.  There can be 0, 1 or 2 (e.g. IPv4 and IPv6)
 func getIPAddresses(iface net.Interface) []string {
-
 	var IPAddresses []string
 
 	addrs, err := iface.Addrs()
@@ -273,7 +266,6 @@ func getIPAddresses(iface net.Interface) []string {
 
 // NetworkHandler - Show the status of each network interface
 func NetworkHandler(w http.ResponseWriter, r *http.Request) {
-
 	// Type used in serving interface information.
 	type interfaceProperties struct {
 		Name        string
@@ -312,334 +304,52 @@ func NetworkHandler(w http.ResponseWriter, r *http.Request) {
 		Interfaces:       interfaces,
 		Config:           *config,
 		ErrorEncountered: err != nil,
-		ErrorMessage:     errorMessage}
+		ErrorMessage:     errorMessage,
+	}
 
 	// Need to respond to individual requests to test if a network status is up or down.
 	tmpl.ExecuteTemplate(w, "network.html", state)
 }
 
-// getNetworkSSID gets the ssid from the wpa_supplicant configuration with the specified id
-func getNetworkSSID(networkID string) (string, error) {
-	out, err := exec.Command("wpa_cli", "get_network", networkID, "ssid").Output()
-	if err != nil {
-		return "", fmt.Errorf("error executing wpa_cli get_network %s - error %s output %s", networkID, err, out)
-	}
-
-	stdOut := string(out)
-	scanner := bufio.NewScanner(strings.NewReader(stdOut))
-	scanner.Scan() //skip 1st line interface line
-	scanner.Scan()
-	ssid := scanner.Text()
-	return ssid, err
-
-}
-
-// deleteNetwork removes the network from the wpa_supplicant configuration with specified id.
-func deleteNetwork(id string) error {
-	//check if is bushnet
-	ssid, err := getNetworkSSID(id)
-	if err != nil {
-		return err
-	}
-	if strings.ToLower(ssid) == "\"bushnet\"" {
-		return errors.New("error bushnet cannot be deleted")
-	}
-
-	//remove network
-	cmd := exec.Command("wpa_cli")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return fmt.Errorf("error getting stdin pipe from cmd -error %s", err)
-	}
-	defer stdin.Close()
-	io.WriteString(stdin, fmt.Sprintf("remove_network %s\n", id))
-	io.WriteString(stdin, "quit\n")
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("error deleting wpa network -error %s", err)
-	}
-	errOccured := hasErrorOccured(string(out))
-	if errOccured {
-		reloadWPAConfig()
-		err = errors.New("error deleting network")
-		return err
-	}
-
-	//save and reload config
-	err = saveWPAConfig()
-	reloadErr := reloadWPAConfig()
-	if err == nil { //probably wont happen
-		err = reloadErr
-	}
-	return err
-}
-
-// doesWpaNetworkExist checks for a network with the specified ssid in the wpa_supplicant configuration.
-func doesWPANetworkExist(ssid string) (bool, error) {
-	networks, err := parseWPASupplicantConfig()
-	if err != nil {
-		return false, err
-	}
-	for _, v := range networks {
-		if strings.ToLower(v.SSID) == strings.ToLower(ssid) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-var dhcp_config_default = []string{
-	"hostname",
-	"clientid",
-	"persistent",
-	"option rapid_commit",
-	"option domain_name_servers, domain_name, domain_search, host_name",
-	"option classless_static_routes",
-	"option interface_mtu",
-	"require dhcp_server_identifier",
-	"slaac private",
-}
-
-func writeLines(file_path string, lines []string) error {
-	file, err := os.Create(file_path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	w := bufio.NewWriter(file)
-	for _, line := range lines {
-		_, _ = fmt.Fprintln(w, line)
-	}
-	return w.Flush()
-}
-
-func restartNetwork() error {
-	if err := writeLines("/etc/dhcpcd.conf", dhcp_config_default); err != nil {
-		return err
-	}
-	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
-		return err
-	}
-	if err := exec.Command("systemctl", "restart", "dhcpcd").Run(); err != nil {
-		return err
-	}
-	return exec.Command("systemctl", "restart", "networking").Run()
-}
-
-// addWPANetwork adds a new wpa network in the wpa_supplication configuration
-// with specified ssid and password (if it doesn't already exist)
-func addWPANetwork(ssid string, password string) error {
-	if ssid == "" {
-		return errors.New("SSID must have a value")
-	} else if strings.ToLower(ssid) == "bushnet" {
-		return errors.New("SSID cannot be bushnet")
-	}
-	if err := restartNetwork(); err != nil {
-		return err
-	}
-
-	networkExists, err := doesWPANetworkExist(ssid)
-	if err != nil {
-		log.Println(err)
-	}
-	if networkExists {
-		return fmt.Errorf("SSID %s already exists", ssid)
-	}
-
-	networkID, err := addNewNetwork()
-	if err != nil {
-		return err
-	}
-
-	err = setWPANetworkDetails(ssid, password, networkID)
-	if err != nil {
-		return err
-	}
-
-	err = saveWPAConfig()
-	reloadErr := reloadWPAConfig()
-	if err == nil { //probably wont happen
-		err = reloadErr
-	}
-	return err
-}
-
-// addNewNetwork adds a new network in the wpa_supplication configuration and returns the new network id
-func addNewNetwork() (int, error) {
-	out, err := exec.Command("wpa_cli", "add_network").Output()
-	var networkID = -1
-
-	if err != nil {
-		return networkID, fmt.Errorf("error executing wpa_cli add_network - error %s output %s", err, out)
-	}
-	stdOut := string(out)
-
-	//get the networkid of the new networks from stdOut
-	scanner := bufio.NewScanner(strings.NewReader(stdOut))
-	scanner.Scan() //skip interface line
-	if scanner.Scan() {
-		line := scanner.Text()
-		networkID, err = strconv.Atoi(line)
-		if err != nil {
-			return -1, fmt.Errorf("could not find network id - error %s from stdout %s", err, stdOut)
-		}
-	}
-	return networkID, err
-}
-
-// setWPANetworkDetails sets the ssid and password of the specified networkID in the wpa_supplication configuration
-func setWPANetworkDetails(ssid string, password string, networkID int) error {
-	cmd := exec.Command("wpa_cli")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return fmt.Errorf("error getting stdin pipe from cmd: %s", err)
-	}
-
-	defer stdin.Close()
-	io.WriteString(stdin, fmt.Sprintf("set_network %d ssid \"%s\"\n", networkID, ssid))
-	io.WriteString(stdin, fmt.Sprintf("set_network %d psk \"%s\"\n", networkID, password))
-	io.WriteString(stdin, fmt.Sprintf("enable_network %d\n", networkID))
-	io.WriteString(stdin, "quit\n")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("error adding wpa network -error %s", err)
-	}
-
-	errOccured := hasErrorOccured(string(out))
-	if errOccured {
-		reloadWPAConfig()
-		err = errors.New("error setting new network")
-	}
-	return err
-}
-
-// reloadWPAConfig executes wpa_cli reconfigure
-func reloadWPAConfig() error {
-	out, err := exec.Command("wpa_cli", "reconfigure").Output()
-	if err != nil {
-		return fmt.Errorf("error reloading config - error %s output %s", err, out)
-	}
-
-	errOccured := hasErrorOccured(string(out))
-	if errOccured {
-		err = errors.New("error reloading config")
-	}
-	return err
-}
-
-// hasErrorOccured checks string for FAIL text
-func hasErrorOccured(stdOut string) bool {
-	errorOccured := strings.Contains(stdOut, "\nFAIL\n")
-	return errorOccured
-}
-
-// saveWPAConfig executes wpa_cli save config
-func saveWPAConfig() error {
-	out, err := exec.Command("wpa_cli", "save", "config").Output()
-	if err != nil {
-		return fmt.Errorf("error saving config - error %s output %s", err, out)
-	}
-	errOccured := hasErrorOccured(string(out))
-	if errOccured {
-		err = errors.New("error saving config")
-	}
-	return err
-}
-
 type wifiNetwork struct {
-	SSID      string
+	ID        string
 	NetworkID int
-}
-
-func listAvailableWifiNetworkSSIDs() ([]string, error) {
-	cmd := "iw wlan0 scan | egrep 'SSID'"
-	out, err := exec.Command("bash", "-c", cmd).Output()
-	ssids := []string{}
-	if err != nil {
-		return ssids, fmt.Errorf("error listing available networks: %v", err)
-	}
-	networkList := string(out)
-	scanner := bufio.NewScanner(strings.NewReader(networkList))
-	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.Split(line, ":")
-		if len(parts) > 1 {
-			if strings.ToLower(parts[1]) != "bushnet" {
-				ssids = append(ssids, strings.TrimSpace(parts[1]))
-			}
-		}
-	}
-	return ssids, err
-}
-
-// parseWPASupplicantConfig uses wpa_cli list_networks to get all networks in the wpa_supplicant configuration
-func parseWPASupplicantConfig() ([]wifiNetwork, error) {
-	out, err := exec.Command("wpa_cli", "list_networks").Output()
-	networks := []wifiNetwork{}
-
-	if err != nil {
-		return networks, fmt.Errorf("error listing networks: %v", err)
-	}
-	networkList := string(out)
-	scanner := bufio.NewScanner(strings.NewReader(networkList))
-	scanner.Scan() //skip interface listing
-	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.Split(line, "\t")
-		if len(parts) > 2 {
-			if id, err := strconv.Atoi(parts[0]); err == nil {
-				if strings.ToLower(parts[1]) != "bushnet" {
-					wNetwork := wifiNetwork{SSID: parts[1], NetworkID: id}
-					networks = append(networks, wNetwork)
-				}
-			} else {
-				err = fmt.Errorf("error parsing network_id %s for line %s", err, line)
-			}
-		}
-	}
-
-	sort.Slice(networks, func(i, j int) bool { return networks[i].SSID < networks[j].SSID })
-	return networks, err
 }
 
 // WifiNetworkHandler show the wireless networks listed in the wpa_supplicant configuration
 func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
-
 	type wifiProperties struct {
 		AvailableNetworks []string
 		Networks          []wifiNetwork
 		Error             string
 	}
-	var err error
-	if r.Method == http.MethodPost {
-		if err := r.ParseForm(); err != nil {
-			log.Printf("WifiNetworkHandler error parsing form: %s", err)
-			w.WriteHeader(http.StatusBadRequest)
-			return
+	wifiProps := wifiProperties{}
+
+	wifiNetworks, err := netmanagerclient.ListUserSavedWifiNetworks()
+	if err != nil {
+		log.Println(err)
+		wifiProps.Error = "Error while getting saved networks: " + err.Error()
+	}
+	wifiProps.Networks = []wifiNetwork{}
+	for _, network := range wifiNetworks {
+		if network.ID == "" || network.ID == "bushnet" || network.ID == "Bushnet" || network.ID == "BushnetHotspot" {
+			continue
 		}
-		deleteID := r.FormValue("deleteID")
-		if deleteID != "" {
-			err = deleteNetwork(deleteID)
-		} else {
-			ssid := r.FormValue("ssid")
-			if ssid == "" {
-				ssid = r.FormValue("ssid-select")
-			}
-			password := r.FormValue("password")
-			err = addWPANetwork(ssid, password)
-		}
+		wifiProps.Networks = append(wifiProps.Networks, wifiNetwork{ID: network.ID})
 	}
 
-	wifiProps := wifiProperties{}
+	availableWifiNetworks, err := netmanagerclient.ScanWiFiNetworks()
+	wifiProps.AvailableNetworks = []string{}
 	if err != nil {
-		wifiProps.Error = err.Error()
+		log.Println(err)
+		wifiProps.Error = "Error while getting available networks: " + err.Error()
 	}
-	wifiProps.Networks, err = parseWPASupplicantConfig()
-	wifiProps.AvailableNetworks, err = listAvailableWifiNetworkSSIDs()
+	for _, network := range availableWifiNetworks {
+		wifiProps.AvailableNetworks = append(wifiProps.AvailableNetworks, network.SSID)
+	}
+
 	if wifiProps.Error == "" && err != nil {
-		wifiProps.Error = err.Error()
+		wifiProps.Error = "Wifi Error: " + err.Error()
 	}
 
 	tmpl.ExecuteTemplate(w, "wifi-networks.html", wifiProps)
@@ -647,19 +357,16 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 
 // Return info on the packages that are currently installed on the device.
 func getInstalledPackages() (string, error) {
-
 	if runtime.GOOS == "windows" {
 		return "", nil
 	}
 
 	out, err := exec.Command("/usr/bin/dpkg-query", "--show", "--showformat", "${Package}|${Version}|${Maintainer}\n").Output()
-
 	if err != nil {
 		return "", err
 	}
 
 	return string(out), nil
-
 }
 
 // AboutHandlerGen is a wrapper for the AboutHandler function.
@@ -781,6 +488,50 @@ func Modem(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "modem.html", nil)
 }
 
+func Battery(w http.ResponseWriter, r *http.Request) {
+	tmpl.ExecuteTemplate(w, "battery.html", nil)
+}
+
+func DownloadTemperatureCSV(w http.ResponseWriter, r *http.Request) {
+	filePath := "/var/log/temperature.csv"
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer file.Close()
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=temperature.csv")
+
+	_, err = io.Copy(w, file)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+}
+
+func DownloadBatteryCSV(w http.ResponseWriter, r *http.Request) {
+	filePath := "/var/log/battery-readings.csv"
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer file.Close()
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=battery-readings.csv")
+
+	_, err = io.Copy(w, file)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+}
+
 type audiobaitResponse struct {
 	Running      bool
 	Schedule     schedule
@@ -797,7 +548,7 @@ type schedule struct {
 }
 
 type combo struct {
-	Every     int //Minutes
+	Every     int // Minutes
 	From      string
 	Until     string
 	SoundInfo []soundInfo
@@ -814,7 +565,7 @@ type soundInfo struct {
 func Audiobait(w http.ResponseWriter, r *http.Request) {
 	// TODO Rather than generating the HTML like this it should probably use the
 	// audiobait APIs that are now available...
-	playSchedule, err := playlist.LoadScheduleFromDisk(goconfig.DefaultAudio().Dir)
+	playSchedule, err := playlist.LoadScheduleFromDisk(goconfig.DefaultAudioBait().Dir)
 	if err != nil {
 		log.Println(err)
 		tmpl.ExecuteTemplate(w, "audiobait.html", audiobaitResponse{
@@ -822,7 +573,7 @@ func Audiobait(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	library, err := audiofilelibrary.OpenLibrary(goconfig.DefaultAudio().Dir)
+	library, err := audiofilelibrary.OpenLibrary(goconfig.DefaultAudioBait().Dir)
 	if err != nil {
 		log.Println(err)
 		tmpl.ExecuteTemplate(w, "audiobait.html", audiobaitResponse{
