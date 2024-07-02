@@ -50,7 +50,7 @@ const (
 	cptvGlob            = "*.cptv"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
-	apiVersion          = 8
+	apiVersion          = 9
 )
 
 type ManagementAPI struct {
@@ -96,12 +96,14 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 		Groupname  string `json:"groupname"`
 		Devicename string `json:"devicename"`
 		DeviceID   int    `json:"deviceID"`
+		Type       string `json:"type"`
 	}
 	info := deviceInfo{
 		ServerURL:  device.Server,
 		Groupname:  device.Group,
 		Devicename: device.Name,
 		DeviceID:   device.ID,
+		Type:       getDeviceType(),
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(info)
@@ -338,6 +340,30 @@ func (api *ManagementAPI) ClearConfigSection(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+func (api *ManagementAPI) GetLocation(w http.ResponseWriter, r *http.Request) {
+	var location goconfig.Location
+	if err := api.config.Unmarshal(goconfig.LocationKey, &location); err != nil {
+		serverError(&w, err)
+		return
+	}
+	type Location struct {
+		Latitude  float32 `json:"latitude"`
+		Longitude float32 `json:"longitude"`
+		Altitude  float32 `json:"altitude"`
+		Accuracy  float32 `json:"accuracy"`
+		Timestamp string  `json:"timestamp"`
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(Location{
+		Latitude:  location.Latitude,
+		Longitude: location.Longitude,
+		Altitude:  location.Altitude,
+		Accuracy:  location.Accuracy,
+		Timestamp: location.Timestamp.UTC().Format(time.RFC3339),
+	})
+}
+
 // SetLocation is for specifically writing to location setting.
 func (api *ManagementAPI) SetLocation(w http.ResponseWriter, r *http.Request) {
 	log.Println("update location")
@@ -509,7 +535,7 @@ func (api *ManagementAPI) StartSaltUpdate(w http.ResponseWriter, r *http.Request
 	}
 }
 
-//GetSaltUpdateState will get the salt update status
+// GetSaltUpdateState will get the salt update status
 func (api *ManagementAPI) GetSaltUpdateState(w http.ResponseWriter, r *http.Request) {
 	state, err := saltrequester.State()
 	if err != nil {
@@ -520,7 +546,7 @@ func (api *ManagementAPI) GetSaltUpdateState(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(state)
 }
 
-//GetSaltAutoUpdate will check if salt auto update is enabled
+// GetSaltAutoUpdate will check if salt auto update is enabled
 func (api *ManagementAPI) GetSaltAutoUpdate(w http.ResponseWriter, r *http.Request) {
 	autoUpdate, err := saltrequester.IsAutoUpdateOn()
 	if err != nil {
@@ -531,7 +557,7 @@ func (api *ManagementAPI) GetSaltAutoUpdate(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(map[string]interface{}{"autoUpdate": autoUpdate})
 }
 
-//PostSaltAutoUpdate will set if auto update is enabled or not
+// PostSaltAutoUpdate will set if auto update is enabled or not
 func (api *ManagementAPI) PostSaltAutoUpdate(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		parseFormErrorResponse(&w, err)
@@ -588,6 +614,48 @@ func (api *ManagementAPI) GetServiceStatus(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	json.NewEncoder(w).Encode(serviceStatus)
+}
+
+func (api *ManagementAPI) GetModem(w http.ResponseWriter, r *http.Request) {
+	// Send dbus call to modem service to get all modem statuses
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
+		return
+	}
+
+	modemDbus := conn.Object("org.cacophony.modemd", "/org/cacophony/modemd")
+
+	var status map[string]interface{}
+	err = modemDbus.Call("org.cacophony.modemd.GetStatus", 0).Store(&status)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to get modem status", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	encoder := json.NewEncoder(w)
+	if err := encoder.Encode(status); err != nil {
+		http.Error(w, "Failed to encode status to JSON", http.StatusInternalServerError)
+	}
+}
+
+func getDeviceType() string {
+	data, err := os.ReadFile("/etc/salt/minion_id")
+	if err != nil {
+		log.Println(err)
+		return ""
+	}
+
+	parts := strings.Split(string(data), "-")
+	if len(parts) < 2 {
+		log.Printf("Failed to parse '%s' device type from /etc/salt/minion_id", string(data))
+		return ""
+	}
+
+	return strings.Join(parts[:len(parts)-1], "-")
 }
 
 func (api *ManagementAPI) RestartService(w http.ResponseWriter, r *http.Request) {
