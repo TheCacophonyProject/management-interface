@@ -50,13 +50,11 @@ github.com/Masterminds/vcs v1.13.0/go.mod h1:N09YCmOQr6RLxC6UNHzuVwAdodYbbnycGHS
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/TheCacophonyProject/audiobait/v3 v3.0.1 h1:7MGtBVqwuxLs4Tuw3VUQy1z/vcSumoht6bOr06i6tsY=
 github.com/TheCacophonyProject/audiobait/v3 v3.0.1/go.mod h1:EDM0fyF6oHPUmtOfY4QsLmOL4mfpLOtsngaQfHbttKk=
-github.com/TheCacophonyProject/event-reporter v1.3.1/go.mod h1:R5LwOPsxqhvQHCY6s17Nsx6juiFP85RE8WSwW51gbyU=
 github.com/TheCacophonyProject/event-reporter v1.3.2-0.20200210010421-ca3fcb76a231 h1:nLqfSx3zDBzghlP/S8X2j/WRtW0e3BZvSkMm1J/Fa8U=
 github.com/TheCacophonyProject/event-reporter v1.3.2-0.20200210010421-ca3fcb76a231/go.mod h1:kei6S/4x+VHp5yiwYPqvcNnhuRpZ8iLsh95Sue6kPvc=
 github.com/TheCacophonyProject/event-reporter/v3 v3.2.1/go.mod h1:0ejh8kTFM9iC3/Q+etu7Hf4XivPu35PDH5oQ1XY3KNU=
 github.com/TheCacophonyProject/event-reporter/v3 v3.3.0 h1:/leMKQ0G+nEzTOgd+d/WMT20U7zenTmhpcNcf4bQ8xE=
 github.com/TheCacophonyProject/event-reporter/v3 v3.3.0/go.mod h1:dGIYfhABsJHKjcsxtftDwpdcfLOWTYKeIyCYxCOIMrc=
-github.com/TheCacophonyProject/go-api v0.0.0-20190722123419-412d616d6d5e/go.mod h1:7OQjzdX6PbCJDxVRgTqNH9y12Ew+Q1sx9nwcRG7fj9s=
 github.com/TheCacophonyProject/go-api v0.0.0-20190923033957-174cea2ac81c/go.mod h1:FfMpa4cFhNXQ9tuKG18HO6yLExezcJhzjUjBOFocrQw=
 github.com/TheCacophonyProject/go-api v1.0.2 h1:6fVnts23OFsUuUec9GjGEhH86WmOkev/X9FzSVCEzso=
 github.com/TheCacophonyProject/go-api v1.0.2/go.mod h1:SH5Jo4bH5UdMetAUpoDeFwMYxV1RdiektVNQT11k9ow=
@@ -64,8 +62,8 @@ github.com/TheCacophonyProject/go-config v0.0.0-20190922224052-7c2a21bc6b88/go.m
 github.com/TheCacophonyProject/go-config v0.0.0-20190927054511-c93578ae648a/go.mod h1:QCgT+KCrz1CmLVpeeOMl5L8/X1QvWwpsLzR7afTmEJc=
 github.com/TheCacophonyProject/go-config v1.4.0/go.mod h1:oARW/N3eJbcewCqB+Jc7TBwuODawwYgpo56UO6yBdKU=
 github.com/TheCacophonyProject/go-config v1.7.0/go.mod h1:2VGuQR5dATuq8nzdBMQd7mbc6OhCimkSsGHRLWcer2c=
-github.com/TheCacophonyProject/go-config v1.8.3 h1:I7TOwfoPvIkBEY5+KgI9/3sHqnCgrFr14KkO4zWF/48=
-github.com/TheCacophonyProject/go-config v1.8.3/go.mod h1:65yj/WEJ4yBUjYSMmTRH4wuzcvsmJNUrvziP6lzGXcA=
+github.com/TheCacophonyProject/go-config v1.9.1 h1:TCeogtNYg5eHx2q97DQ1B+RsbjacW+jr7h1TCv1FpAk=
+github.com/TheCacophonyProject/go-config v1.9.1/go.mod h1:XZwQmNl2wQXhYR18RQtwZ6LwFwgAx73yzJfymYLz68s=
 github.com/TheCacophonyProject/go-cptv v0.0.0-20200116020937-858bd8b71512/go.mod h1:8H6Aaft5549sIWxcsuCIL2o60/TQkoF93fVoSTpgZb8=
 github.com/TheCacophonyProject/go-cptv v0.0.0-20200616224711-fc633122087a/go.mod h1:Vg73Ezn4kr8qDNP9LNgjki9qgi+5T/0Uc9oDyflaYUY=
 github.com/TheCacophonyProject/go-cptv v0.0.0-20201215230510-ae7134e91a71 h1:g6XLYIt3hFo2JOQhbfySLxcFFv0kofg0L1Z7MyNXsLc=
@@ -91,13 +89,11 @@ github.com/TheCacophonyProject/window v0.0.0-20200312071457-7fc8799fdce7/go.mod 
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alexflint/go-arg v0.0.0-20180516182405-f7c0423bd11e/go.mod h1:PHxo6ZWOLVMZZgWSAqBynb/KhIqoGO6WKwOVX7rM9dg=
-github.com/alexflint/go-arg v0.0.0-20181227200040-57836b82be06/go.mod h1:Cto8k5VtkP4pp0EXiWD4ZJMFOOinZ38ggVcQ/6CGuRI=
 github.com/alexflint/go-arg v1.0.0/go.mod h1:Cto8k5VtkP4pp0EXiWD4ZJMFOOinZ38ggVcQ/6CGuRI=
 github.com/alexflint/go-arg v1.1.0/go.mod h1:3Rj4baqzWaGGmZA2+bVTV8zQOZEjBQAPBnL5xLT+ftY=
 github.com/alexflint/go-arg v1.2.0/go.mod h1:3Rj4baqzWaGGmZA2+bVTV8zQOZEjBQAPBnL5xLT+ftY=
 github.com/alexflint/go-arg v1.3.0/go.mod h1:9iRbDxne7LcR/GSvEr7ma++GLpdIU1zrghf2y2768kM=
 github.com/alexflint/go-arg v1.4.2/go.mod h1:9iRbDxne7LcR/GSvEr7ma++GLpdIU1zrghf2y2768kM=
-github.com/alexflint/go-arg v1.4.3/go.mod h1:3PZ/wp/8HuqRZMUUgu7I+e1qcpUbvmS258mRXkFH4IA=
 github.com/alexflint/go-scalar v1.0.0/go.mod h1:GpHzbCOZXEKMEcygYQ5n/aa4Aq84zbxjy3MxYW0gjYw=
 github.com/alexflint/go-scalar v1.1.0/go.mod h1:LoFvNMqS1CPrMVltza4LvnGKhaSpc3oyLEBUZVhhS2o=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
@@ -288,7 +284,6 @@ github.com/joho/godotenv v1.3.0/go.mod h1:7hK45KPybAkOC6peb+G5yklZfMxEjkZhHbwpqx
 github.com/joho/godotenv v1.4.0 h1:3l4+N6zfMWnkbPEXKng2o2/MR5mSwTrBih4ZEkkz1lg=
 github.com/joho/godotenv v1.4.0/go.mod h1:f4LDr5Voq0i2e/R5DDNOoa2zzDfwtkZa6DnEwAbqwq4=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
-github.com/jonboulle/clockwork v0.3.0/go.mod h1:Pkfl5aHPm1nk2H9h0bjmnJD/BcgbGXUBGnn1kMkgxc8=
 github.com/json-iterator/go v1.1.11/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=
 github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024/go.mod h1:6v2b51hI/fHJwM22ozAgKL4VKDeJcHhJFhtBdhmNjmU=
 github.com/jstemmer/go-junit-report v0.9.1/go.mod h1:Brl9GWCQeLvo8nXZwPNNblvFj/XSXhF0NWZEnDohbsk=
@@ -852,9 +847,6 @@ honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWh
 honnef.co/go/tools v0.0.1-2019.2.3/go.mod h1:a3bituU0lyd329TUQxRnasdCoJDkEUEAqEt0JzvZhAg=
 honnef.co/go/tools v0.0.1-2020.1.3/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9vFzvIQ3k=
 honnef.co/go/tools v0.0.1-2020.1.4/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9vFzvIQ3k=
-periph.io/x/conn/v3 v3.7.0/go.mod h1:ypY7UVxgDbP9PJGwFSVelRRagxyXYfttVh7hJZUHEhg=
-periph.io/x/d2xx v0.1.0/go.mod h1:OflHQcWZ4LDP/2opGYbdXSP/yvWSnHVFO90KRoyobWY=
-periph.io/x/host/v3 v3.8.0/go.mod h1:rzOLH+2g9bhc6pWZrkCrmytD4igwQ2vxFw6Wn6ZOlLY=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=

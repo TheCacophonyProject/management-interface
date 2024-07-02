@@ -52,7 +52,6 @@ var socketsLock sync.RWMutex
 var cameraInfo map[string]interface{}
 var lastFrame *FrameData
 var currentFrame = -1
-var managementAPI *api.ManagementAPI
 
 // Set up and handle page requests.
 func main() {
@@ -91,10 +90,10 @@ func main() {
 	router.HandleFunc("/rename", managementinterface.Rename).Methods("GET")
 	router.HandleFunc("/config", managementinterface.Config).Methods("GET")
 	router.HandleFunc("/audiobait", managementinterface.Audiobait).Methods("GET")
+	router.HandleFunc("/modem", managementinterface.Modem).Methods("GET")
 
 	// API
 	apiObj, err := api.NewAPI(config.config, version)
-	managementAPI = apiObj
 
 	if err != nil {
 		log.Fatal(err)
@@ -114,6 +113,7 @@ func main() {
 	apiRouter.HandleFunc("/config", apiObj.SetConfig).Methods("POST")
 	apiRouter.HandleFunc("/clear-config-section", apiObj.ClearConfigSection).Methods("POST")
 	apiRouter.HandleFunc("/location", apiObj.SetLocation).Methods("POST") // Set location via a POST request.
+	apiRouter.HandleFunc("/location", apiObj.GetLocation).Methods("GET")  // Get location via a POST request.
 	apiRouter.HandleFunc("/clock", apiObj.GetClock).Methods("GET")
 	apiRouter.HandleFunc("/clock", apiObj.PostClock).Methods("POST")
 	apiRouter.HandleFunc("/version", apiObj.GetVersion).Methods("GET")
@@ -132,11 +132,35 @@ func main() {
 	apiRouter.HandleFunc("/logs", apiObj.GetServiceLogs).Methods("GET")
 	apiRouter.HandleFunc("/service", apiObj.GetServiceStatus).Methods("GET")
 	apiRouter.HandleFunc("/service-restart", apiObj.RestartService).Methods("POST")
+	apiRouter.HandleFunc("/modem", apiObj.GetModem).Methods("GET")
 	apiRouter.Use(basicAuth)
+
+	go func() {
+		if err := initilseHotspot(); err != nil {
+			if err := stopHotspot(); err != nil {
+				log.Println("Failed to stop hotspot:", err)
+			}
+			log.Println("Failed to initialise hotspot:", err)
+		} else {
+			t := time.NewTimer(5 * time.Minute)
+			apiRouter.Use(func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					t.Reset(5 * time.Minute)
+					next.ServeHTTP(w, r)
+				})
+			})
+
+			<-t.C
+			if err := stopHotspot(); err != nil {
+				log.Println("Failed to stop hotspot:", err)
+			}
+		}
+	}()
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, router))
+
 }
 
 func basicAuth(next http.Handler) http.Handler {
@@ -220,9 +244,9 @@ func sendFrameToSockets() {
 		if len(sockets) != 0 {
 			if cameraInfo == nil {
 				cameraInfo = Headers()
-				// wairing for camera to connect
+				// waiting for camera to connect
 				if cameraInfo == nil {
-					time.Sleep(5)
+					time.Sleep(time.Second)
 					continue
 				}
 				fps = cameraInfo["FPS"].(int32)
@@ -353,8 +377,7 @@ func GetFrame() *FrameData {
 		}
 	}
 
-	if f != nil {
-		currentFrame = f.Frame.Status.FrameCount
-	}
+	currentFrame = f.Frame.Status.FrameCount
+
 	return f
 }

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Modem Details</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <style>
+      .monospace {
+      	font-family: monospace;
+      }
+    </style>
+</head>
+
+<body>
+    {{template "navbar"}}
+
+    <div class="container">
+        <div class="container pt-5 pl-0">
+            <h2>Modem Details<br></h2>
+        </div>
+        <hr>
+
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">GPS:</p>
+          <p id="GPS" class="monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">Band:</p>
+          <p id="band" class="monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">Connected Time:</p>
+          <p id="connectedTime" class="monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">Name:</p>
+          <p id="name" class="monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">Netdev:</p>
+          <p id="netdev" class="monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">On/Off Reason:</p>
+          <p id="onOffReason" class="monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">Powered:</p>
+          <p id="powered" class="monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">Signal Strength:</p>
+          <p id="signalStrength" class="monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">Sim Card Status:</p>
+          <p id="simCardStatus" class="monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">Time:</p>
+          <p id="time" class="monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-md-3 mr-2 text-right">Vendor:</p>
+          <p id="vendor" class="monospace"></p>
+        </div>
+
+    </div>
+
+    <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+    <script src="/static/js/api-utils.js"></script>
+    <script src="/static/js/modem.js"></script>
+</body>
+</html>
