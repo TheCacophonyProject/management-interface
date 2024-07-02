@@ -68,14 +68,9 @@
         </div>
         <button id="check-salt-button" type="button" onclick="checkSaltConnection()" class="btn btn-primary">Check Salt Connection</button>
         <button id="salt-update-button" type="button" onclick="runSaltUpdate()" class="btn btn-primary">Run Salt Update</button>
-        <label>AutoUpdate:</label>
-        <div class="btn-group btn-group-toggle" data-toggle="buttons">
-            <label class="btn btn-secondary" id="auto-update-on" onclick="setAutoUpdate(true);">
-                <input type="radio" name="auto-update"> ON
-            </label>
-            <label class="btn btn-secondary" id="auto-update-off" onclick="setAutoUpdate(false);">
-                <input type="radio" name="auto-update" > OFF
-            </label>
+        <div class="form-group form-check">
+            <input type="checkbox" class="form-check-input" id="auto-update-checkbox" onclick="setAutoUpdate(this.checked)">
+            <label class="form-check-label" for="auto-update-checkbox">AutoUpdate</label>
         </div>
 
         <div class="row">
@@ -110,6 +105,17 @@
         <div class="container pt-5 pb-4 pl-0">
             <button id="download-temp-log" type="button" onclick="downloadTemperatureCsv()" class="btn btn-primary">Download Temperature Logs</button>
         </div>
+
+        <!-- Dropdown for selecting the salt environment -->
+        <div class="form-group">
+            <label for="environment-select">Select Environment:</label>
+            <select class="form-control" id="environment-select">
+                <option value="tc2-dev">tc2-dev</option>
+                <option value="tc2-test">tc2-test</option>
+                <option value="tc2-prod">tc2-prod</option>
+            </select>
+        </div>
+        <button id="set-environment-button" type="button" onclick="setEnvironment()" class="btn btn-primary">Set Environment</button>
 
         <div class="container pt-5 pb-4 pl-0">
             <h3>Installed Packages<br></h3>
