@@ -18,12 +18,11 @@
         </div>
         <hr>
 
-
         <div class="container pt-5 pl-0">
             <h3>Windows<br></h3>
         </div>
 
-        <div class="row">
+        <div class="row pt-5 pl-0">
             <div class="col-xs-8">
                 <div class="table-responsive">
                     <table class="table">
@@ -49,7 +48,41 @@
                 </div>
             </div>
         </div>
-        <button id="save-button" type="button" onclick="saveWindowsConfig()" class="btn btn-primary">Save Windows Config</button>
+
+        <div class="container pt-1 pl-0">
+            <button id="save-button" type="button" onclick="saveWindowsConfig()" class="btn btn-primary">Save Windows Config</button>
+        </div>
+
+        <div class="container pt-5 pl-0">
+            <h3>Modem<br></h3>
+        </div>
+        
+        <div class="row">
+            <div class="col-xs-8">
+                <div class="table-responsive">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <td>Initial On Duration</td>
+                                <td><input type="text" id="input-initial-on-duration"></td>
+                            </tr>
+                            <tr>
+                                <td>Find Modem Timeout</td>
+                                <td><input type="text" id="input-find-modem-timeout"></td>
+                            </tr>
+                            <tr>
+                                <td>Connection Timeout</td>
+                                <td><input type="text" id="input-connection-timeout"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="container pt-1 pl-0">
+            <button id="save-button" type="button" onclick="saveModemConfig()" class="btn btn-primary">Save Modem Config</button>
+        </div>
         
     </div>
 
