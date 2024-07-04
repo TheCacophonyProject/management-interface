@@ -32,10 +32,11 @@
                     <div class="form-group col-md-6">
                         <label for="audio-mode-select">Select an Audio Mode</label>
                         <select name="auio-mode-select" id="audio-mode-select" onchange="handleModeChange()">
-                            <option value="Disabled">Disabled</option>
-                            <option value="AudioOnly">Audio Only</option>
-                            <option value="AudioOrThermal">Audio or Thermal</option>
-                            <option value="AudioAndThermal">Audio and Thermal</option>
+                            <option value="Disabled" {{ if eq "Disabled" .AudioRecording.AudioMode }} selected="selected"{{ end }}
+                            >Disabled</option>
+                            <option value="AudioOnly" {{ if eq "AudioOnly" .AudioRecording.AudioMode }} selected="selected"{{ end }}>Audio Only</option>
+                            <option value="AudioOrThermal" {{ if eq "AudioOrThermal" .AudioRecording.AudioMode }} selected="selected"{{ end }}>Audio or Thermal</option>
+                            <option value="AudioAndThermal" {{ if eq "AudioAndThermal" .AudioRecording.AudioMode }} selected="selected"{{ end }}>Audio and Thermal</option>
                         </select>
                     </div>
                 </div>
