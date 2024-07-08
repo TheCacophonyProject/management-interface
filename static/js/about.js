@@ -68,7 +68,7 @@ function runSaltUpdate() {
     if (xmlHttp.status == 200) {
       $("#salt-update-button").attr("disabled", true);
       $("#salt-update-button").html("Running Salt Update...");
-      pollSaltUpdateState();
+      setTimeout(updateSaltState, 2000);
     } else {
       console.log(response);
     }
@@ -117,10 +117,18 @@ async function updateSaltState() {
     });
 
     if (response.ok) {
-      var jsonString = await response.text();
+      var data = JSON.parse(await response.text());
 
-      var data = JSON.parse(jsonString);
+      if (data.RunningUpdate) {
+        document.getElementById("salt-update-button").setAttribute("disabled", true);
+        document.getElementById("salt-update-button").textContent = "Running Salt Update...";
+        setTimeout(updateSaltState, 2000);
+      } else {
+        enableSaltButton();
+      }
 
+      document.getElementById("salt-update-progress").textContent = data.UpdateProgressPercentage;
+      document.getElementById("salt-update-progress-text").textContent = data.UpdateProgressStr;
       document.getElementById("running-salt-command").textContent =
         data.RunningUpdate ? "Yes" : "No";
       document.getElementById("running-salt-arguements").textContent =
@@ -135,11 +143,18 @@ async function updateSaltState() {
     } else {
       alert("Error updating salt");
       console.error("Error with response:", await response.text());
+      enableSaltButton();
     }
   } catch (error) {
     alert("Error updating salt");
     console.error("Error with fetching salt update:", error);
+    enableSaltButton();
   }
+}
+
+function enableSaltButton() {
+  document.getElementById("salt-update-button").removeAttribute("disabled");
+  document.getElementById("salt-update-button").textContent = "Run Salt Update...";
 }
 
 var runningSaltUpdate = true;
