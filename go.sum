@@ -82,8 +82,8 @@ github.com/TheCacophonyProject/rpi-net-manager v0.4.0-deb12 h1:0EowolSaXYxt8DOlV
 github.com/TheCacophonyProject/rpi-net-manager v0.4.0-deb12/go.mod h1:6Xl1Dp7F8IyvufOv0O5EfoXQjqoA/qNLeoWh3Rv1Y0c=
 github.com/TheCacophonyProject/rtc-utils v1.2.0 h1:570sPJE/s0b21NrP9VVeSI/gBh/dLK+G5Ne/ZFwkNv0=
 github.com/TheCacophonyProject/rtc-utils v1.2.0/go.mod h1:uV1SIy93TLZrrBcqDczUNFUz2G/Pk6pZNUdTRglmANU=
-github.com/TheCacophonyProject/salt-updater v0.8.1 h1:F2k0ooGOoMQ5iA71QqaJ6vh0f6GVXhftp/6j/QdruSU=
-github.com/TheCacophonyProject/salt-updater v0.8.1/go.mod h1:jzmJe2yOF4Vme6Mj7RL9S4VyTTceY7dsAVdSMW/91UE=
+github.com/TheCacophonyProject/salt-updater v0.8.2 h1:QEGJDRKGWxJJcITD0Lrl7bsQU2DzBFdk8R46nR9w6Rg=
+github.com/TheCacophonyProject/salt-updater v0.8.2/go.mod h1:jzmJe2yOF4Vme6Mj7RL9S4VyTTceY7dsAVdSMW/91UE=
 github.com/TheCacophonyProject/trap-controller v0.0.0-20230227002937-262a1adfaa47 h1:QSQnyDIk04eLq1FcegZbA4nF3QtBU+co0VX/g94u8I8=
 github.com/TheCacophonyProject/trap-controller v0.0.0-20230227002937-262a1adfaa47/go.mod h1:tGi6Qpp0vY9ycT9AM+a0/5DMW5kkvS2ofe7pdRMFqoU=
 github.com/TheCacophonyProject/window v0.0.0-20190821235241-ab92c2ee24b6/go.mod h1:Vww417iimOb0s46Ndsm8U/vYtwc0dZUet4uW8QzBo4M=
