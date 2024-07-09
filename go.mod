@@ -10,7 +10,7 @@ require (
 	github.com/TheCacophonyProject/go-cptv v0.0.0-20201215230510-ae7134e91a71
 	github.com/TheCacophonyProject/lepton3 v0.0.0-20211005194419-22311c15d6ee
 	github.com/TheCacophonyProject/rtc-utils v1.2.0
-	github.com/TheCacophonyProject/salt-updater v0.8.0
+	github.com/TheCacophonyProject/salt-updater v0.8.1
 	github.com/gobuffalo/packr v1.30.1
 	github.com/godbus/dbus v4.1.0+incompatible
 	github.com/gorilla/mux v1.8.0
