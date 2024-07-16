@@ -19,12 +19,16 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"sync"
 	"sync/atomic"
@@ -32,19 +36,23 @@ import (
 
 	"github.com/gobuffalo/packr"
 	"github.com/godbus/dbus"
+
 	"github.com/gorilla/mux"
 	"golang.org/x/net/websocket"
 
 	goconfig "github.com/TheCacophonyProject/go-config"
 	"github.com/TheCacophonyProject/go-cptv/cptvframe"
+	"github.com/TheCacophonyProject/lepton3"
 	managementinterface "github.com/TheCacophonyProject/management-interface"
 	"github.com/TheCacophonyProject/management-interface/api"
 	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
+	"github.com/TheCacophonyProject/thermal-recorder/headers"
 )
 
 const (
 	configDir     = goconfig.DefaultConfigDir
 	socketTimeout = 7 * time.Second
+	frameSocket   = "/var/spool/managementd"
 )
 
 var (
@@ -52,7 +60,7 @@ var (
 	version      = "<not set>"
 	sockets      = make(map[int64]*WebsocketRegistration)
 	socketsLock  sync.RWMutex
-	cameraInfo   map[string]interface{}
+	headerInfo   *headers.HeaderInfo
 	lastFrame    *FrameData
 	currentFrame = -1
 )
@@ -200,9 +208,78 @@ func main() {
 		})
 	})
 
+	go func() {
+		for {
+			// Set up listener for frames sent by leptond.
+			os.Remove(frameSocket)
+			listener, err := net.Listen("unix", frameSocket)
+			if err != nil {
+				log.Println("Couldn't make socket", err)
+				return
+			}
+			log.Print("waiting for frames from tc2-agent")
+
+			conn, err := listener.Accept()
+			if err != nil {
+				log.Printf("socket accept failed: %v", err)
+				continue
+			}
+
+			// Prevent concurrent connections.
+			listener.Close()
+
+			err = handleConn(conn)
+			log.Printf("camera connection ended with: %v", err)
+		}
+	}()
+
 	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, router))
+}
+
+func handleConn(conn net.Conn) error {
+	reader := bufio.NewReader(conn)
+	var err error
+	headerInfo, err = headers.ReadHeaderInfo(reader)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("connection from %s %s (%dx%d@%dfps) frame size %d", headerInfo.Brand(), headerInfo.Model(), headerInfo.ResX(), headerInfo.ResY(), headerInfo.FPS(), headerInfo.FrameSize())
+
+	var clearB []byte = make([]byte, 8)
+	_, err = io.ReadFull(reader, clearB)
+	if err != nil {
+		return err
+	}
+
+	rawFrame := make([]byte, headerInfo.FrameSize())
+	var frame *cptvframe.Frame = cptvframe.NewFrame(headerInfo)
+	var frames int = 0
+	for {
+		_, err := io.ReadFull(reader, rawFrame)
+		if err != nil {
+			log.Println("Error reading frame ", err)
+			return err
+		}
+		if err := lepton3.ParseRawFrame(rawFrame, frame, 0); err != nil {
+			log.Println("Could parse lepton3 frame", err)
+		} else {
+			lastFrame = &FrameData{
+				Frame: frame,
+			}
+
+			frames += 1
+			if frames%100 == 0 {
+				log.Printf("Got %v frames\n", frames)
+			}
+			// FrameInfo{
+			// 	Telemetry: frame.Status,
+			// }
+		}
+
+	}
 }
 
 func basicAuth(next http.Handler) http.Handler {
@@ -279,60 +356,57 @@ type FrameInfo struct {
 
 func sendFrameToSockets() {
 	frameNum := 0
-	var fps int32 = 9
+	var fps int = 9
 	sleepDuration := time.Duration(1000/fps) * time.Millisecond
 	for {
 		// NOTE: Only bother with this work if we have clients connected.
 		if len(sockets) != 0 {
-			if cameraInfo == nil {
-				cameraInfo = Headers()
-				// waiting for camera to connect
-				if cameraInfo == nil {
-					time.Sleep(time.Second)
-					continue
-				}
-				fps = cameraInfo["FPS"].(int32)
-				sleepDuration = time.Duration(1000/fps) * time.Millisecond
-			}
-			time.Sleep(sleepDuration)
-			lastFrame = GetFrame()
-			if lastFrame == nil {
+			if headerInfo == nil {
+				time.Sleep(time.Second)
 				continue
 			}
-			// Make the frame info
-			buffer := bytes.NewBuffer(make([]byte, 0))
-			// lastFrameLock.RLock()
-			frameInfo := FrameInfo{
-				Camera:    cameraInfo,
-				Telemetry: lastFrame.Frame.Status,
-				Tracks:    lastFrame.Tracks,
+
+			fps = headerInfo.FPS()
+			sleepDuration = time.Duration(1000/fps) * time.Millisecond
+
+			time.Sleep(sleepDuration)
+			if lastFrame != nil && frameNum != lastFrame.Frame.Status.FrameCount {
+
+				// Make the frame info
+				buffer := bytes.NewBuffer(make([]byte, 0))
+				frameInfo := FrameInfo{
+					Camera:    map[string]interface{}{"ResX": headerInfo.ResX, "ResY": headerInfo.ResY},
+					Telemetry: lastFrame.Frame.Status,
+					Tracks:    lastFrame.Tracks,
+				}
+				frameInfoJson, e := json.Marshal(frameInfo)
+				log.Printf("Frame info %v %v", string(frameInfoJson), e)
+				frameInfoLen := len(frameInfoJson)
+				// Write out the length of the frameInfo json as a u16
+				_ = binary.Write(buffer, binary.LittleEndian, uint16(frameInfoLen))
+				_ = binary.Write(buffer, binary.LittleEndian, frameInfoJson)
+				for _, row := range lastFrame.Frame.Pix {
+					_ = binary.Write(buffer, binary.LittleEndian, row)
+				}
+				// Send the buffer back to the client
+				frameBytes := buffer.Bytes()
+				socketsLock.RLock()
+				for uuid, socket := range sockets {
+					go func(socket *WebsocketRegistration, uuid int64, frameNum int) {
+						// If the socket is busy sending the previous frame,
+						// don't block, just move on to the next socket.
+						if atomic.CompareAndSwapUint32(&socket.AtomicLock, 0, 1) {
+							_ = websocket.Message.Send(socket.Socket, frameBytes)
+							atomic.StoreUint32(&socket.AtomicLock, 0)
+						} else {
+							// Locked, skip this frame to let client catch up.
+							log.Println("Skipping frame for", uuid, frameNum)
+						}
+					}(socket, uuid, frameNum)
+				}
+				socketsLock.RUnlock()
+				frameNum = lastFrame.Frame.Status.FrameCount
 			}
-			frameInfoJson, _ := json.Marshal(frameInfo)
-			frameInfoLen := len(frameInfoJson)
-			// Write out the length of the frameInfo json as a u16
-			_ = binary.Write(buffer, binary.LittleEndian, uint16(frameInfoLen))
-			_ = binary.Write(buffer, binary.LittleEndian, frameInfoJson)
-			for _, row := range lastFrame.Frame.Pix {
-				_ = binary.Write(buffer, binary.LittleEndian, row)
-			}
-			// Send the buffer back to the client
-			frameBytes := buffer.Bytes()
-			socketsLock.RLock()
-			for uuid, socket := range sockets {
-				go func(socket *WebsocketRegistration, uuid int64, frameNum int) {
-					// If the socket is busy sending the previous frame,
-					// don't block, just move on to the next socket.
-					if atomic.CompareAndSwapUint32(&socket.AtomicLock, 0, 1) {
-						_ = websocket.Message.Send(socket.Socket, frameBytes)
-						atomic.StoreUint32(&socket.AtomicLock, 0)
-					} else {
-						// Locked, skip this frame to let client catch up.
-						log.Println("Skipping frame for", uuid, frameNum)
-					}
-				}(socket, uuid, frameNum)
-			}
-			socketsLock.RUnlock()
-			frameNum++
 
 			var socketsToRemove []int64
 			socketsLock.RLock()
@@ -362,20 +436,20 @@ func sendFrameToSockets() {
 	}
 }
 
-func Headers() map[string]interface{} {
-	conn, err := dbus.SystemBus()
-	if err != nil {
-		return nil
-	}
-	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
-	specs := map[string]interface{}{}
-	err = recorder.Call("org.cacophony.thermalrecorder.CameraInfo", 0).Store(&specs)
-	if err != nil {
-		log.Printf("Error getting camera headers %v", err)
-		return nil
-	}
-	return specs
-}
+// func Headers() map[string]interface{} {
+// 	conn, err := dbus.SystemBus()
+// 	if err != nil {
+// 		return nil
+// 	}
+// 	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
+// 	specs := map[string]interface{}{}
+// 	err = recorder.Call("org.cacophony.thermalrecorder.CameraInfo", 0).Store(&specs)
+// 	if err != nil {
+// 		log.Printf("Error getting camera headers %v", err)
+// 		return nil
+// 	}
+// 	return specs
+// }
 
 type FrameData struct {
 	Frame  *cptvframe.Frame
