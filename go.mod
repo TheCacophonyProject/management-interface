@@ -5,12 +5,12 @@ go 1.20
 require (
 	github.com/TheCacophonyProject/audiobait/v3 v3.0.1
 	github.com/TheCacophonyProject/event-reporter v1.3.2-0.20200210010421-ca3fcb76a231
-	github.com/TheCacophonyProject/go-api v1.1.0
+	github.com/TheCacophonyProject/go-api v1.2.0
 	github.com/TheCacophonyProject/go-config v1.18.0
 	github.com/TheCacophonyProject/go-cptv v0.0.0-20211109233846-8c32a5d161f7
 	github.com/TheCacophonyProject/lepton3 v0.0.0-20211005194419-22311c15d6ee
 	github.com/TheCacophonyProject/rtc-utils v1.2.0
-	github.com/TheCacophonyProject/salt-updater v0.4.0
+	github.com/TheCacophonyProject/salt-updater v0.8.2
 	github.com/gobuffalo/packr v1.30.1
 	github.com/godbus/dbus v4.1.0+incompatible
 	github.com/gorilla/mux v1.8.0

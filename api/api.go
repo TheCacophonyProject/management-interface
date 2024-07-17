@@ -666,18 +666,50 @@ func (api *ManagementAPI) CheckSaltConnection(w http.ResponseWriter, r *http.Req
 
 // StartSaltUpdate will start a salt update process if not already running
 func (api *ManagementAPI) StartSaltUpdate(w http.ResponseWriter, r *http.Request) {
+	var requestBody struct {
+		Force bool `json:"force"`
+	}
+
+	// Decode the JSON request body if there is one.
+	if r.ContentLength >= 0 {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			serverError(&w, errors.New("failed to parse request body"))
+			return
+		}
+	}
+
 	state, err := saltrequester.State()
 	if err != nil {
 		serverError(&w, errors.New("failed to check salt state"))
-	}
-	if state.RunningUpdate {
-		w.Write([]byte("already runing salt update"))
 		return
 	}
-	if err := saltrequester.RunUpdate(); err != nil {
+
+	// Check if the update is already running
+	if state.RunningUpdate {
+		w.Write([]byte("already running salt update"))
+		return
+	}
+
+	// Check if we should force the update
+	if requestBody.Force {
+		err := saltrequester.ForceUpdate()
+		if err != nil {
+			log.Printf("error forcing salt update: %v", err)
+			serverError(&w, errors.New("failed to force salt update"))
+			return
+		}
+		w.Write([]byte("force salt update started"))
+		return
+	}
+
+	// Run the update, this will only run an update if one is required.
+	err = saltrequester.RunUpdate()
+	if err != nil {
 		log.Printf("error calling a salt update: %v", err)
 		serverError(&w, errors.New("failed to call a salt update"))
+		return
 	}
+	w.Write([]byte("salt update started"))
 }
 
 // GetSaltUpdateState will get the salt update status
