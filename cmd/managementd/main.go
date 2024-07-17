@@ -61,7 +61,7 @@ var (
 	sockets      = make(map[int64]*WebsocketRegistration)
 	socketsLock  sync.RWMutex
 	headerInfo   *headers.HeaderInfo
-	lastFrame    *FrameData
+	frameCh      = make(chan *FrameData, 4)
 	currentFrame = -1
 )
 
@@ -248,7 +248,7 @@ func handleConn(conn net.Conn) error {
 
 	log.Printf("connection from %s %s (%dx%d@%dfps) frame size %d", headerInfo.Brand(), headerInfo.Model(), headerInfo.ResX(), headerInfo.ResY(), headerInfo.FPS(), headerInfo.FrameSize())
 
-	var clearB []byte = make([]byte, 8)
+	var clearB []byte = make([]byte, 5)
 	_, err = io.ReadFull(reader, clearB)
 	if err != nil {
 		return err
@@ -257,11 +257,16 @@ func handleConn(conn net.Conn) error {
 	rawFrame := make([]byte, headerInfo.FrameSize())
 	var frame *cptvframe.Frame = cptvframe.NewFrame(headerInfo)
 	var frames int = 0
+	var lastFrame *FrameData
+
 	for {
 		_, err := io.ReadFull(reader, rawFrame)
 		if err != nil {
 			log.Println("Error reading frame ", err)
 			return err
+		}
+		if len(sockets) == 0 {
+			continue
 		}
 		if err := lepton3.ParseRawFrame(rawFrame, frame, 0); err != nil {
 			log.Println("Could parse lepton3 frame", err)
@@ -269,7 +274,7 @@ func handleConn(conn net.Conn) error {
 			lastFrame = &FrameData{
 				Frame: frame,
 			}
-
+			frameCh <- lastFrame
 			frames += 1
 			if frames%100 == 0 {
 				log.Printf("Got %v frames\n", frames)
@@ -356,57 +361,46 @@ type FrameInfo struct {
 
 func sendFrameToSockets() {
 	frameNum := 0
-	var fps int = 9
-	sleepDuration := time.Duration(1000/fps) * time.Millisecond
+	var lastFrame *FrameData
+
 	for {
 		// NOTE: Only bother with this work if we have clients connected.
+		lastFrame = <-frameCh
+
 		if len(sockets) != 0 {
-			if headerInfo == nil {
-				time.Sleep(time.Second)
-				continue
+			// Make the frame info
+			buffer := bytes.NewBuffer(make([]byte, 0))
+			frameInfo := FrameInfo{
+				Camera:    map[string]interface{}{"ResX": headerInfo.ResX(), "ResY": headerInfo.ResY()},
+				Telemetry: lastFrame.Frame.Status,
+				Tracks:    lastFrame.Tracks,
 			}
-
-			fps = headerInfo.FPS()
-			sleepDuration = time.Duration(1000/fps) * time.Millisecond
-
-			time.Sleep(sleepDuration)
-			if lastFrame != nil && frameNum != lastFrame.Frame.Status.FrameCount {
-
-				// Make the frame info
-				buffer := bytes.NewBuffer(make([]byte, 0))
-				frameInfo := FrameInfo{
-					Camera:    map[string]interface{}{"ResX": headerInfo.ResX, "ResY": headerInfo.ResY},
-					Telemetry: lastFrame.Frame.Status,
-					Tracks:    lastFrame.Tracks,
-				}
-				frameInfoJson, e := json.Marshal(frameInfo)
-				log.Printf("Frame info %v %v", string(frameInfoJson), e)
-				frameInfoLen := len(frameInfoJson)
-				// Write out the length of the frameInfo json as a u16
-				_ = binary.Write(buffer, binary.LittleEndian, uint16(frameInfoLen))
-				_ = binary.Write(buffer, binary.LittleEndian, frameInfoJson)
-				for _, row := range lastFrame.Frame.Pix {
-					_ = binary.Write(buffer, binary.LittleEndian, row)
-				}
-				// Send the buffer back to the client
-				frameBytes := buffer.Bytes()
-				socketsLock.RLock()
-				for uuid, socket := range sockets {
-					go func(socket *WebsocketRegistration, uuid int64, frameNum int) {
-						// If the socket is busy sending the previous frame,
-						// don't block, just move on to the next socket.
-						if atomic.CompareAndSwapUint32(&socket.AtomicLock, 0, 1) {
-							_ = websocket.Message.Send(socket.Socket, frameBytes)
-							atomic.StoreUint32(&socket.AtomicLock, 0)
-						} else {
-							// Locked, skip this frame to let client catch up.
-							log.Println("Skipping frame for", uuid, frameNum)
-						}
-					}(socket, uuid, frameNum)
-				}
-				socketsLock.RUnlock()
-				frameNum = lastFrame.Frame.Status.FrameCount
+			frameInfoJson, _ := json.Marshal(frameInfo)
+			frameInfoLen := len(frameInfoJson)
+			// Write out the length of the frameInfo json as a u16
+			_ = binary.Write(buffer, binary.LittleEndian, uint16(frameInfoLen))
+			_ = binary.Write(buffer, binary.LittleEndian, frameInfoJson)
+			for _, row := range lastFrame.Frame.Pix {
+				_ = binary.Write(buffer, binary.LittleEndian, row)
 			}
+			// Send the buffer back to the client
+			frameBytes := buffer.Bytes()
+			socketsLock.RLock()
+			for uuid, socket := range sockets {
+				go func(socket *WebsocketRegistration, uuid int64, frameNum int) {
+					// If the socket is busy sending the previous frame,
+					// don't block, just move on to the next socket.
+					if atomic.CompareAndSwapUint32(&socket.AtomicLock, 0, 1) {
+						_ = websocket.Message.Send(socket.Socket, frameBytes)
+						atomic.StoreUint32(&socket.AtomicLock, 0)
+					} else {
+						// Locked, skip this frame to let client catch up.
+						log.Println("Skipping frame for", uuid, frameNum)
+					}
+				}(socket, uuid, frameNum)
+			}
+			socketsLock.RUnlock()
+			frameNum = lastFrame.Frame.Status.FrameCount
 
 			var socketsToRemove []int64
 			socketsLock.RLock()
