@@ -35,7 +35,6 @@ import (
 	"time"
 
 	"github.com/gobuffalo/packr"
-	"github.com/godbus/dbus"
 
 	"github.com/gorilla/mux"
 	"golang.org/x/net/websocket"
@@ -279,9 +278,6 @@ func handleConn(conn net.Conn) error {
 			if frames%100 == 0 {
 				log.Printf("Got %v frames\n", frames)
 			}
-			// FrameInfo{
-			// 	Telemetry: frame.Status,
-			// }
 		}
 
 	}
@@ -430,60 +426,7 @@ func sendFrameToSockets() {
 	}
 }
 
-// func Headers() map[string]interface{} {
-// 	conn, err := dbus.SystemBus()
-// 	if err != nil {
-// 		return nil
-// 	}
-// 	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
-// 	specs := map[string]interface{}{}
-// 	err = recorder.Call("org.cacophony.thermalrecorder.CameraInfo", 0).Store(&specs)
-// 	if err != nil {
-// 		log.Printf("Error getting camera headers %v", err)
-// 		return nil
-// 	}
-// 	return specs
-// }
-
 type FrameData struct {
 	Frame  *cptvframe.Frame
 	Tracks []map[string]interface{}
-}
-
-func GetFrame() *FrameData {
-	conn, err := dbus.SystemBus()
-	if err != nil {
-		return nil
-	}
-
-	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
-	f := &FrameData{&cptvframe.Frame{}, nil}
-
-	c := recorder.Call("org.cacophony.thermalrecorder.TakeSnapshot", 0, currentFrame)
-	if c.Err != nil {
-		log.Printf("Err taking snapshot %v", err)
-		return nil
-	}
-	val := c.Body[0].([]interface{})
-
-	tel := val[1].([]interface{})
-	f.Frame.Pix = val[0].([][]uint16)
-	f.Frame.Status.TimeOn = time.Duration(tel[0].(int64))
-	f.Frame.Status.FFCState = tel[1].(string)
-	f.Frame.Status.FrameCount = int(tel[2].(int32))
-	f.Frame.Status.FrameMean = tel[3].(uint16)
-	f.Frame.Status.TempC = tel[4].(float64)
-	f.Frame.Status.LastFFCTempC = tel[5].(float64)
-	f.Frame.Status.LastFFCTime = time.Duration(tel[6].(int64))
-	f.Frame.Status.BackgroundFrame = tel[7].(bool)
-	if len(val) == 3 {
-		jsonS := val[2].(string)
-		if jsonS != "" {
-			json.Unmarshal([]byte(jsonS), &f.Tracks)
-		}
-	}
-
-	currentFrame = f.Frame.Status.FrameCount
-
-	return f
 }
