@@ -210,7 +210,12 @@ func main() {
 	go func() {
 		for {
 			// Set up listener for frames sent by leptond.
-			os.Remove(frameSocket)
+			err := os.Remove(frameSocket)
+			if err != nil {
+				log.Printf("Couldn't remove  %v %v\n", frameSocket, err)
+				time.Sleep(1000)
+				continue
+			}
 			listener, err := net.Listen("unix", frameSocket)
 			if err != nil {
 				log.Println("Couldn't make socket", err)
@@ -268,14 +273,14 @@ func handleConn(conn net.Conn) error {
 			continue
 		}
 		if err := lepton3.ParseRawFrame(rawFrame, frame, 0); err != nil {
-			log.Println("Could parse lepton3 frame", err)
+			log.Println("Could not parse lepton3 frame", err)
 		} else {
 			lastFrame = &FrameData{
 				Frame: frame,
 			}
 			frameCh <- lastFrame
 			frames += 1
-			if frames%100 == 0 {
+			if frames == 1 || frames%100 == 0 {
 				log.Printf("Got %v frames\n", frames)
 			}
 		}
