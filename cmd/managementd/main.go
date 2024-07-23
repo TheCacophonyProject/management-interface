@@ -19,32 +19,39 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/gobuffalo/packr"
-	"github.com/godbus/dbus"
+
 	"github.com/gorilla/mux"
 	"golang.org/x/net/websocket"
 
 	goconfig "github.com/TheCacophonyProject/go-config"
 	"github.com/TheCacophonyProject/go-cptv/cptvframe"
+	"github.com/TheCacophonyProject/lepton3"
 	managementinterface "github.com/TheCacophonyProject/management-interface"
 	"github.com/TheCacophonyProject/management-interface/api"
 	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
+	"github.com/TheCacophonyProject/thermal-recorder/headers"
 )
 
 const (
 	configDir     = goconfig.DefaultConfigDir
 	socketTimeout = 7 * time.Second
+	frameSocket   = "/var/spool/managementd"
 )
 
 var (
@@ -52,8 +59,8 @@ var (
 	version      = "<not set>"
 	sockets      = make(map[int64]*WebsocketRegistration)
 	socketsLock  sync.RWMutex
-	cameraInfo   map[string]interface{}
-	lastFrame    *FrameData
+	headerInfo   *headers.HeaderInfo
+	frameCh      = make(chan *FrameData, 4)
 	currentFrame = -1
 )
 
@@ -200,9 +207,85 @@ func main() {
 		})
 	})
 
+	go func() {
+		for {
+			// Set up listener for frames sent by leptond.
+			err := os.Remove(frameSocket)
+			if err != nil {
+				log.Printf("Couldn't remove  %v %v\n", frameSocket, err)
+				time.Sleep(1000)
+				continue
+			}
+			listener, err := net.Listen("unix", frameSocket)
+			if err != nil {
+				log.Println("Couldn't make socket", err)
+				return
+			}
+			log.Print("waiting for frames from tc2-agent")
+
+			conn, err := listener.Accept()
+			if err != nil {
+				log.Printf("socket accept failed: %v", err)
+				continue
+			}
+
+			// Prevent concurrent connections.
+			listener.Close()
+
+			err = handleConn(conn)
+			log.Printf("camera connection ended with: %v", err)
+		}
+	}()
+
 	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, router))
+}
+
+func handleConn(conn net.Conn) error {
+	reader := bufio.NewReader(conn)
+	var err error
+	headerInfo, err = headers.ReadHeaderInfo(reader)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("connection from %s %s (%dx%d@%dfps) frame size %d", headerInfo.Brand(), headerInfo.Model(), headerInfo.ResX(), headerInfo.ResY(), headerInfo.FPS(), headerInfo.FrameSize())
+
+	var clearB []byte = make([]byte, 5)
+	_, err = io.ReadFull(reader, clearB)
+	if err != nil {
+		return err
+	}
+
+	rawFrame := make([]byte, headerInfo.FrameSize())
+	var frame *cptvframe.Frame = cptvframe.NewFrame(headerInfo)
+	var frames int = 0
+	var lastFrame *FrameData
+
+	for {
+		_, err := io.ReadFull(reader, rawFrame)
+		if err != nil {
+			log.Println("Error reading frame ", err)
+			return err
+		}
+		if len(sockets) == 0 {
+			continue
+		}
+		if err := lepton3.ParseRawFrame(rawFrame, frame, 0); err != nil {
+			log.Println("Could not parse lepton3 frame", err)
+		} else {
+			lastFrame = &FrameData{
+				Frame: frame,
+			}
+			frameCh <- lastFrame
+			frames += 1
+			if frames == 1 || frames%100 == 0 {
+				log.Printf("Got %v frames\n", frames)
+			}
+		}
+
+	}
 }
 
 func basicAuth(next http.Handler) http.Handler {
@@ -279,31 +362,17 @@ type FrameInfo struct {
 
 func sendFrameToSockets() {
 	frameNum := 0
-	var fps int32 = 9
-	sleepDuration := time.Duration(1000/fps) * time.Millisecond
+	var lastFrame *FrameData
+
 	for {
 		// NOTE: Only bother with this work if we have clients connected.
+		lastFrame = <-frameCh
+
 		if len(sockets) != 0 {
-			if cameraInfo == nil {
-				cameraInfo = Headers()
-				// waiting for camera to connect
-				if cameraInfo == nil {
-					time.Sleep(time.Second)
-					continue
-				}
-				fps = cameraInfo["FPS"].(int32)
-				sleepDuration = time.Duration(1000/fps) * time.Millisecond
-			}
-			time.Sleep(sleepDuration)
-			lastFrame = GetFrame()
-			if lastFrame == nil {
-				continue
-			}
 			// Make the frame info
 			buffer := bytes.NewBuffer(make([]byte, 0))
-			// lastFrameLock.RLock()
 			frameInfo := FrameInfo{
-				Camera:    cameraInfo,
+				Camera:    map[string]interface{}{"ResX": headerInfo.ResX(), "ResY": headerInfo.ResY()},
 				Telemetry: lastFrame.Frame.Status,
 				Tracks:    lastFrame.Tracks,
 			}
@@ -332,7 +401,7 @@ func sendFrameToSockets() {
 				}(socket, uuid, frameNum)
 			}
 			socketsLock.RUnlock()
-			frameNum++
+			frameNum = lastFrame.Frame.Status.FrameCount
 
 			var socketsToRemove []int64
 			socketsLock.RLock()
@@ -362,60 +431,7 @@ func sendFrameToSockets() {
 	}
 }
 
-func Headers() map[string]interface{} {
-	conn, err := dbus.SystemBus()
-	if err != nil {
-		return nil
-	}
-	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
-	specs := map[string]interface{}{}
-	err = recorder.Call("org.cacophony.thermalrecorder.CameraInfo", 0).Store(&specs)
-	if err != nil {
-		log.Printf("Error getting camera headers %v", err)
-		return nil
-	}
-	return specs
-}
-
 type FrameData struct {
 	Frame  *cptvframe.Frame
 	Tracks []map[string]interface{}
-}
-
-func GetFrame() *FrameData {
-	conn, err := dbus.SystemBus()
-	if err != nil {
-		return nil
-	}
-
-	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
-	f := &FrameData{&cptvframe.Frame{}, nil}
-
-	c := recorder.Call("org.cacophony.thermalrecorder.TakeSnapshot", 0, currentFrame)
-	if c.Err != nil {
-		log.Printf("Err taking snapshot %v", err)
-		return nil
-	}
-	val := c.Body[0].([]interface{})
-
-	tel := val[1].([]interface{})
-	f.Frame.Pix = val[0].([][]uint16)
-	f.Frame.Status.TimeOn = time.Duration(tel[0].(int64))
-	f.Frame.Status.FFCState = tel[1].(string)
-	f.Frame.Status.FrameCount = int(tel[2].(int32))
-	f.Frame.Status.FrameMean = tel[3].(uint16)
-	f.Frame.Status.TempC = tel[4].(float64)
-	f.Frame.Status.LastFFCTempC = tel[5].(float64)
-	f.Frame.Status.LastFFCTime = time.Duration(tel[6].(int64))
-	f.Frame.Status.BackgroundFrame = tel[7].(bool)
-	if len(val) == 3 {
-		jsonS := val[2].(string)
-		if jsonS != "" {
-			json.Unmarshal([]byte(jsonS), &f.Tracks)
-		}
-	}
-
-	currentFrame = f.Frame.Status.FrameCount
-
-	return f
 }

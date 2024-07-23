@@ -7,7 +7,7 @@ require (
 	github.com/TheCacophonyProject/event-reporter v1.3.2-0.20200210010421-ca3fcb76a231
 	github.com/TheCacophonyProject/go-api v1.2.0
 	github.com/TheCacophonyProject/go-config v1.18.0
-	github.com/TheCacophonyProject/go-cptv v0.0.0-20201215230510-ae7134e91a71
+	github.com/TheCacophonyProject/go-cptv v0.0.0-20211109233846-8c32a5d161f7
 	github.com/TheCacophonyProject/lepton3 v0.0.0-20211005194419-22311c15d6ee
 	github.com/TheCacophonyProject/rtc-utils v1.2.0
 	github.com/TheCacophonyProject/salt-updater v0.8.2
@@ -20,8 +20,10 @@ require (
 
 require (
 	github.com/TheCacophonyProject/rpi-net-manager v0.4.0-deb12
+	github.com/TheCacophonyProject/thermal-recorder v1.22.1-0.20230627011240-89964c0511f7
 	github.com/TheCacophonyProject/trap-controller v0.0.0-20230227002937-262a1adfaa47
 	golang.org/x/text v0.16.0
+
 )
 
 require (
@@ -54,6 +56,7 @@ require (
 	golang.org/x/sys v0.21.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637 // indirect
+	gopkg.in/yaml.v1 v1.0.0-20140924161607-9f9df34309c0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	periph.io/x/periph v3.6.8+incompatible // indirect
 )
