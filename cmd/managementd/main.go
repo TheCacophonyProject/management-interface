@@ -209,13 +209,13 @@ func main() {
 
 	go func() {
 		for {
-			// Set up listener for frames sent by leptond.
 			err := os.Remove(frameSocket)
-			if err != nil {
+			if err != nil && !os.IsNotExist(err) {
 				log.Printf("Couldn't remove  %v %v\n", frameSocket, err)
 				time.Sleep(1000)
 				continue
 			}
+
 			listener, err := net.Listen("unix", frameSocket)
 			if err != nil {
 				log.Println("Couldn't make socket", err)
