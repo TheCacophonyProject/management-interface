@@ -176,7 +176,7 @@ function updateAudio() {
     updateAudioError(xmlHttp);
   };
 
-  xmlHttp.send(JSON.stringify(data));
+  xmlHttp.send($.param(data));
 }
 
 function updateAudioError(xmlHttp: XMLHttpRequest) {
