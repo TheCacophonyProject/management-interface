@@ -145,7 +145,9 @@ function handleModeChange() {
 
 function updateAudio() {
   var data: any = {};
-  data["audio-mode"] = document.getElementById("audio-mode-select")?.nodeValue;
+  data["audio-mode"] = (
+    document.getElementById("audio-mode-select") as HTMLSelectElement
+  ).value;
 
   var xmlHttp = new XMLHttpRequest();
   xmlHttp.open("POST", "/api/audiorecording", true);
@@ -157,7 +159,8 @@ function updateAudio() {
   xmlHttp.onload = async function () {
     if (xmlHttp.status == 200) {
       if (
-        document.getElementById("audio-mode-select")?.nodeValue != "Disabled"
+        (document.getElementById("audio-mode-select") as HTMLSelectElement)
+          .value != "Disabled"
       ) {
         document
           .getElementById("audio-test-button")
