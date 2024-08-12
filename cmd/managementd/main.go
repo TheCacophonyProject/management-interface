@@ -55,13 +55,13 @@ const (
 )
 
 var (
-	haveClients  = make(chan bool)
-	version      = "<not set>"
-	sockets      = make(map[int64]*WebsocketRegistration)
-	socketsLock  sync.RWMutex
-	headerInfo   *headers.HeaderInfo
-	frameCh      = make(chan *FrameData, 4)
-	currentFrame = -1
+	haveClients = make(chan bool)
+	version     = "<not set>"
+	sockets     = make(map[int64]*WebsocketRegistration)
+	socketsLock sync.RWMutex
+	headerInfo  *headers.HeaderInfo
+	frameCh     = make(chan *FrameData, 4)
+	connected   atomic.Bool
 )
 
 // Set up and handle page requests.
@@ -233,7 +233,10 @@ func main() {
 			listener.Close()
 
 			err = handleConn(conn)
+			frameCh <- &FrameData{Disconnected: true}
 			log.Printf("camera connection ended with: %v", err)
+			connected.Store(false)
+
 		}
 	}()
 
@@ -262,7 +265,7 @@ func handleConn(conn net.Conn) error {
 	var frame *cptvframe.Frame = cptvframe.NewFrame(headerInfo)
 	var frames int = 0
 	var lastFrame *FrameData
-
+	connected.Store(true)
 	for {
 		_, err := io.ReadFull(reader, rawFrame)
 		if err != nil {
@@ -333,6 +336,10 @@ func WebsocketServer(ws *websocket.Conn) {
 					LastHeartbeatAt: time.Now(),
 					AtomicLock:      0,
 				}
+				if !connected.Load() {
+					_ = websocket.Message.Send(ws, "disconnected")
+				}
+
 				socketsLock.Unlock()
 				if firstSocket {
 					log.Print("Get new client register")
@@ -369,40 +376,56 @@ func sendFrameToSockets() {
 		lastFrame = <-frameCh
 
 		if len(sockets) != 0 {
-			// Make the frame info
-			buffer := bytes.NewBuffer(make([]byte, 0))
-			frameInfo := FrameInfo{
-				Camera:    map[string]interface{}{"ResX": headerInfo.ResX(), "ResY": headerInfo.ResY()},
-				Telemetry: lastFrame.Frame.Status,
-				Tracks:    lastFrame.Tracks,
+			if lastFrame.Disconnected {
+				socketsLock.RLock()
+				for uuid, socket := range sockets {
+					go func(socket *WebsocketRegistration, uuid int64, frameNum int) {
+						// If the socket is busy sending the previous frame,
+						// don't block, just move on to the next socket.
+						if atomic.CompareAndSwapUint32(&socket.AtomicLock, 0, 1) {
+							_ = websocket.Message.Send(socket.Socket, "disconnected")
+							atomic.StoreUint32(&socket.AtomicLock, 0)
+						} else {
+							time.Sleep(100 * time.Millisecond)
+						}
+					}(socket, uuid, frameNum)
+				}
+				socketsLock.RUnlock()
+			} else {
+				// Make the frame info
+				buffer := bytes.NewBuffer(make([]byte, 0))
+				frameInfo := FrameInfo{
+					Camera:    map[string]interface{}{"ResX": headerInfo.ResX(), "ResY": headerInfo.ResY()},
+					Telemetry: lastFrame.Frame.Status,
+					Tracks:    lastFrame.Tracks,
+				}
+				frameInfoJson, _ := json.Marshal(frameInfo)
+				frameInfoLen := len(frameInfoJson)
+				// Write out the length of the frameInfo json as a u16
+				_ = binary.Write(buffer, binary.LittleEndian, uint16(frameInfoLen))
+				_ = binary.Write(buffer, binary.LittleEndian, frameInfoJson)
+				for _, row := range lastFrame.Frame.Pix {
+					_ = binary.Write(buffer, binary.LittleEndian, row)
+				}
+				// Send the buffer back to the client
+				frameBytes := buffer.Bytes()
+				socketsLock.RLock()
+				for uuid, socket := range sockets {
+					go func(socket *WebsocketRegistration, uuid int64, frameNum int) {
+						// If the socket is busy sending the previous frame,
+						// don't block, just move on to the next socket.
+						if atomic.CompareAndSwapUint32(&socket.AtomicLock, 0, 1) {
+							_ = websocket.Message.Send(socket.Socket, frameBytes)
+							atomic.StoreUint32(&socket.AtomicLock, 0)
+						} else {
+							// Locked, skip this frame to let client catch up.
+							log.Println("Skipping frame for", uuid, frameNum)
+						}
+					}(socket, uuid, frameNum)
+				}
+				socketsLock.RUnlock()
+				frameNum = lastFrame.Frame.Status.FrameCount
 			}
-			frameInfoJson, _ := json.Marshal(frameInfo)
-			frameInfoLen := len(frameInfoJson)
-			// Write out the length of the frameInfo json as a u16
-			_ = binary.Write(buffer, binary.LittleEndian, uint16(frameInfoLen))
-			_ = binary.Write(buffer, binary.LittleEndian, frameInfoJson)
-			for _, row := range lastFrame.Frame.Pix {
-				_ = binary.Write(buffer, binary.LittleEndian, row)
-			}
-			// Send the buffer back to the client
-			frameBytes := buffer.Bytes()
-			socketsLock.RLock()
-			for uuid, socket := range sockets {
-				go func(socket *WebsocketRegistration, uuid int64, frameNum int) {
-					// If the socket is busy sending the previous frame,
-					// don't block, just move on to the next socket.
-					if atomic.CompareAndSwapUint32(&socket.AtomicLock, 0, 1) {
-						_ = websocket.Message.Send(socket.Socket, frameBytes)
-						atomic.StoreUint32(&socket.AtomicLock, 0)
-					} else {
-						// Locked, skip this frame to let client catch up.
-						log.Println("Skipping frame for", uuid, frameNum)
-					}
-				}(socket, uuid, frameNum)
-			}
-			socketsLock.RUnlock()
-			frameNum = lastFrame.Frame.Status.FrameCount
-
 			var socketsToRemove []int64
 			socketsLock.RLock()
 			for uuid, socket := range sockets {
@@ -432,6 +455,7 @@ func sendFrameToSockets() {
 }
 
 type FrameData struct {
-	Frame  *cptvframe.Frame
-	Tracks []map[string]interface{}
+	Disconnected bool
+	Frame        *cptvframe.Frame
+	Tracks       []map[string]interface{}
 }

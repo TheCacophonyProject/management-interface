@@ -24,7 +24,8 @@ async function readAutoUpdate() {
   var res = await fetch("/api/auto-update", { headers: authHeaders });
   if (res.ok) {
     resJson = await res.json();
-    document.getElementById('auto-update-checkbox').checked = resJson.autoUpdate;
+    document.getElementById("auto-update-checkbox").checked =
+      resJson.autoUpdate;
   }
 }
 
@@ -122,15 +123,20 @@ async function updateSaltState() {
       var data = JSON.parse(await response.text());
 
       if (data.RunningUpdate) {
-        document.getElementById("salt-update-button").setAttribute("disabled", true);
-        document.getElementById("salt-update-button").textContent = "Running Salt Update...";
+        document
+          .getElementById("salt-update-button")
+          .setAttribute("disabled", true);
+        document.getElementById("salt-update-button").textContent =
+          "Running Salt Update...";
         setTimeout(updateSaltState, 2000);
       } else {
         enableSaltButton();
       }
 
-      document.getElementById("salt-update-progress").textContent = data.UpdateProgressPercentage;
-      document.getElementById("salt-update-progress-text").textContent = data.UpdateProgressStr;
+      document.getElementById("salt-update-progress").textContent =
+        data.UpdateProgressPercentage;
+      document.getElementById("salt-update-progress-text").textContent =
+        data.UpdateProgressStr;
       document.getElementById("running-salt-command").textContent =
         data.RunningUpdate ? "Yes" : "No";
       document.getElementById("running-salt-arguements").textContent =
@@ -156,7 +162,8 @@ async function updateSaltState() {
 
 function enableSaltButton() {
   document.getElementById("salt-update-button").removeAttribute("disabled");
-  document.getElementById("salt-update-button").textContent = "Run Salt Update...";
+  document.getElementById("salt-update-button").textContent =
+    "Run Salt Update...";
 }
 
 var runningSaltUpdate = true;
@@ -202,37 +209,40 @@ function pollSaltUpdateState() {
 }
 
 function getEnvironmentState() {
-  fetch('/api/salt-grains', {
-    headers: authHeaders
+  fetch("/api/salt-grains", {
+    headers: authHeaders,
   })
-  .then(response => response.json())
-  .then(data => {
+    .then((response) => response.json())
+    .then((data) => {
       if (data.environment) {
-          document.getElementById('environment-select').value = data.environment;
+        document.getElementById("environment-select").value = data.environment;
       }
-  })
-  .catch(error => console.error('Error fetching environment state:', error));
+    })
+    .catch((error) =>
+      console.error("Error fetching environment state:", error)
+    );
 }
 
 async function setEnvironment() {
   $("#set-environment-button").attr("disabled", true);
   $("#set-environment-button").html("Setting Environment");
-  const selectedEnvironment = document.getElementById('environment-select').value;
+  const selectedEnvironment =
+    document.getElementById("environment-select").value;
   headers = authHeaders;
-  headers.append('Content-Type', 'application/json');
+  headers.append("Content-Type", "application/json");
   try {
-    var response = await fetch('/api/salt-grains', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({ environment: selectedEnvironment })
-    })
+    var response = await fetch("/api/salt-grains", {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify({ environment: selectedEnvironment }),
+    });
     if (response.ok) {
-      alert('Environment set successfully');
+      alert("Environment set successfully");
     } else {
-        alert('Failed to set environment');
+      alert("Failed to set environment");
     }
   } catch (error) {
-    console.error('Error setting environment:', error);
+    console.error("Error setting environment:", error);
   }
   $("#set-environment-button").attr("disabled", false);
   $("#set-environment-button").html("Set Environment");

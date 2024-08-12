@@ -1,5 +1,51 @@
 import { FrameInfo, Frame, Region, CameraInfo } from "../../api/types";
 
+let audioOnly = false;
+async function getAudioMode() {
+  var xmlHttp = new XMLHttpRequest();
+  xmlHttp.responseType = "json";
+  xmlHttp.open("GET", "/api/audiorecording", true);
+  xmlHttp.setRequestHeader("Authorization", "Basic " + btoa("admin:feathers"));
+  var success = false;
+  xmlHttp.onload = async function () {
+    if (xmlHttp.status == 200) {
+      audioOnly = xmlHttp.response["audio-mode"] == "AudioOnly";
+    }
+  };
+  xmlHttp.onerror = async function () {
+    console.log("Error getting audio status");
+  };
+  await xmlHttp.send();
+}
+
+async function getAudioStatus() {
+  var xmlHttp = new XMLHttpRequest();
+  xmlHttp.responseType = "json";
+  xmlHttp.open("GET", "/api/audio/audio-status", true);
+  xmlHttp.setRequestHeader("Authorization", "Basic " + btoa("admin:feathers"));
+  var success = false;
+  xmlHttp.onload = async function () {
+    if (xmlHttp.status == 200) {
+      const rp2040state = xmlHttp.response;
+      const state = Number(rp2040state.status);
+      const mode = Number(rp2040state.mode);
+      let statusText = "";
+      if (mode == 1) {
+        //in audio mode possibly could handle states, but should either be
+        //recording and about to record
+        document.getElementById("snapshot-stopped-message")!.innerText =
+          "Waiting for audio recording to finish";
+
+        document.getElementById("snapshot-stopped")!.style.display = "";
+        document.getElementById("snapshot-restart")!.style.display = "none";
+      }
+    }
+  };
+  xmlHttp.onerror = async function () {
+    console.log("Error getting audio status");
+  };
+  xmlHttp.send();
+}
 export const BlobReader = (function (): {
   arrayBuffer: (blob: Blob) => Promise<ArrayBuffer>;
 } {
@@ -292,6 +338,7 @@ export class CameraConnection {
     this.closing = false;
     this.connect();
   }
+  private thermalConnected: boolean = false;
   private state: CameraState = {
     socket: null,
     UUID: new Date().getTime(),
@@ -366,8 +413,35 @@ export class CameraConnection {
     });
     this.state.socket.addEventListener("message", async (event) => {
       if (event.data instanceof Blob) {
+        if (!this.thermalConnected) {
+          //make sure ui is in good state
+          document
+            .getElementById("take-snapshot-recording")!
+            .removeAttribute("disabled");
+
+          document.getElementById("snapshot-stopped")!.style.display = "none";
+          document.getElementById("snapshot-restart")!.style.display = "";
+        }
+        this.thermalConnected = true;
+
         this.onFrame((await this.parseFrame(event.data as Blob)) as Frame);
       } else {
+        if (event.data == "disconnected") {
+          await getAudioMode();
+          this.thermalConnected = false;
+          document
+            .getElementById("take-snapshot-recording")!
+            .setAttribute("disabled", "true");
+          if (audioOnly == true) {
+            document.getElementById("snapshot-stopped-message")!.innerText =
+              'In Audio only mode, change the mode in the "Audio Recording" section';
+
+            document.getElementById("snapshot-stopped")!.style.display = "";
+            document.getElementById("snapshot-restart")!.style.display = "none";
+          } else {
+            getAudioStatus();
+          }
+        }
         console.log("got message", event.data);
       }
       snapshotCount++;

@@ -5,12 +5,16 @@ let lastState: number | null = null;
 let countdown = 0;
 async function getAudioStatus() {
   var xmlHttp = new XMLHttpRequest();
+  xmlHttp.responseType = "json";
   xmlHttp.open("GET", "/api/audio/audio-status", true);
   xmlHttp.setRequestHeader("Authorization", "Basic " + btoa("admin:feathers"));
   var success = false;
   xmlHttp.onload = async function () {
     if (xmlHttp.status == 200) {
-      const state = Number(xmlHttp.response);
+      const rp2040state = xmlHttp.response;
+      const state = Number(rp2040state.status);
+      const mode = Number(rp2040state.mode);
+
       let statusText = "";
       if (state == 1) {
         countdown = 2;
@@ -52,7 +56,8 @@ async function getAudioStatus() {
         }
       } else if (state == 4) {
         countdown = 2;
-        statusText = "Already Taking a Recording";
+        let recType = mode == 1 ? "an audio" : "a thermal";
+        statusText = `Already Taking ${recType} Recording`;
         if (lastState != 4) {
           clearInterval(intervalId as number);
           document
