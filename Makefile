@@ -15,7 +15,6 @@ build: install-packr install-typescript
 install-typescript:
 	npm install -g typescript
 	npm install -g rollup
-	npm i --save-dev @types/jquery
 	npx tsc
 
 .PHONY: release
