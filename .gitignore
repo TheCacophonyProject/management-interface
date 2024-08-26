@@ -11,3 +11,6 @@ static/js/audiorecording.js
 static/js/audiorecording.js.map
 go.work
 go.work.sum
+node_modules
+package-lock.json
+package.json
