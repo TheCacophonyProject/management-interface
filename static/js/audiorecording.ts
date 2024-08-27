@@ -1,7 +1,23 @@
 "use strict";
 
-let intervalId: number | null = null;
-let lastState: number | null = null;
+class AudioState {
+  constructor(
+    public intervalId: number | null,
+    public lastState: number | null
+  ) {}
+  clearInterval() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId as number);
+    }
+    this.intervalId = null;
+    this.lastState = null;
+  }
+  startPolling() {
+    this.clearInterval();
+    this.intervalId = setInterval(getAudioStatus, 1000);
+  }
+}
+const audioState = new AudioState(null, null);
 let countdown = 0;
 async function getAudioStatus() {
   var xmlHttp = new XMLHttpRequest();
@@ -18,10 +34,8 @@ async function getAudioStatus() {
       let statusText = "";
       if (state == 1) {
         countdown = 2;
-        if (lastState) {
-          clearInterval(intervalId as number);
-          lastState = null;
-          intervalId = null;
+        if (audioState) {
+          audioState.clearInterval();
           statusText = "";
           document
             .getElementById("audio-test-button")
@@ -32,24 +46,24 @@ async function getAudioStatus() {
         }
       } else if (state == 2) {
         countdown = 2;
-        lastState = state;
+        audioState.lastState = state;
         statusText = "Test Recording Pending";
-        if (!intervalId) {
-          intervalId = setInterval(getAudioStatus, 1000);
+        if (!audioState.intervalId) {
+          audioState.startPolling();
           document
             .getElementById("audio-test-button")
             ?.setAttribute("disabled", "true");
         }
       } else if (state == 3) {
-        lastState = state;
+        audioState.lastState = state;
         if (countdown == 0) {
           statusText = "Taking Test Recording";
         } else {
           statusText = `Taking Test Recording in ${countdown}s`;
           countdown -= 1;
         }
-        if (!intervalId) {
-          intervalId = setInterval(getAudioStatus, 1000);
+        if (!audioState.intervalId) {
+          audioState.startPolling();
           document
             .getElementById("audio-test-button")
             ?.setAttribute("disabled", "true");
@@ -58,24 +72,22 @@ async function getAudioStatus() {
         countdown = 2;
         let recType = mode == 1 ? "an audio" : "a thermal";
         statusText = `Already Taking ${recType} Recording`;
-        if (lastState != 4) {
-          clearInterval(intervalId as number);
+        if (audioState.lastState != 4) {
           document
             .getElementById("audio-test-button")
             ?.setAttribute("disabled", "true");
-          intervalId = setInterval(getAudioStatus, 10000);
+          audioState.startPolling();
           //need to tell tc2 agent to poll state
           testAPICall(false);
           (
             document.getElementById("audio-test-button") as HTMLElement
           ).innerText = "Waiting for Recording to finish";
         }
-        lastState = state;
+        audioState.lastState = state;
       } else {
         countdown = 0;
         statusText = "unknow state";
-        clearInterval(intervalId as number);
-        intervalId = null;
+        audioState.clearInterval();
         document
           .getElementById("audio-test-button")
           ?.removeAttribute("disabled");
@@ -96,9 +108,8 @@ async function getAudioStatus() {
 }
 
 function enableRecButton() {
-  if (intervalId) {
-    clearInterval(intervalId);
-  }
+  audioState.clearInterval();
+
   document.getElementById("audio-test-button")?.removeAttribute("disabled");
   (document.getElementById("audio-test-button") as HTMLElement).innerText =
     "Take Test Recording";
@@ -126,8 +137,8 @@ async function testAPICall(checkResponse: boolean) {
           enableRecButton();
           updateAudioError(xmlHttp);
         } else {
-          clearInterval(intervalId as number);
-          intervalId = setInterval(getAudioStatus, 1000);
+          audioState.clearInterval();
+          audioState.startPolling();
         }
       } else {
         enableRecButton();

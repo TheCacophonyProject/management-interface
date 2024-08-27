@@ -1,21 +1,15 @@
 import { FrameInfo, Frame, Region, CameraInfo } from "../../api/types";
 
-let audioOnly = false;
 async function getAudioMode() {
-  var xmlHttp = new XMLHttpRequest();
-  xmlHttp.responseType = "json";
-  xmlHttp.open("GET", "/api/audiorecording", true);
-  xmlHttp.setRequestHeader("Authorization", "Basic " + btoa("admin:feathers"));
-  var success = false;
-  xmlHttp.onload = async function () {
-    if (xmlHttp.status == 200) {
-      audioOnly = xmlHttp.response["audio-mode"] == "AudioOnly";
-    }
-  };
-  xmlHttp.onerror = async function () {
-    console.log("Error getting audio status");
-  };
-  await xmlHttp.send();
+  return fetch("/api/audiorecording", {
+    method: "GET", // Default is 'get'
+    headers: new Headers({
+      Authorization: "Basic " + btoa("admin:feathers"),
+      "Content-Type": "application/json",
+    }),
+  })
+    .then((response) => response.json())
+    .then((json) => json["audio-mode"] == "AudioOnly");
 }
 
 async function getAudioStatus() {
@@ -326,7 +320,7 @@ async function processFrame(frame: Frame) {
 
 export class CameraConnection {
   private closing: boolean;
-
+  private audioOnly: boolean;
   constructor(
     public host: string,
     public port: string,
@@ -335,6 +329,7 @@ export class CameraConnection {
       connectionState: CameraConnectionState
     ) => void
   ) {
+    this.audioOnly = false;
     this.closing = false;
     this.connect();
   }
@@ -427,12 +422,12 @@ export class CameraConnection {
         this.onFrame((await this.parseFrame(event.data as Blob)) as Frame);
       } else {
         if (event.data == "disconnected") {
-          await getAudioMode();
+          this.audioOnly = await getAudioMode();
           this.thermalConnected = false;
           document
             .getElementById("take-snapshot-recording")!
             .setAttribute("disabled", "true");
-          if (audioOnly == true) {
+          if (this.audioOnly == true) {
             document.getElementById("snapshot-stopped-message")!.innerText =
               'In Audio only mode, change the mode in the "Audio Recording" section';
 
