@@ -19,13 +19,13 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
-	"log"
-
+	"github.com/TheCacophonyProject/go-utils/logging"
 	signalstrength "github.com/TheCacophonyProject/management-interface/signal-strength"
 )
 
+var log = logging.NewLogger("info")
+
 func main() {
-	log.SetFlags(0)
 	sig, err := signalstrength.Run()
 	if err != nil {
 		log.Fatal(err)

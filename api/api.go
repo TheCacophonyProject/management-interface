@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net"
 	"net/http"
@@ -51,7 +50,10 @@ import (
 	"github.com/TheCacophonyProject/trap-controller/trapdbusclient"
 
 	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
+	"github.com/sirupsen/logrus"
 )
+
+var log *logrus.Logger
 
 const (
 	cptvGlob            = "*.cptv"
@@ -68,7 +70,8 @@ type ManagementAPI struct {
 	appVersion   string
 }
 
-func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string) (*ManagementAPI, error) {
+func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *logrus.Logger) (*ManagementAPI, error) {
+	log = l
 	thermalRecorder := goconfig.DefaultThermalRecorder()
 	if err := config.Unmarshal(goconfig.ThermalRecorderKey, &thermalRecorder); err != nil {
 		return nil, err
