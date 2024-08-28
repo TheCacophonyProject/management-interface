@@ -23,7 +23,6 @@ import (
 	"html/template"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -38,9 +37,12 @@ import (
 	goconfig "github.com/TheCacophonyProject/go-config"
 	"github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
 
+	"github.com/TheCacophonyProject/go-utils/logging"
 	"github.com/gobuffalo/packr"
 	"github.com/gorilla/mux"
 )
+
+var log = logging.NewLogger("info")
 
 // Using a packr box means the html files are bundled up in the binary application.
 var templateBox = packr.NewBox("./html")

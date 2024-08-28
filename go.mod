@@ -1,6 +1,6 @@
 module github.com/TheCacophonyProject/management-interface
 
-go 1.20
+go 1.22.3
 
 require (
 	github.com/TheCacophonyProject/audiobait/v3 v3.0.1
@@ -19,9 +19,12 @@ require (
 )
 
 require (
+	github.com/TheCacophonyProject/go-utils v0.1.1
 	github.com/TheCacophonyProject/rpi-net-manager v0.4.0-deb12
 	github.com/TheCacophonyProject/thermal-recorder v1.22.1-0.20230627011240-89964c0511f7
 	github.com/TheCacophonyProject/trap-controller v0.0.0-20230227002937-262a1adfaa47
+	github.com/alexflint/go-arg v1.4.3
+	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/text v0.16.0
 
 )
@@ -29,6 +32,7 @@ require (
 require (
 	github.com/TheCacophonyProject/event-reporter/v3 v3.7.0 // indirect
 	github.com/TheCacophonyProject/window v0.0.0-20200312071457-7fc8799fdce7 // indirect
+	github.com/alexflint/go-scalar v1.1.0 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gobuffalo/envy v1.10.2 // indirect

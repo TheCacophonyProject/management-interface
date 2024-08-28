@@ -25,7 +25,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -41,11 +40,14 @@ import (
 
 	goconfig "github.com/TheCacophonyProject/go-config"
 	"github.com/TheCacophonyProject/go-cptv/cptvframe"
+	"github.com/TheCacophonyProject/go-utils/logging"
 	"github.com/TheCacophonyProject/lepton3"
 	managementinterface "github.com/TheCacophonyProject/management-interface"
 	"github.com/TheCacophonyProject/management-interface/api"
 	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
 	"github.com/TheCacophonyProject/thermal-recorder/headers"
+	"github.com/alexflint/go-arg"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -62,11 +64,29 @@ var (
 	headerInfo  *headers.HeaderInfo
 	frameCh     = make(chan *FrameData, 4)
 	connected   atomic.Bool
+	log         *logrus.Logger
 )
+
+type Args struct {
+	logging.LogArgs
+}
+
+func (Args) Version() string {
+	return version
+}
+
+func procArgs() Args {
+	args := Args{}
+	arg.MustParse(&args)
+	return args
+}
 
 // Set up and handle page requests.
 func main() {
-	log.SetFlags(0) // Removes timestamp output
+	args := procArgs()
+
+	log = logging.NewLogger(args.LogLevel)
+
 	log.Printf("running version: %s", version)
 
 	config, err := ParseConfig(configDir)
@@ -121,7 +141,7 @@ func main() {
 
 	// API
 	apiRouter := router.PathPrefix("/api").Subrouter()
-	apiObj, err := api.NewAPI(apiRouter, config.config, version)
+	apiObj, err := api.NewAPI(apiRouter, config.config, version, log)
 	if err != nil {
 		log.Fatal(err)
 		return

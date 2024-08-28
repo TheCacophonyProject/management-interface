@@ -224,6 +224,10 @@ function getEnvironmentState() {
 }
 
 async function setEnvironment() {
+  if (selectedEnvironment == "") {
+    alert('Please select an environment');
+    return;
+  }
   $("#set-environment-button").attr("disabled", true);
   $("#set-environment-button").html("Setting Environment");
   const selectedEnvironment =

@@ -20,7 +20,6 @@ package api
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 
 	goconfig "github.com/TheCacophonyProject/go-config"
