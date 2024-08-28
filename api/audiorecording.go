@@ -64,16 +64,18 @@ func (api *ManagementAPI) AudioRecordingStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	var result int
-	err = tc2AgentDbus.Call("org.cacophony.TC2Agent.audiostatus", 0).Store(&result)
+	var status int
+	var mode int
+	err = tc2AgentDbus.Call("org.cacophony.TC2Agent.audiostatus", 0).Store(&mode, &status)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to request test audio recoding", http.StatusInternalServerError)
 		return
 	}
+	rp2040status := map[string]int{"mode": mode, "status": status}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(result)
+	json.NewEncoder(w).Encode(rp2040status)
 
 }
 

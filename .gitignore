@@ -7,5 +7,10 @@ api/types.js
 api/types.js.map
 static/js/camera.js
 static/js/camera.js.map
+static/js/audiorecording.js
+static/js/audiorecording.js.map
 go.work
 go.work.sum
+node_modules
+package-lock.json
+package.json
