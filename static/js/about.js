@@ -8,10 +8,13 @@ window.onload = async function () {
 };
 
 async function setAutoUpdate(autoUpdate) {
+
+  var headers = new Headers(authHeaders);
+  headers.append("Content-Type", "application/x-www-form-urlencoded");
   console.log("set auto update", autoUpdate);
   var res = await fetch("/api/auto-update", {
     method: "POST",
-    headers: authHeaders,
+    headers: headers,
     body: new URLSearchParams({ autoUpdate: autoUpdate }),
   });
   if (!res.ok) {
@@ -224,14 +227,15 @@ function getEnvironmentState() {
 }
 
 async function setEnvironment() {
+  const selectedEnvironment =
+    document.getElementById("environment-select").value;
   if (selectedEnvironment == "") {
     alert('Please select an environment');
     return;
   }
   $("#set-environment-button").attr("disabled", true);
   $("#set-environment-button").html("Setting Environment");
-  const selectedEnvironment =
-    document.getElementById("environment-select").value;
+
   headers = authHeaders;
   headers.append("Content-Type", "application/json");
   try {
