@@ -35,7 +35,7 @@ import (
 	"github.com/TheCacophonyProject/audiobait/v3/audiofilelibrary"
 	"github.com/TheCacophonyProject/audiobait/v3/playlist"
 	goconfig "github.com/TheCacophonyProject/go-config"
-	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
+	"github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
 
 	"github.com/TheCacophonyProject/go-utils/logging"
 	"github.com/gobuffalo/packr"
@@ -380,6 +380,7 @@ func AboutHandlerGen(conf *goconfig.Config) func(http.ResponseWriter, *http.Requ
 
 // AboutHandler shows the currently installed packages on the device.
 func AboutHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config) {
+
 	type aboutResponse struct {
 		RaspberryPiSerialNumber string
 		SaltMinionID            string
