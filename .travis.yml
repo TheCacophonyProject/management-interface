@@ -1,20 +1,20 @@
 language: go
 
 go:
-  - "1.22"
+  - "1.22.x"
 
 script:
   - go mod tidy
-  - git diff --exit-code --quiet || (echo "Please run 'go mod tidy' to clean up the 'go.mod' and 'go.sum' files."; false)
+  - git diff --exit-code || (echo "Please run 'go mod tidy' to clean up the 'go.mod' and 'go.sum' files. Your go version should match the one used with travis."; false)
   - go vet ./...
   - go test ./...
   - curl -sL https://git.io/goreleaser | bash -s check
 
-# Create a release using goreleaser when tests pass and revision is tagged.
+# calls goreleaser
 deploy:
-  - provider: script
-    skip_cleanup: true
-    script: make release
-    on:
-      tags: true
-      go: "1.22"
+- provider: script
+  skip_cleanup: true
+  script: curl -sL https://git.io/goreleaser | bash
+  on:
+    tags: true
+    go: "1.22.x"
