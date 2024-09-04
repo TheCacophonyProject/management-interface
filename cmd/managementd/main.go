@@ -152,8 +152,6 @@ func main() {
 	apiRouter.HandleFunc("/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
 	apiRouter.HandleFunc("/camera/snapshot", apiObj.TakeSnapshot).Methods("PUT")
 	apiRouter.HandleFunc("/camera/snapshot-recording", apiObj.TakeSnapshotRecording).Methods("PUT")
-	apiRouter.HandleFunc("/audio/record", apiObj.RecordAudio).Methods("POST")
-	apiRouter.HandleFunc("/audio/files", apiObj.GetAudioFiles).Methods("GET")
 	apiRouter.HandleFunc("/signal-strength", apiObj.GetSignalStrength).Methods("GET")
 	apiRouter.HandleFunc("/reregister", apiObj.Reregister).Methods("POST")
 	apiRouter.HandleFunc("/reregister-authorized", apiObj.ReregisterAuthorized).Methods("POST")
@@ -213,6 +211,7 @@ func main() {
 	apiRouter.HandleFunc("/audiorecording", apiObj.GetAudioRecording).Methods("GET")
 	apiRouter.HandleFunc("/audio/test-recording", apiObj.TakeTestAudioRecording).Methods("PUT")
 	apiRouter.HandleFunc("/audio/audio-status", apiObj.AudioRecordingStatus).Methods("GET")
+	apiRouter.HandleFunc("/audio/recordings", apiObj.GetAudioRecordings).Methods("GET")
 
 	apiRouter.Use(basicAuth)
 

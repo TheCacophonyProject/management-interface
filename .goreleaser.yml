@@ -4,56 +4,58 @@ release:
   github:
     owner: TheCacophonyProject
     name: management-interface
-  name_template: '{{.Tag}}'
+  name_template: "{{.Tag}}"
+
+version: 2
 
 builds:
-- id: "managementd"
-  binary: "managementd"
-  main: "./cmd/managementd"
-  goos:
-  - linux
-  goarch:
-  - arm
-  - arm64
-  goarm:
-  - "7"
-  ldflags: -s -w -X main.version={{.Version}}
-  hooks:
-    pre: 
-    - packr
-    - tsc
-    post: packr clean
-- id: "signal-strength"
-  binary: "signal-strength"
-  main: "./cmd/signal-strength"
-  goos:
-  - linux
-  goarch:
-  - arm
-  - arm64
-  goarm:
-  - "7"
-  ldflags: -s -w
+  - id: "managementd"
+    binary: "managementd"
+    main: "./cmd/managementd"
+    goos:
+      - linux
+    goarch:
+      - arm
+      - arm64
+    goarm:
+      - "7"
+    ldflags: -s -w -X main.version={{.Version}}
+    hooks:
+      pre:
+        - packr
+        - tsc
+      post: packr clean
+  - id: "signal-strength"
+    binary: "signal-strength"
+    main: "./cmd/signal-strength"
+    goos:
+      - linux
+    goarch:
+      - arm
+      - arm64
+    goarm:
+      - "7"
+    ldflags: -s -w
 
 nfpms:
-- vendor: The Cacophony Project
-  homepage: http://cacophony.org.nz/
-  maintainer: Cacophony Developers <coredev@cacophony.org.nz>
-  description: Management interface for Cacophonators
-  license: GPL v3.0
-  file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}"
-  formats:
-    - deb
-  bindir: /usr/bin
-  contents:
-    - src: _release/managementd-avahi.service
-      dst: /etc/avahi/services/managementd.service
-    - src: _release/managementd.service
-      dst: /etc/systemd/system/managementd.service
-  scripts:
+  - vendor: The Cacophony Project
+    homepage: http://cacophony.org.nz/
+    maintainer: Cacophony Developers <coredev@cacophony.org.nz>
+    description: Management interface for Cacophonators
+    license: GPL v3.0
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}"
+    formats:
+      - deb
+    bindir: /usr/bin
+    contents:
+      - src: _release/managementd-avahi.service
+        dst: /etc/avahi/services/managementd.service
+      - src: _release/managementd.service
+        dst: /etc/systemd/system/managementd.service
+    scripts:
       postinstall: "_release/postinstall.sh"
 
 checksum:
-  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
 
 dist: dist

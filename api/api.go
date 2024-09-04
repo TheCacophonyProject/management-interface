@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -57,6 +56,7 @@ var log *logrus.Logger
 
 const (
 	cptvGlob            = "*.cptv"
+	wavGlob             = "*.wav"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
 	apiVersion          = 8
@@ -66,7 +66,7 @@ type ManagementAPI struct {
 	config       *goconfig.Config
 	router       *mux.Router
 	hotspotTimer *time.Ticker
-	cptvDir      string
+	recordingDir string
 	appVersion   string
 }
 
@@ -78,10 +78,10 @@ func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *l
 	}
 
 	return &ManagementAPI{
-		config:     config,
-		router:     router,
-		cptvDir:    thermalRecorder.OutputDir,
-		appVersion: appVersion,
+		config:       config,
+		router:       router,
+		recordingDir: thermalRecorder.OutputDir,
+		appVersion:   appVersion,
 	}, nil
 }
 
@@ -193,10 +193,10 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(info)
 }
 
-// GetRecordings returns a list of cptv files in a array.
+// GetRecordings returns a list of recordings in a array.
 func (api *ManagementAPI) GetRecordings(w http.ResponseWriter, r *http.Request) {
 	log.Println("get recordings")
-	names := getCptvNames(api.cptvDir)
+	names := getCptvNames(api.recordingDir)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(names)
 }
@@ -212,26 +212,29 @@ func (api *ManagementAPI) GetSignalStrength(w http.ResponseWriter, r *http.Reque
 	io.WriteString(w, strconv.Itoa(sig))
 }
 
-// GetRecording downloads a cptv file
+// GetRecording downloads a recordings
 func (api *ManagementAPI) GetRecording(w http.ResponseWriter, r *http.Request) {
-	cptvName := mux.Vars(r)["id"]
-	log.Printf("get recording '%s'", cptvName)
-	cptvPath := getRecordingPath(cptvName, api.cptvDir)
-	if cptvPath == "" {
+	name := mux.Vars(r)["id"]
+	log.Printf("get recording '%s'", name)
+	recordingPath := getRecordingPath(name, api.recordingDir)
+	if recordingPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		io.WriteString(w, "file not found\n")
 		return
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, cptvName))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
 
-	ext := filepath.Ext(cptvName)
-	if ext == ".cptv" {
+	ext := filepath.Ext(name)
+	switch ext {
+	case ".cptv":
 		w.Header().Set("Content-Type", "application/x-cptv")
-	} else {
+	case ".wav":
+		w.Header().Set("Content-Type", "audio/wav")
+	default:
 		w.Header().Set("Content-Type", "application/json")
 	}
-	f, err := os.Open(cptvPath)
+	f, err := os.Open(recordingPath)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Println(err)
@@ -242,13 +245,13 @@ func (api *ManagementAPI) GetRecording(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, bufio.NewReader(f))
 }
 
-// DeleteRecording deletes the given cptv file
+// DeleteRecording deletes the given recording file id
 func (api *ManagementAPI) DeleteRecording(w http.ResponseWriter, r *http.Request) {
-	cptvName := mux.Vars(r)["id"]
-	recPath := getRecordingPath(cptvName, api.cptvDir)
+	recordingName := mux.Vars(r)["id"]
+	recPath := getRecordingPath(recordingName, api.recordingDir)
 	if recPath == "" {
 		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, "cptv file not found\n")
+		io.WriteString(w, "recording file not found\n")
 		return
 	}
 
@@ -257,11 +260,11 @@ func (api *ManagementAPI) DeleteRecording(w http.ResponseWriter, r *http.Request
 		log.Printf("deleting meta '%s'", metaFile)
 		os.Remove(metaFile)
 	}
-	log.Printf("delete cptv '%s'", recPath)
+	log.Printf("delete recording '%s'", recPath)
 	err := os.Remove(recPath)
 	if os.IsNotExist(err) {
 		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, "cptv file not found\n")
+		io.WriteString(w, "recording file not found\n")
 		return
 	} else if err != nil {
 		log.Println(err)
@@ -270,7 +273,7 @@ func (api *ManagementAPI) DeleteRecording(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, "cptv file deleted")
+	io.WriteString(w, "recording file deleted")
 }
 
 // TakeSnapshot will request a new snapshot to be taken by thermal-recorder
@@ -576,8 +579,19 @@ func getCptvNames(dir string) []string {
 	return names
 }
 
+func getWavNames(dir string) []string {
+	matches, _ := filepath.Glob(filepath.Join(dir, wavGlob))
+	failedUploadMatches, _ := filepath.Glob(filepath.Join(dir, failedUploadsFolder, wavGlob))
+	matches = append(matches, failedUploadMatches...)
+	names := make([]string, len(matches))
+	for i, filename := range matches {
+		names[i] = filepath.Base(filename)
+	}
+	return names
+}
+
 func getRecordingPath(file, dir string) string {
-	// Check that given file is a cptv file on the device.
+	// Check that given file is a recording file on the device.
 	paths := []string{
 		filepath.Join(dir, file),
 		filepath.Join(dir, failedUploadsFolder, file),
@@ -1199,7 +1213,6 @@ func (api *ManagementAPI) GetModem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *ManagementAPI) GetSaltGrains(w http.ResponseWriter, r *http.Request) {
-
 	file, err := os.Open("/etc/salt/grains")
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to open grains file: %v", err), http.StatusInternalServerError)
@@ -1248,7 +1261,7 @@ func (api *ManagementAPI) SetSaltGrains(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Validate and set grains
-	var approvedKeyAndValues = map[string][]string{
+	approvedKeyAndValues := map[string][]string{
 		"environment": {"tc2-dev", "tc2-test", "tc2-prod"},
 	}
 	for key, value := range grains {
@@ -1586,65 +1599,6 @@ func (api *ManagementAPI) GetSavedWifiNetworks(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(networks)
 }
 
-// RecordAudio creates a mock audio file
-func (api *ManagementAPI) RecordAudio(w http.ResponseWriter, r *http.Request) {
-	// Create the audio folder if it doesn't exist
-	audioFolderPath := goconfig.ThermalRecorder{}.OutputDir + "/audio"
-	if _, err := os.Stat(audioFolderPath); os.IsNotExist(err) {
-		err := os.Mkdir(audioFolderPath, 0755)
-		if err != nil {
-			log.Printf("Error creating audio folder: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			io.WriteString(w, "Failed to create audio folder\n")
-			return
-		}
-	}
-
-	// Create a new file within the audio folder
-	random := rand.New(rand.NewSource(time.Now().UnixNano()))
-	audioFilePrefix := "audio" + strconv.Itoa(random.Intn(1000000))
-	audioFileSuffix := ".wav"
-	filePath := audioFolderPath + "/" + audioFilePrefix + audioFileSuffix
-	file, err := os.Create(filePath)
-	if err != nil {
-		log.Printf("Error creating audio file: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Failed to create audio file\n")
-		return
-	}
-	defer file.Close()
-
-	// Write some mock data to the file
-	_, err = file.WriteString("This is a mock audio file.")
-	if err != nil {
-		log.Printf("Error writing to audio file: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Failed to write to audio file\n")
-		return
-	}
-
-	// Send a success response
-	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, "Audio file created successfully\n")
-}
-
-// GetAudioFiles returns a list of audio files
-func (api *ManagementAPI) GetAudioFiles(w http.ResponseWriter, r *http.Request) {
-	// Get the list of audio files
-	audioFolderPath := goconfig.ThermalRecorder{}.OutputDir + "/audio"
-	files, err := os.ReadDir(audioFolderPath)
-	if err != nil {
-		log.Printf("Error reading audio folder: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Failed to read audio folder\n")
-		return
-	}
-
-	// Send the list of audio files as a JSON response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(files)
-}
-
 // DownloadAudioFile downloads an audio file
 func (api *ManagementAPI) DownloadAudioFile(w http.ResponseWriter, r *http.Request) {
 	// Get the file name from the request
@@ -1675,6 +1629,13 @@ func (api *ManagementAPI) DownloadAudioFile(w http.ResponseWriter, r *http.Reque
 	// Send the file as a response
 	w.WriteHeader(http.StatusOK)
 	io.Copy(w, file)
+}
+
+func (api *ManagementAPI) GetAudioRecordings(w http.ResponseWriter, r *http.Request) {
+	log.Println("get audio recordings")
+	names := getWavNames(api.recordingDir)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(names)
 }
 
 func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {
