@@ -1,7 +1,7 @@
 language: go
 
 go:
-  - "1.22.x"
+  - "1.22.3"
 
 script:
   - go mod tidy
@@ -17,4 +17,4 @@ deploy:
     script: make release
     on:
       tags: true
-      go: "1.22.x"
+      go: "1.22.3"
