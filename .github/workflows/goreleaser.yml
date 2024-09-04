@@ -37,14 +37,12 @@ jobs:
       - name: Run Go Tests
         run: go test ./...
 
-      - name: Run GoReleaser
+      - name: Check GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          args: check
 
   release:
     runs-on: ubuntu-latest
