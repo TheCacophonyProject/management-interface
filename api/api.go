@@ -66,7 +66,7 @@ type ManagementAPI struct {
 	config       *goconfig.Config
 	router       *mux.Router
 	hotspotTimer *time.Ticker
-	cptvDir      string
+	recordingDir string
 	appVersion   string
 }
 
@@ -78,10 +78,10 @@ func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *l
 	}
 
 	return &ManagementAPI{
-		config:     config,
-		router:     router,
-		cptvDir:    thermalRecorder.OutputDir,
-		appVersion: appVersion,
+		config:       config,
+		router:       router,
+		recordingDir: thermalRecorder.OutputDir,
+		appVersion:   appVersion,
 	}, nil
 }
 
@@ -193,10 +193,10 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(info)
 }
 
-// GetRecordings returns a list of cptv files in a array.
+// GetRecordings returns a list of recordings in a array.
 func (api *ManagementAPI) GetRecordings(w http.ResponseWriter, r *http.Request) {
 	log.Println("get recordings")
-	names := getCptvNames(api.cptvDir)
+	names := getCptvNames(api.recordingDir)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(names)
 }
@@ -212,12 +212,12 @@ func (api *ManagementAPI) GetSignalStrength(w http.ResponseWriter, r *http.Reque
 	io.WriteString(w, strconv.Itoa(sig))
 }
 
-// GetRecording downloads a cptv file
+// GetRecording downloads a recordings
 func (api *ManagementAPI) GetRecording(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["id"]
 	log.Printf("get recording '%s'", name)
-	cptvPath := getRecordingPath(name, api.cptvDir)
-	if cptvPath == "" {
+	recordingPath := getRecordingPath(name, api.recordingDir)
+	if recordingPath == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		io.WriteString(w, "file not found\n")
 		return
@@ -234,7 +234,7 @@ func (api *ManagementAPI) GetRecording(w http.ResponseWriter, r *http.Request) {
 	default:
 		w.Header().Set("Content-Type", "application/json")
 	}
-	f, err := os.Open(cptvPath)
+	f, err := os.Open(recordingPath)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Println(err)
@@ -245,13 +245,13 @@ func (api *ManagementAPI) GetRecording(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, bufio.NewReader(f))
 }
 
-// DeleteRecording deletes the given cptv file
+// DeleteRecording deletes the given recording file id
 func (api *ManagementAPI) DeleteRecording(w http.ResponseWriter, r *http.Request) {
-	cptvName := mux.Vars(r)["id"]
-	recPath := getRecordingPath(cptvName, api.cptvDir)
+	recordingName := mux.Vars(r)["id"]
+	recPath := getRecordingPath(recordingName, api.recordingDir)
 	if recPath == "" {
 		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, "cptv file not found\n")
+		io.WriteString(w, "recording file not found\n")
 		return
 	}
 
@@ -260,11 +260,11 @@ func (api *ManagementAPI) DeleteRecording(w http.ResponseWriter, r *http.Request
 		log.Printf("deleting meta '%s'", metaFile)
 		os.Remove(metaFile)
 	}
-	log.Printf("delete cptv '%s'", recPath)
+	log.Printf("delete recording '%s'", recPath)
 	err := os.Remove(recPath)
 	if os.IsNotExist(err) {
 		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, "cptv file not found\n")
+		io.WriteString(w, "recording file not found\n")
 		return
 	} else if err != nil {
 		log.Println(err)
@@ -273,7 +273,7 @@ func (api *ManagementAPI) DeleteRecording(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, "cptv file deleted")
+	io.WriteString(w, "recording file deleted")
 }
 
 // TakeSnapshot will request a new snapshot to be taken by thermal-recorder
@@ -591,7 +591,7 @@ func getWavNames(dir string) []string {
 }
 
 func getRecordingPath(file, dir string) string {
-	// Check that given file is a cptv file on the device.
+	// Check that given file is a recording file on the device.
 	paths := []string{
 		filepath.Join(dir, file),
 		filepath.Join(dir, failedUploadsFolder, file),
@@ -1633,7 +1633,7 @@ func (api *ManagementAPI) DownloadAudioFile(w http.ResponseWriter, r *http.Reque
 
 func (api *ManagementAPI) GetAudioRecordings(w http.ResponseWriter, r *http.Request) {
 	log.Println("get audio recordings")
-	names := getWavNames(api.cptvDir)
+	names := getWavNames(api.recordingDir)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(names)
 }
