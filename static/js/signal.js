@@ -28,6 +28,12 @@ async function updateSignalTC2() {
   }
   strength = response.signal.strength;
 
+  // A signal strength of 99 means that the signal was not detectable.
+  if (strength == 99) {
+    handleSignalSuccess(0);
+    return;
+  }
+
   barsStrength = 1;
   if (strength < 9) {
     barsStrength = 2;
