@@ -21,6 +21,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	goconfig "github.com/TheCacophonyProject/go-config"
 	"github.com/godbus/dbus"
@@ -34,6 +35,7 @@ func (api *ManagementAPI) GetAudioRecording(w http.ResponseWriter, r *http.Reque
 	}
 	type AudioRecording struct {
 		AudioMode string `json:"audio-mode"`
+		AudioSeed string `json:"audio-seed"`
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -46,9 +48,28 @@ func (api *ManagementAPI) GetAudioRecording(w http.ResponseWriter, r *http.Reque
 func (api *ManagementAPI) SetAudioRecording(w http.ResponseWriter, r *http.Request) {
 	log.Println("update audio recording")
 	audioMode := r.FormValue("audio-mode")
+	stringSeed := r.FormValue("audio-seed")
+	var audioSeed uint32
+	log.Printf("Audio seeds is %v", stringSeed)
+	if stringSeed == "" {
+		audioSeed = 0
+		log.Printf("Set empty")
+
+	} else {
+		log.Printf("try parse")
+
+		seed, err := strconv.ParseUint(r.FormValue("audio-seed"), 10, 32)
+		if err != nil {
+			badRequest(&w, err)
+			return
+		}
+		audioSeed = uint32(seed)
+
+	}
 
 	audioRecording := goconfig.AudioRecording{
 		AudioMode: audioMode,
+		AudioSeed: audioSeed,
 	}
 
 	if err := api.config.Set(goconfig.AudioRecordingKey, &audioRecording); err != nil {

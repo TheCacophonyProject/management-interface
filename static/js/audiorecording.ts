@@ -164,7 +164,9 @@ function updateAudio() {
   data["audio-mode"] = (
     document.getElementById("audio-mode-select") as HTMLSelectElement
   ).value;
-
+  data["audio-seed"] = (
+    document.getElementById("audio-seed") as HTMLInputElement
+  ).value;
   var xmlHttp = new XMLHttpRequest();
   xmlHttp.open("POST", "/api/audiorecording", true);
   xmlHttp.setRequestHeader("Authorization", "Basic " + btoa("admin:feathers"));
@@ -204,4 +206,14 @@ function updateAudioError(xmlHttp: XMLHttpRequest) {
 
 window.onload = async function () {
   getAudioStatus();
+  document
+    .getElementById("updateBtn")
+    ?.addEventListener("click", updateAudio, false);
+
+  const audioseed = (document.getElementById("audio-seed") as HTMLInputElement)
+    .value;
+  if (Number(audioseed) == 0) {
+    // @ts-ignore
+    (document.getElementById("audio-seed") as HTMLInputElement).value = null;
+  }
 };

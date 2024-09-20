@@ -40,6 +40,15 @@
                         </select>
                     </div>
                 </div>
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="audio-seed">Enter an audio seed</label>
+                        <input type="number" min = 0 max=4294967295 id="audio-seed" class="form-control" name="audioseed" placeholder="Enter a seed value" value="{{.AudioRecording.AudioSeed}}">
+                        <br>
+                        <button id = "updateBtn" type="button" value="update" class="btn btn-primary">Update</button>
+
+                    </div>
+                </div>
             </form>
 
             <div class="row">
