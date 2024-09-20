@@ -50,28 +50,21 @@ func (api *ManagementAPI) SetAudioRecording(w http.ResponseWriter, r *http.Reque
 	audioMode := r.FormValue("audio-mode")
 	stringSeed := r.FormValue("audio-seed")
 	var audioSeed uint32
-	log.Printf("Audio seeds is %v", stringSeed)
 	if stringSeed == "" {
 		audioSeed = 0
-		log.Printf("Set empty")
-
 	} else {
-		log.Printf("try parse")
-
 		seed, err := strconv.ParseUint(r.FormValue("audio-seed"), 10, 32)
 		if err != nil {
 			badRequest(&w, err)
 			return
 		}
 		audioSeed = uint32(seed)
-
 	}
 
 	audioRecording := goconfig.AudioRecording{
 		AudioMode: audioMode,
 		AudioSeed: audioSeed,
 	}
-
 	if err := api.config.Set(goconfig.AudioRecordingKey, &audioRecording); err != nil {
 		serverError(&w, err)
 	}
