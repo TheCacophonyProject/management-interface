@@ -8,7 +8,6 @@ window.onload = async function () {
 };
 
 async function setAutoUpdate(autoUpdate) {
-
   var headers = new Headers(authHeaders);
   headers.append("Content-Type", "application/x-www-form-urlencoded");
   console.log("set auto update", autoUpdate);
@@ -230,7 +229,7 @@ async function setEnvironment() {
   const selectedEnvironment =
     document.getElementById("environment-select").value;
   if (selectedEnvironment == "") {
-    alert('Please select an environment');
+    alert("Please select an environment");
     return;
   }
   $("#set-environment-button").attr("disabled", true);
