@@ -209,6 +209,9 @@ window.onload = async function () {
   document
     .getElementById("updateBtn")
     ?.addEventListener("click", updateAudio, false);
+  document
+    .getElementById("audio-mode-select")
+    ?.addEventListener("change", handleModeChange, false);
 
   const audioseed = (document.getElementById("audio-seed") as HTMLInputElement)
     .value;

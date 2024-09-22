@@ -31,7 +31,7 @@
                 <div class="form-row">
                     <div class="form-group col-md-6">
                         <label for="audio-mode-select">Select an Audio Mode</label>
-                        <select name="auio-mode-select" id="audio-mode-select" onchange="handleModeChange()">
+                        <select name="auio-mode-select" id="audio-mode-select">
                             <option value="Disabled" {{ if eq "Disabled" .AudioRecording.AudioMode }} selected="selected"{{ end }}
                             >Disabled</option>
                             <option value="AudioOnly" {{ if eq "AudioOnly" .AudioRecording.AudioMode }} selected="selected"{{ end }}>Audio Only</option>
@@ -42,24 +42,24 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group col-md-6">
-                        <label for="audio-seed">Enter an audio seed</label>
+                        <label for="audio-seed">Enter an audio seed number</label>
+                        <label for="audio-seed" style="font-size:0.8em">This can be used to synchronize audio recordings accross multiple devices, by enetering the same number (default is 0 or blank which will use a random seed each time)</label>
                         <input type="number" min = 0 max=4294967295 id="audio-seed" class="form-control" name="audioseed" placeholder="Enter a seed value" value="{{.AudioRecording.AudioSeed}}">
                         <br>
-                        <button id = "updateBtn" type="button" value="update" class="btn btn-primary">Update</button>
+                        <button id = "updateBtn" type="button" value="update" class="btn btn-primary">Update Audio Seed</button>
 
                     </div>
                 </div>
             </form>
-
+            </br>
+            <h2> Test Recording</h2>
             <div class="row">
-                <div class="col w-100" >
                     <div class="col-3">
                         <button id="audio-test-button" onclick="takeTestRecording(this)" class="btn btn-primary mb-4" {{if eq .AudioRecording.AudioMode "Disabled"}} disabled {{else}} enabled {{end}}>Take Test Recording</button>
                     </div>
                     <div class="col-3">
                         <label id="audio-test-status"></label>
                     </div>
-                </div>
             </div>
         </div>
 
