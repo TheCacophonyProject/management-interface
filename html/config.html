@@ -114,7 +114,87 @@
         <div class="container pt-1 pl-0">
             <button id="save-button" type="button" onclick="saveThermalMotionConfig()" class="btn btn-primary">Save ThermalMotion Config</button>
         </div>
+
+        <div class="container pt-5 pl-0">
+            <h3>Comms port<br></h3>
+        </div>
+
+        <div class="row">
+            <div class="col-xs-8">
+                <div class="table-responsive">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <td>Enable</td>
+                                <td><input type="checkbox" id="input-comms-enable"></td>
+                            </tr>
+                            <tr></tr>
+                                <td>Trap Default State</td>
+                                <td><input type="checkbox" id="input-comms-trap-default"></td>
+                            </tr>
+
+                            <tr>
+                                <td>Bluetooth Enablued</td>
+                                <td><input type="checkbox" id="input-comms-bluetooth"></td>
+                            </tr>
+
+                            <tr>
+                                <td>Power Output</td>
+                                <td>
+                                    <div id="comms-type">
+                                        <select class="form-select" id="input-comms-power-output">
+                                            <option selected>Select Power Output type</option>
+                                            <option>on</option>
+                                            <option>off</option>
+                                            <option>comms-only</option>
+                                        </select>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>Power On Duration</td>
+                                <td><input type="text" id="input-comms-power-up-duration"></td>
+                            </tr>
+
+                            <tr>
+                                <td>Comms Type</td>
+                                <td>
+                                    <div id="comms-type">
+                                        <select class="form-select" id="input-comms-type-select">
+                                            <option selected>Select Comms type</option>
+                                            <option>simple</option>
+                                            <option>uart</option>
+                                        </select>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Trap Species</td>
+                                <td><input type="text" id="input-comms-trap-species"></td>
+                            </tr>
+                            <tr>
+                                <td>Trap Duration</td>
+                                <td><input type="text" id="input-comms-trap-duration"></td>
+                            </tr>
+                            <tr>
+                                <td>Protect Species</td>
+                                <td><input type="text" id="input-comms-protect-species"></td>
+                            </tr>
+                            <tr>
+                                <td>Protect Species</td>
+                                <td><input type="text" id="input-comms-protect-duration"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
         
+        <div class="container pt-1 pl-0">
+            <button id="save-button" type="button" onclick="saveCommsConfig()" class="btn btn-primary">Save Comms Config</button>
+        </div>
+
     </div>
 
     <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
