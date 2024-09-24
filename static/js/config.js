@@ -109,6 +109,18 @@ async function saveThermalMotionConfig() {
 }
 
 async function saveCommsConfig() {
+
+  try {
+    var protectSpecies = JSON.parse(document.querySelector("#input-comms-protect-species").value) || undefined;
+    console.log("protectSpecies", protectSpecies);
+    var trapSpecies = JSON.parse(document.querySelector("#input-comms-trap-species").value) || undefined;
+    console.log("TrapSpecies", trapSpecies);
+  } catch (error) {
+    console.error("Error parsing JSON:", error);
+    alert("Error parsing JSON for trap or protect species");
+    return;
+  }
+
   const data = {
     "enable": document.querySelector("#input-comms-enable").checked,
     "trap-enabled-by-default": document.querySelector("#input-comms-trap-default").checked,
@@ -116,9 +128,9 @@ async function saveCommsConfig() {
     "bluetooth": document.querySelector("#input-comms-bluetooth").checked,
     "power-output": document.querySelector("#input-comms-power-output").value || undefined,
     "power-up-duration": document.querySelector("#input-comms-power-up-duration").value || undefined,
-    "trap-species": JSON.parse(document.querySelector("#input-comms-trap-species").value) || undefined,
+    "trap-species": trapSpecies,
     "trap-duration": document.querySelector("#input-comms-trap-duration").value || undefined,
-    "protect-species": JSON.parse(document.querySelector("#input-comms-protect-species").value) || undefined,
+    "protect-species": protectSpecies,
     "protect-duration": document.querySelector("#input-comms-protect-duration").value || undefined,
   };
 
