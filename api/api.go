@@ -37,7 +37,6 @@ import (
 
 	goapi "github.com/TheCacophonyProject/go-api"
 	goconfig "github.com/TheCacophonyProject/go-config"
-	"github.com/TheCacophonyProject/lepton3"
 	signalstrength "github.com/TheCacophonyProject/management-interface/signal-strength"
 	saltrequester "github.com/TheCacophonyProject/salt-updater"
 	"github.com/godbus/dbus"
@@ -399,10 +398,12 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 	newConfigRaw := r.FormValue("config")
 	newConfig := map[string]interface{}{}
 	if err := json.Unmarshal([]byte(newConfigRaw), &newConfig); err != nil {
+		log.Printf("Error with unmarshal: %s", err)
 		badRequest(&w, err)
 		return
 	}
 	if err := api.config.SetFromMap(section, newConfig, false); err != nil {
+		log.Printf("Error with SetFromMap: %s", err)
 		badRequest(&w, err)
 		return
 	}
@@ -416,50 +417,26 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	configDefaults := map[string]interface{}{
-		goconfig.AudioRecordingKey:   goconfig.DefaultAudioRecording(),
-		goconfig.AudioBaitKey:        goconfig.DefaultAudioBait(),
-		goconfig.GPIOKey:             goconfig.DefaultGPIO(),
-		goconfig.LeptonKey:           goconfig.DefaultLepton(),
-		goconfig.ModemdKey:           goconfig.DefaultModemd(),
-		goconfig.PortsKey:            goconfig.DefaultPorts(),
-		goconfig.TestHostsKey:        goconfig.DefaultTestHosts(),
-		goconfig.ThermalMotionKey:    goconfig.DefaultThermalMotion(lepton3.Model35), // TODO don't assume that model 3.5 is being used
-		goconfig.ThermalRecorderKey:  goconfig.DefaultThermalRecorder(),
-		goconfig.ThermalThrottlerKey: goconfig.DefaultThermalThrottler(),
-		goconfig.WindowsKey:          goconfig.DefaultWindows(),
+	defaultValues := map[string]interface{}{}
+	for k, v := range goconfig.GetDefaults() {
+		defaultValues[toCamelCase(k)] = v
 	}
 
-	configValues := map[string]interface{}{
-		goconfig.AudioRecordingKey:   &goconfig.AudioRecording{},
-		goconfig.AudioBaitKey:        &goconfig.AudioBait{},
-		goconfig.GPIOKey:             &goconfig.GPIO{},
-		goconfig.LeptonKey:           &goconfig.Lepton{},
-		goconfig.ModemdKey:           &goconfig.Modemd{},
-		goconfig.PortsKey:            &goconfig.Ports{},
-		goconfig.TestHostsKey:        &goconfig.TestHosts{},
-		goconfig.ThermalMotionKey:    &goconfig.ThermalMotion{},
-		goconfig.ThermalRecorderKey:  &goconfig.ThermalRecorder{},
-		goconfig.ThermalThrottlerKey: &goconfig.ThermalThrottler{},
-		goconfig.WindowsKey:          &goconfig.Windows{},
-	}
-
-	for section, sectionStruct := range configValues {
-		if err := api.config.Unmarshal(section, sectionStruct); err != nil {
-			serverError(&w, err)
-			return
-		}
+	values, err := api.config.GetAllValues()
+	if err != nil {
+		serverError(&w, err)
+		return
 	}
 
 	configValuesCC := map[string]interface{}{}
-	for k, v := range configValues {
+	for k, v := range values {
 		configValuesCC[toCamelCase(k)] = v
 	}
-	configValues = configValuesCC
+	values = configValuesCC
 
 	valuesAndDefaults := map[string]interface{}{
-		"values":   configValues,
-		"defaults": configDefaults,
+		"values":   values,
+		"defaults": defaultValues,
 	}
 
 	jsonString, err := json.Marshal(valuesAndDefaults)

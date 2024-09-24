@@ -10,7 +10,13 @@ var refreshTime = refreshMillis;
 var signalFails = 0;
 
 async function updateSignalTC2() {
-  var response = await apiGetJSON("/api/modem");
+  var response;
+  try {
+    response = await apiGetJSON("/api/modem");
+  } catch (e) {
+    console.log(e);
+    return;
+  }
 
   if (response.simCard) {
     if (response.simCard.simCardStatus == "READY") {
