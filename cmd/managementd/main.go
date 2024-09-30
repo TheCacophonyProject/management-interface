@@ -273,15 +273,15 @@ func handleConn(conn net.Conn) error {
 
 	log.Printf("connection from %s %s (%dx%d@%dfps) frame size %d", headerInfo.Brand(), headerInfo.Model(), headerInfo.ResX(), headerInfo.ResY(), headerInfo.FPS(), headerInfo.FrameSize())
 
-	var clearB []byte = make([]byte, 5)
+	clearB := make([]byte, 5)
 	_, err = io.ReadFull(reader, clearB)
 	if err != nil {
 		return err
 	}
 
 	rawFrame := make([]byte, headerInfo.FrameSize())
-	var frame *cptvframe.Frame = cptvframe.NewFrame(headerInfo)
-	var frames int = 0
+	frame := cptvframe.NewFrame(headerInfo)
+	frames := 0
 	var lastFrame *FrameData
 	connected.Store(true)
 	for {

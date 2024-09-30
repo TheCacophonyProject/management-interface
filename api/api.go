@@ -85,9 +85,9 @@ func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *l
 	}, nil
 }
 
-func (s *ManagementAPI) StopHotspotTimer() {
-	if s.hotspotTimer != nil {
-		s.hotspotTimer.Stop()
+func (api *ManagementAPI) StopHotspotTimer() {
+	if api.hotspotTimer != nil {
+		api.hotspotTimer.Stop()
 	}
 }
 
@@ -105,7 +105,7 @@ func checkIsConnectedToNetworkWithRetries() (string, error) {
 	return ssid, err
 }
 
-func (server *ManagementAPI) ManageHotspot() {
+func (api *ManagementAPI) ManageHotspot() {
 	// Check if we are connected to a network
 	ssid, err := checkIsConnectedToNetworkWithRetries()
 	if err != nil {

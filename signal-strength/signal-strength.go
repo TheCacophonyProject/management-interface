@@ -20,7 +20,7 @@ package signalstrength
 
 import (
 	"encoding/xml"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"time"
@@ -57,7 +57,7 @@ func Run() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return 0, err
 	}

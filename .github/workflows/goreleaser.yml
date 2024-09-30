@@ -37,6 +37,12 @@ jobs:
       - name: Run Go Tests
         run: go test ./...
 
+      - name: Install Staticcheck
+        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+
+      - name: Run Staticcheck
+        run: staticcheck --checks="all,-ST1000,-ST1022,-ST1020,-ST1003" ./...
+
       - name: Check GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
