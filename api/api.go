@@ -37,6 +37,8 @@ import (
 
 	goapi "github.com/TheCacophonyProject/go-api"
 	goconfig "github.com/TheCacophonyProject/go-config"
+	"github.com/TheCacophonyProject/go-utils/logging"
+	"github.com/TheCacophonyProject/go-utils/saltutil"
 	signalstrength "github.com/TheCacophonyProject/management-interface/signal-strength"
 	saltrequester "github.com/TheCacophonyProject/salt-updater"
 	"github.com/godbus/dbus"
@@ -48,10 +50,9 @@ import (
 	"github.com/TheCacophonyProject/trap-controller/trapdbusclient"
 
 	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
-	"github.com/sirupsen/logrus"
 )
 
-var log *logrus.Logger
+var log *logging.Logger
 
 const (
 	cptvGlob            = "*.cptv"
@@ -69,7 +70,7 @@ type ManagementAPI struct {
 	appVersion   string
 }
 
-func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *logrus.Logger) (*ManagementAPI, error) {
+func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *logging.Logger) (*ManagementAPI, error) {
 	log = l
 	thermalRecorder := goconfig.DefaultThermalRecorder()
 	if err := config.Unmarshal(goconfig.ThermalRecorderKey, &thermalRecorder); err != nil {
@@ -1259,6 +1260,10 @@ func (api *ManagementAPI) SetSaltGrains(w http.ResponseWriter, r *http.Request) 
 			}
 		}
 
+		if !saltutil.IsSaltIdSet() {
+			http.Error(w, "Salt is not yet ready to set grains", http.StatusInternalServerError)
+			return
+		}
 		cmd := exec.Command("salt-call", "grains.setval", key, value)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			http.Error(w, fmt.Sprintf("failed to set grain: %s, output: %s", err, output), http.StatusInternalServerError)
@@ -1642,6 +1647,10 @@ func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !saltutil.IsSaltIdSet() {
+		http.Error(w, "Salt is not yet ready to upload logs", http.StatusInternalServerError)
+		return
+	}
 	if err := exec.Command("salt-call", "cp.push", logFileName+".gz").Run(); err != nil {
 		log.Printf("Error pushing log file with salt: %v", err)
 		serverError(&w, err)

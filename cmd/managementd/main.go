@@ -47,7 +47,6 @@ import (
 	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
 	"github.com/TheCacophonyProject/thermal-recorder/headers"
 	"github.com/alexflint/go-arg"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -64,7 +63,7 @@ var (
 	headerInfo  *headers.HeaderInfo
 	frameCh     = make(chan *FrameData, 4)
 	connected   atomic.Bool
-	log         *logrus.Logger
+	log         = logging.NewLogger("info")
 )
 
 type Args struct {

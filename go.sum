@@ -57,8 +57,8 @@ github.com/TheCacophonyProject/event-reporter/v3 v3.8.0 h1:FYNR+MX5ypyG7UWpogDnD
 github.com/TheCacophonyProject/event-reporter/v3 v3.8.0/go.mod h1:WTppJtTBxduasM1Or5SAh4Mm0YrTDnprOChjnGYgyEI=
 github.com/TheCacophonyProject/go-api v0.0.0-20190923033957-174cea2ac81c/go.mod h1:FfMpa4cFhNXQ9tuKG18HO6yLExezcJhzjUjBOFocrQw=
 github.com/TheCacophonyProject/go-api v1.0.4/go.mod h1:F7UUNgsLhbw7hsiNBMRB9kQz9uXXosVmNToqImz7EA8=
-github.com/TheCacophonyProject/go-api v1.2.1 h1:QS8mzStQHzb3oAqqwjoLqCvXsRM8fx7F9I7hpgKND5c=
-github.com/TheCacophonyProject/go-api v1.2.1/go.mod h1:F7UUNgsLhbw7hsiNBMRB9kQz9uXXosVmNToqImz7EA8=
+github.com/TheCacophonyProject/go-api v1.2.2 h1:lXV2/upgA6lgLWOuTMRJoTjMXxlSveN9v8Dr3mvYqPM=
+github.com/TheCacophonyProject/go-api v1.2.2/go.mod h1:innR3kf5xnua2wbnLvOudI13j2TU1sGY1dxJQJLRZkI=
 github.com/TheCacophonyProject/go-config v0.0.0-20190922224052-7c2a21bc6b88/go.mod h1:gPUJLVu408NRz9/P3BrsxzOzLc+KJLrv+jVdDw3RI0Y=
 github.com/TheCacophonyProject/go-config v0.0.0-20190927054511-c93578ae648a/go.mod h1:QCgT+KCrz1CmLVpeeOMl5L8/X1QvWwpsLzR7afTmEJc=
 github.com/TheCacophonyProject/go-config v1.4.0/go.mod h1:oARW/N3eJbcewCqB+Jc7TBwuODawwYgpo56UO6yBdKU=
@@ -71,8 +71,8 @@ github.com/TheCacophonyProject/go-cptv v0.0.0-20200616224711-fc633122087a/go.mod
 github.com/TheCacophonyProject/go-cptv v0.0.0-20200818214604-bd5d4aa36043/go.mod h1:wG4/P/TsGtk33uBClYPjRlSbcdQrIASXutOUV8LMn2o=
 github.com/TheCacophonyProject/go-cptv v0.0.0-20211109233846-8c32a5d161f7 h1:sf9KTj7u3mFMx5NsLpQtf8FtP3BDZAgtHutanDygQgk=
 github.com/TheCacophonyProject/go-cptv v0.0.0-20211109233846-8c32a5d161f7/go.mod h1:T74NuMjo2YrLoyhAd0+9hj2pgVt8F7DWWzTMlU8aH6k=
-github.com/TheCacophonyProject/go-utils v0.1.1 h1:VOt9EphEqRUYMqKJlJeliIarIMlCVKYGb1fdqM6b4YM=
-github.com/TheCacophonyProject/go-utils v0.1.1/go.mod h1:jZPUZ4GtYVxnlTtqiYKMFWDT//kmxdbwjLW3HCyCmCE=
+github.com/TheCacophonyProject/go-utils v0.1.3 h1:DSuDeJz7ZM00yQRLsoukWH0fnC+8X8+ziYxOl6l3wEY=
+github.com/TheCacophonyProject/go-utils v0.1.3/go.mod h1:jZPUZ4GtYVxnlTtqiYKMFWDT//kmxdbwjLW3HCyCmCE=
 github.com/TheCacophonyProject/lepton3 v0.0.0-20200121020734-2ae28662e1bc/go.mod h1:xzPAWtvVCbJdJC2Gn1cG0Ovs/VP7XGGiQpUU8wU4HME=
 github.com/TheCacophonyProject/lepton3 v0.0.0-20200213011619-1934a9300bd3/go.mod h1:xzPAWtvVCbJdJC2Gn1cG0Ovs/VP7XGGiQpUU8wU4HME=
 github.com/TheCacophonyProject/lepton3 v0.0.0-20200909032119-e2b2b778a8ee/go.mod h1:+FTQKx63hdEbuTe/nxNv9TQ2EWqdlzMZx7UNLGCX9SE=
