@@ -5,7 +5,7 @@ go 1.22.3
 require (
 	github.com/TheCacophonyProject/audiobait/v3 v3.0.1
 	github.com/TheCacophonyProject/event-reporter v1.3.2-0.20200210010421-ca3fcb76a231
-	github.com/TheCacophonyProject/go-api v1.2.1
+	github.com/TheCacophonyProject/go-api v1.2.2
 	github.com/TheCacophonyProject/go-config v1.22.0
 	github.com/TheCacophonyProject/go-cptv v0.0.0-20211109233846-8c32a5d161f7
 	github.com/TheCacophonyProject/lepton3 v0.0.0-20211005194419-22311c15d6ee
@@ -19,12 +19,11 @@ require (
 )
 
 require (
-	github.com/TheCacophonyProject/go-utils v0.1.1
+	github.com/TheCacophonyProject/go-utils v0.1.3
 	github.com/TheCacophonyProject/rpi-net-manager v0.4.0-deb12
 	github.com/TheCacophonyProject/thermal-recorder v1.22.1-0.20230627011240-89964c0511f7
 	github.com/TheCacophonyProject/trap-controller v0.0.0-20230227002937-262a1adfaa47
 	github.com/alexflint/go-arg v1.4.3
-	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/text v0.16.0
 
 )
@@ -48,6 +47,7 @@ require (
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/sagikazarmark/locafero v0.6.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect

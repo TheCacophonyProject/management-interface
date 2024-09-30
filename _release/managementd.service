@@ -1,6 +1,7 @@
 [Unit]
 Description=Cacophonator management interface
 After=network.target
+ConditionPathExists=/etc/salt/minion_id
 
 [Service]
 ExecStart=/usr/bin/managementd
