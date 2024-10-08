@@ -93,6 +93,31 @@ func (api *ManagementAPI) AudioRecordingStatus(w http.ResponseWriter, r *http.Re
 
 }
 
+func (api *ManagementAPI) TakeLongAudioRecording(w http.ResponseWriter, r *http.Request) {
+	tc2AgentDbus, err := getTC2AgentDbus()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
+		return
+	}
+	seconds, err := strconv.ParseUint(r.URL.Query().Get("seconds"), 10, 32)
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+	var result string
+
+	err = tc2AgentDbus.Call("org.cacophony.TC2Agent.longaudiorecording", 0, seconds).Store(&result)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to request long audio recording", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(w).Encode(result)
+}
+
 func (api *ManagementAPI) TakeTestAudioRecording(w http.ResponseWriter, r *http.Request) {
 	tc2AgentDbus, err := getTC2AgentDbus()
 	if err != nil {
