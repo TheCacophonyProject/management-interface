@@ -110,7 +110,7 @@ func (api *ManagementAPI) TakeLongAudioRecording(w http.ResponseWriter, r *http.
 	err = tc2AgentDbus.Call("org.cacophony.TC2Agent.longaudiorecording", 0, seconds).Store(&result)
 	if err != nil {
 		log.Println(err)
-		http.Error(w, "Failed to request long audio recording", http.StatusInternalServerError)
+		http.Error(w, "Failed to request 5 minute audio recording", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)

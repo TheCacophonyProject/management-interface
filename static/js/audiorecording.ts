@@ -1,5 +1,15 @@
 "use strict";
+enum AudioMode {
+  Audio = 0,
+  Thermal = 1,
+}
 
+enum AudioStatus {
+  Ready = 1,
+  WaitingToTakeTestRecording = 2,
+  TakingTestRecording = 3,
+  Recording = 4,
+}
 class AudioState {
   constructor(
     public intervalId: number | null,
@@ -32,29 +42,22 @@ async function getAudioStatus() {
       const mode = Number(rp2040state.mode);
 
       let statusText = "";
-      if (state == 1) {
+      if (state == AudioStatus.Ready) {
         countdown = 2;
         if (audioState) {
           audioState.clearInterval();
           statusText = "";
-          document
-            .getElementById("audio-test-button")
-            ?.removeAttribute("disabled");
-          (
-            document.getElementById("audio-test-button") as HTMLElement
-          ).innerText = "Take Test Recording";
+          enableRecButtons();
         }
-      } else if (state == 2) {
+      } else if (state == AudioStatus.WaitingToTakeTestRecording) {
         countdown = 2;
         audioState.lastState = state;
         statusText = "Test Recording Pending";
         if (!audioState.intervalId) {
           audioState.startPolling();
-          document
-            .getElementById("audio-test-button")
-            ?.setAttribute("disabled", "true");
+          disableRecButtons();
         }
-      } else if (state == 3) {
+      } else if (state == AudioStatus.TakingTestRecording) {
         audioState.lastState = state;
         if (countdown == 0) {
           statusText = "Taking Test Recording";
@@ -64,36 +67,24 @@ async function getAudioStatus() {
         }
         if (!audioState.intervalId) {
           audioState.startPolling();
-          document
-            .getElementById("audio-test-button")
-            ?.setAttribute("disabled", "true");
+          disableRecButtons();
         }
-      } else if (state == 4) {
+      } else if (state == AudioStatus.Recording) {
         countdown = 2;
-        let recType = mode == 1 ? "an audio" : "a thermal";
+        let recType = mode == AudioMode.Audio ? "an audio" : "a thermal";
         statusText = `Already Taking ${recType} Recording`;
-        if (audioState.lastState != 4) {
-          document
-            .getElementById("audio-test-button")
-            ?.setAttribute("disabled", "true");
+        if (audioState.lastState != AudioStatus.TakingTestRecording) {
+          disableRecButtons();
           audioState.startPolling();
           //need to tell tc2 agent to poll state
           testAPICall(false);
-          (
-            document.getElementById("audio-test-button") as HTMLElement
-          ).innerText = "Waiting for Recording to finish";
         }
         audioState.lastState = state;
       } else {
         countdown = 0;
         statusText = "unknow state";
         audioState.clearInterval();
-        document
-          .getElementById("audio-test-button")
-          ?.removeAttribute("disabled");
-        (
-          document.getElementById("audio-test-button") as HTMLElement
-        ).innerText = "Take Test Recording";
+        enableRecButtons();
       }
       (document.getElementById("audio-test-status") as HTMLElement).innerText =
         statusText;
@@ -112,12 +103,8 @@ function enableRecButtons() {
   document
     .getElementById("audio-recording-button")
     ?.removeAttribute("disabled");
-  (document.getElementById("audio-recording-button") as HTMLElement).innerText =
-    "Take Test Recording";
 
   document.getElementById("audio-test-button")?.removeAttribute("disabled");
-  (document.getElementById("audio-test-button") as HTMLElement).innerText =
-    "Take Test Recording";
 }
 
 function disableRecButtons() {
@@ -130,15 +117,11 @@ function disableRecButtons() {
 }
 
 async function takeLongRecording() {
-  (document.getElementById("audio-recording-button") as HTMLElement).innerText =
-    "Making a 5 minute recording";
   disableRecButtons();
   recordingAPICall(true);
 }
 
 async function takeTestRecording() {
-  (document.getElementById("audio-test-button") as HTMLElement).innerText =
-    "Making a test recording";
   disableRecButtons();
   testAPICall(true);
 }
@@ -257,6 +240,9 @@ function updateAudioError(xmlHttp: XMLHttpRequest) {
 
 window.onload = async function () {
   getAudioStatus();
+  document
+    .getElementById("audio-test-button")
+    ?.addEventListener("click", takeTestRecording, false);
   document
     .getElementById("audio-recording-button")
     ?.addEventListener("click", takeLongRecording, false);
