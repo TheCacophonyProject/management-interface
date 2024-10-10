@@ -56,7 +56,7 @@ var log *logging.Logger
 
 const (
 	cptvGlob            = "*.cptv"
-	wavGlob             = "*.wav"
+	aacGlob             = "*.aac"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
 	apiVersion          = 8
@@ -223,24 +223,29 @@ func (api *ManagementAPI) GetRecording(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
-
 	ext := filepath.Ext(name)
 	switch ext {
 	case ".cptv":
-		w.Header().Set("Content-Type", "application/x-cptv")
-	case ".wav":
-		w.Header().Set("Content-Type", "audio/wav")
+		sendFile(w, recordingPath, name, "application/x-cptv")
+	case ".mp3":
+		sendFile(w, recordingPath, name, "audio/mp4")
 	default:
-		w.Header().Set("Content-Type", "application/json")
+		sendFile(w, recordingPath, name, "application/json")
 	}
-	f, err := os.Open(recordingPath)
+}
+
+func sendFile(w http.ResponseWriter, path, name, contentType string) {
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+	w.Header().Set("Content-Type", contentType)
+
+	f, err := os.Open(path)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Println(err)
 		return
 	}
 	defer f.Close()
+
 	w.WriteHeader(http.StatusOK)
 	io.Copy(w, bufio.NewReader(f))
 }
@@ -557,9 +562,9 @@ func getCptvNames(dir string) []string {
 	return names
 }
 
-func getWavNames(dir string) []string {
-	matches, _ := filepath.Glob(filepath.Join(dir, wavGlob))
-	failedUploadMatches, _ := filepath.Glob(filepath.Join(dir, failedUploadsFolder, wavGlob))
+func getAacNames(dir string) []string {
+	matches, _ := filepath.Glob(filepath.Join(dir, aacGlob))
+	failedUploadMatches, _ := filepath.Glob(filepath.Join(dir, failedUploadsFolder, aacGlob))
 	matches = append(matches, failedUploadMatches...)
 	names := make([]string, len(matches))
 	for i, filename := range matches {
@@ -1586,36 +1591,39 @@ func (api *ManagementAPI) DownloadAudioFile(w http.ResponseWriter, r *http.Reque
 	// Get the file name from the request
 	fileName := mux.Vars(r)["fileName"]
 	if fileName == "" {
-		log.Printf("Error getting file name from request: %v", fileName)
-		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, "Failed to get file name from request\n")
+		http.Error(w, "Failed to get file name from request", http.StatusBadRequest)
 		return
 	}
 
-	// Open the file
-	audioFolderPath := goconfig.ThermalRecorder{}.OutputDir + "/audio"
-	filePath := audioFolderPath + "/" + fileName
-	file, err := os.Open(filePath)
+	// Construct the full path to the aac file
+	audioFolderPath := api.recordingDir
+	aacFilePath := filepath.Join(audioFolderPath, fileName)
+	defer os.Remove(aacFilePath) // Clean up the temporary file when done
+
+	// Open the converted M4A file
+	aacFile, err := os.Open(aacFilePath)
 	if err != nil {
-		log.Printf("Error opening audio file: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Failed to open audio file\n")
+		log.Printf("Error opening converted M4A file: %v", err)
+		http.Error(w, "Failed to open converted audio file", http.StatusInternalServerError)
 		return
 	}
-	defer file.Close()
+	defer aacFile.Close()
 
 	// Set the response headers
-	w.Header().Set("Content-Disposition", "attachment; filename="+fileName)
-	w.Header().Set("Content-Type", r.Header.Get("Content-Type"))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
+	w.Header().Set("Content-Type", "audio/mp4")
 
 	// Send the file as a response
-	w.WriteHeader(http.StatusOK)
-	io.Copy(w, file)
+	if _, err := io.Copy(w, aacFile); err != nil {
+		log.Printf("Error sending M4A file: %v", err)
+		http.Error(w, "Failed to send audio file", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (api *ManagementAPI) GetAudioRecordings(w http.ResponseWriter, r *http.Request) {
 	log.Println("get audio recordings")
-	names := getWavNames(api.recordingDir)
+	names := getAacNames(api.recordingDir)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(names)
 }
