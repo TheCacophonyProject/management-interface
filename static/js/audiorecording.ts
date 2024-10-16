@@ -1,7 +1,7 @@
 "use strict";
 enum AudioMode {
-  Audio = 0,
-  Thermal = 1,
+  Audio = 1,
+  Thermal = 0,
 }
 
 enum AudioStatus {
@@ -9,6 +9,8 @@ enum AudioStatus {
   WaitingToTakeTestRecording = 2,
   TakingTestRecording = 3,
   Recording = 4,
+  TakingLongRecording = 5,
+  WaitingToTakeLongRecording = 6,
 }
 class AudioState {
   constructor(
@@ -49,22 +51,38 @@ async function getAudioStatus() {
           statusText = "";
           enableRecButtons();
         }
-      } else if (state == AudioStatus.WaitingToTakeTestRecording) {
+      } else if (
+        state == AudioStatus.WaitingToTakeTestRecording ||
+        state == AudioStatus.WaitingToTakeLongRecording
+      ) {
         countdown = 2;
         audioState.lastState = state;
-        statusText = "Test Recording Pending";
+        if (state == AudioStatus.WaitingToTakeTestRecording) {
+          statusText = "Test Recording Pending";
+        } else {
+          statusText = "5 Minute Recording Pending";
+        }
         if (!audioState.intervalId) {
           audioState.startPolling();
           disableRecButtons();
         }
-      } else if (state == AudioStatus.TakingTestRecording) {
+      } else if (
+        state == AudioStatus.TakingTestRecording ||
+        state == AudioStatus.TakingLongRecording
+      ) {
         audioState.lastState = state;
+
+        let recType = "Test";
+        if (state == AudioStatus.TakingLongRecording) {
+          recType = "5 Minute";
+        }
         if (countdown == 0) {
-          statusText = "Taking Test Recording";
+          statusText = `Taking ${recType} Recording`;
         } else {
-          statusText = `Taking Test Recording in ${countdown}s`;
+          statusText = `Taking ${recType} Recording in ${countdown}s`;
           countdown -= 1;
         }
+
         if (!audioState.intervalId) {
           audioState.startPolling();
           disableRecButtons();
@@ -135,7 +153,7 @@ async function recordingAPICall(checkResponse: boolean) {
   if (checkResponse) {
     xmlHttp.onload = async function () {
       if (xmlHttp.status == 200) {
-        success = xmlHttp.responseText == '"Asked for a test recording"\n';
+        success = xmlHttp.responseText == '"Asked for a 5 minute recording"\n';
         if (!success) {
           enableRecButtons();
           updateAudioError(xmlHttp);
