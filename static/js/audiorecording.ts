@@ -1,5 +1,17 @@
 "use strict";
+enum AudioMode {
+  Audio = 1,
+  Thermal = 0,
+}
 
+enum AudioStatus {
+  Ready = 1,
+  WaitingToTakeTestRecording = 2,
+  TakingTestRecording = 3,
+  Recording = 4,
+  TakingLongRecording = 5,
+  WaitingToTakeLongRecording = 6,
+}
 class AudioState {
   constructor(
     public intervalId: number | null,
@@ -32,68 +44,65 @@ async function getAudioStatus() {
       const mode = Number(rp2040state.mode);
 
       let statusText = "";
-      if (state == 1) {
+      if (state == AudioStatus.Ready) {
         countdown = 2;
         if (audioState) {
           audioState.clearInterval();
           statusText = "";
-          document
-            .getElementById("audio-test-button")
-            ?.removeAttribute("disabled");
-          (
-            document.getElementById("audio-test-button") as HTMLElement
-          ).innerText = "Take Test Recording";
+          enableRecButtons();
         }
-      } else if (state == 2) {
+      } else if (
+        state == AudioStatus.WaitingToTakeTestRecording ||
+        state == AudioStatus.WaitingToTakeLongRecording
+      ) {
         countdown = 2;
         audioState.lastState = state;
-        statusText = "Test Recording Pending";
+        if (state == AudioStatus.WaitingToTakeTestRecording) {
+          statusText = "Test Recording Pending";
+        } else {
+          statusText = "5 Minute Recording Pending";
+        }
         if (!audioState.intervalId) {
           audioState.startPolling();
-          document
-            .getElementById("audio-test-button")
-            ?.setAttribute("disabled", "true");
+          disableRecButtons();
         }
-      } else if (state == 3) {
+      } else if (
+        state == AudioStatus.TakingTestRecording ||
+        state == AudioStatus.TakingLongRecording
+      ) {
         audioState.lastState = state;
+
+        let recType = "Test";
+        if (state == AudioStatus.TakingLongRecording) {
+          recType = "5 Minute";
+        }
         if (countdown == 0) {
-          statusText = "Taking Test Recording";
+          statusText = `Taking ${recType} Recording`;
         } else {
-          statusText = `Taking Test Recording in ${countdown}s`;
+          statusText = `Taking ${recType} Recording in ${countdown}s`;
           countdown -= 1;
         }
+
         if (!audioState.intervalId) {
           audioState.startPolling();
-          document
-            .getElementById("audio-test-button")
-            ?.setAttribute("disabled", "true");
+          disableRecButtons();
         }
-      } else if (state == 4) {
+      } else if (state == AudioStatus.Recording) {
         countdown = 2;
-        let recType = mode == 1 ? "an audio" : "a thermal";
+        let recType = mode == AudioMode.Audio ? "an audio" : "a thermal";
         statusText = `Already Taking ${recType} Recording`;
-        if (audioState.lastState != 4) {
-          document
-            .getElementById("audio-test-button")
-            ?.setAttribute("disabled", "true");
+        if (audioState.lastState != AudioStatus.TakingTestRecording) {
+          disableRecButtons();
           audioState.startPolling();
           //need to tell tc2 agent to poll state
           testAPICall(false);
-          (
-            document.getElementById("audio-test-button") as HTMLElement
-          ).innerText = "Waiting for Recording to finish";
         }
         audioState.lastState = state;
       } else {
         countdown = 0;
         statusText = "unknow state";
         audioState.clearInterval();
-        document
-          .getElementById("audio-test-button")
-          ?.removeAttribute("disabled");
-        (
-          document.getElementById("audio-test-button") as HTMLElement
-        ).innerText = "Take Test Recording";
+        enableRecButtons();
       }
       (document.getElementById("audio-test-status") as HTMLElement).innerText =
         statusText;
@@ -107,21 +116,64 @@ async function getAudioStatus() {
   await xmlHttp.send();
 }
 
-function enableRecButton() {
+function enableRecButtons() {
   audioState.clearInterval();
+  document
+    .getElementById("audio-recording-button")
+    ?.removeAttribute("disabled");
 
   document.getElementById("audio-test-button")?.removeAttribute("disabled");
-  (document.getElementById("audio-test-button") as HTMLElement).innerText =
-    "Take Test Recording";
 }
 
-async function takeTestRecording() {
-  (document.getElementById("audio-test-button") as HTMLElement).innerText =
-    "Making a test recording";
+function disableRecButtons() {
   document
     .getElementById("audio-test-button")
     ?.setAttribute("disabled", "true");
+  document
+    .getElementById("audio-recording-button")
+    ?.setAttribute("disabled", "true");
+}
+
+async function takeLongRecording() {
+  disableRecButtons();
+  recordingAPICall(true);
+}
+
+async function takeTestRecording() {
+  disableRecButtons();
   testAPICall(true);
+}
+
+async function recordingAPICall(checkResponse: boolean) {
+  var xmlHttp = new XMLHttpRequest();
+  xmlHttp.open("PUT", "/api/audio/long-recording?seconds=300", true);
+  xmlHttp.setRequestHeader("Authorization", "Basic " + btoa("admin:feathers"));
+
+  var success = false;
+  if (checkResponse) {
+    xmlHttp.onload = async function () {
+      if (xmlHttp.status == 200) {
+        success = xmlHttp.responseText == '"Asked for a 5 minute recording"\n';
+        if (!success) {
+          enableRecButtons();
+          updateAudioError(xmlHttp);
+        } else {
+          audioState.clearInterval();
+          audioState.startPolling();
+        }
+      } else {
+        enableRecButtons();
+        updateAudioError(xmlHttp);
+      }
+    };
+  }
+
+  xmlHttp.onerror = async function () {
+    enableRecButtons();
+    updateAudioError(xmlHttp);
+  };
+
+  xmlHttp.send();
 }
 
 async function testAPICall(checkResponse: boolean) {
@@ -134,21 +186,21 @@ async function testAPICall(checkResponse: boolean) {
       if (xmlHttp.status == 200) {
         success = xmlHttp.responseText == '"Asked for a test recording"\n';
         if (!success) {
-          enableRecButton();
+          enableRecButtons();
           updateAudioError(xmlHttp);
         } else {
           audioState.clearInterval();
           audioState.startPolling();
         }
       } else {
-        enableRecButton();
+        enableRecButtons();
         updateAudioError(xmlHttp);
       }
     };
   }
 
   xmlHttp.onerror = async function () {
-    enableRecButton();
+    enableRecButtons();
     updateAudioError(xmlHttp);
   };
 
@@ -164,7 +216,9 @@ function updateAudio() {
   data["audio-mode"] = (
     document.getElementById("audio-mode-select") as HTMLSelectElement
   ).value;
-
+  data["audio-seed"] = (
+    document.getElementById("audio-seed") as HTMLInputElement
+  ).value;
   var xmlHttp = new XMLHttpRequest();
   xmlHttp.open("POST", "/api/audiorecording", true);
   xmlHttp.setRequestHeader("Authorization", "Basic " + btoa("admin:feathers"));
@@ -204,4 +258,23 @@ function updateAudioError(xmlHttp: XMLHttpRequest) {
 
 window.onload = async function () {
   getAudioStatus();
+  document
+    .getElementById("audio-test-button")
+    ?.addEventListener("click", takeTestRecording, false);
+  document
+    .getElementById("audio-recording-button")
+    ?.addEventListener("click", takeLongRecording, false);
+  document
+    .getElementById("updateBtn")
+    ?.addEventListener("click", updateAudio, false);
+  document
+    .getElementById("audio-mode-select")
+    ?.addEventListener("change", handleModeChange, false);
+
+  const audioseed = (document.getElementById("audio-seed") as HTMLInputElement)
+    .value;
+  if (Number(audioseed) == 0) {
+    // @ts-ignore
+    (document.getElementById("audio-seed") as HTMLInputElement).value = null;
+  }
 };

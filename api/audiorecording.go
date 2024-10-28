@@ -21,6 +21,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	goconfig "github.com/TheCacophonyProject/go-config"
 	"github.com/godbus/dbus"
@@ -34,6 +35,7 @@ func (api *ManagementAPI) GetAudioRecording(w http.ResponseWriter, r *http.Reque
 	}
 	type AudioRecording struct {
 		AudioMode string `json:"audio-mode"`
+		AudioSeed string `json:"audio-seed"`
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -46,11 +48,23 @@ func (api *ManagementAPI) GetAudioRecording(w http.ResponseWriter, r *http.Reque
 func (api *ManagementAPI) SetAudioRecording(w http.ResponseWriter, r *http.Request) {
 	log.Println("update audio recording")
 	audioMode := r.FormValue("audio-mode")
+	stringSeed := r.FormValue("audio-seed")
+	var audioSeed uint32
+	if stringSeed == "" {
+		audioSeed = 0
+	} else {
+		seed, err := strconv.ParseUint(r.FormValue("audio-seed"), 10, 32)
+		if err != nil {
+			badRequest(&w, err)
+			return
+		}
+		audioSeed = uint32(seed)
+	}
 
 	audioRecording := goconfig.AudioRecording{
 		AudioMode: audioMode,
+		AudioSeed: audioSeed,
 	}
-
 	if err := api.config.Set(goconfig.AudioRecordingKey, &audioRecording); err != nil {
 		serverError(&w, err)
 	}
@@ -77,6 +91,31 @@ func (api *ManagementAPI) AudioRecordingStatus(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(rp2040status)
 
+}
+
+func (api *ManagementAPI) TakeLongAudioRecording(w http.ResponseWriter, r *http.Request) {
+	tc2AgentDbus, err := getTC2AgentDbus()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
+		return
+	}
+	seconds, err := strconv.ParseUint(r.URL.Query().Get("seconds"), 10, 32)
+	if err != nil {
+		badRequest(&w, err)
+		return
+	}
+	var result string
+
+	err = tc2AgentDbus.Call("org.cacophony.TC2Agent.longaudiorecording", 0, seconds).Store(&result)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to request 5 minute audio recording", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(w).Encode(result)
 }
 
 func (api *ManagementAPI) TakeTestAudioRecording(w http.ResponseWriter, r *http.Request) {

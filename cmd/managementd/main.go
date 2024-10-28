@@ -208,6 +208,7 @@ func main() {
 
 	apiRouter.HandleFunc("/audiorecording", apiObj.SetAudioRecording).Methods("POST")
 	apiRouter.HandleFunc("/audiorecording", apiObj.GetAudioRecording).Methods("GET")
+	apiRouter.HandleFunc("/audio/long-recording", apiObj.TakeLongAudioRecording).Methods("PUT")
 	apiRouter.HandleFunc("/audio/test-recording", apiObj.TakeTestAudioRecording).Methods("PUT")
 	apiRouter.HandleFunc("/audio/audio-status", apiObj.AudioRecordingStatus).Methods("GET")
 	apiRouter.HandleFunc("/audio/recordings", apiObj.GetAudioRecordings).Methods("GET")
