@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"html/template"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -36,6 +35,8 @@ import (
 	"github.com/TheCacophonyProject/audiobait/v3/playlist"
 	goconfig "github.com/TheCacophonyProject/go-config"
 	"github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/TheCacophonyProject/go-utils/logging"
 	"github.com/gobuffalo/packr"
@@ -59,7 +60,11 @@ func init() {
 	tmpl.Funcs(template.FuncMap{"DeviceName": func() string { return deviceName }})
 	for _, name := range templateBox.List() {
 		t := tmpl.New(name)
-		template.Must(t.Parse(templateBox.String(name)))
+		s, err := templateBox.FindString(name)
+		if err != nil {
+			log.Fatal(err)
+		}
+		template.Must(t.Parse(s))
 	}
 }
 
@@ -139,7 +144,7 @@ func readFile(file string) string {
 	}
 
 	// The /etc/salt/minion_id file contains the ID.
-	out, err := ioutil.ReadFile(file)
+	out, err := os.ReadFile(file)
 	if err != nil {
 		return ""
 	}
@@ -216,7 +221,8 @@ func DiskMemoryHandler(w http.ResponseWriter, r *http.Request) {
 			words[0] = words[0] + " K"
 			words[1] = words[1][2:]
 			words[0], words[1] = words[1], words[0] // This reverses the 2 columns
-			words[0] = strings.Title(words[0])
+			titleCaser := cases.Title(language.Und)
+			words[0] = titleCaser.String(words[0])
 		}
 		outputStrings2 = append(outputStrings2, words)
 		if words[0] == "Free Swap" {

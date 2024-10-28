@@ -37,7 +37,8 @@ import (
 
 	goapi "github.com/TheCacophonyProject/go-api"
 	goconfig "github.com/TheCacophonyProject/go-config"
-	"github.com/TheCacophonyProject/lepton3"
+	"github.com/TheCacophonyProject/go-utils/logging"
+	"github.com/TheCacophonyProject/go-utils/saltutil"
 	signalstrength "github.com/TheCacophonyProject/management-interface/signal-strength"
 	saltrequester "github.com/TheCacophonyProject/salt-updater"
 	"github.com/godbus/dbus"
@@ -49,14 +50,13 @@ import (
 	"github.com/TheCacophonyProject/trap-controller/trapdbusclient"
 
 	netmanagerclient "github.com/TheCacophonyProject/rpi-net-manager/netmanagerclient"
-	"github.com/sirupsen/logrus"
 )
 
-var log *logrus.Logger
+var log *logging.Logger
 
 const (
 	cptvGlob            = "*.cptv"
-	wavGlob             = "*.wav"
+	aacGlob             = "*.aac"
 	failedUploadsFolder = "failed-uploads"
 	rebootDelay         = time.Second * 5
 	apiVersion          = 8
@@ -70,7 +70,7 @@ type ManagementAPI struct {
 	appVersion   string
 }
 
-func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *logrus.Logger) (*ManagementAPI, error) {
+func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *logging.Logger) (*ManagementAPI, error) {
 	log = l
 	thermalRecorder := goconfig.DefaultThermalRecorder()
 	if err := config.Unmarshal(goconfig.ThermalRecorderKey, &thermalRecorder); err != nil {
@@ -85,9 +85,9 @@ func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *l
 	}, nil
 }
 
-func (s *ManagementAPI) StopHotspotTimer() {
-	if s.hotspotTimer != nil {
-		s.hotspotTimer.Stop()
+func (api *ManagementAPI) StopHotspotTimer() {
+	if api.hotspotTimer != nil {
+		api.hotspotTimer.Stop()
 	}
 }
 
@@ -105,7 +105,7 @@ func checkIsConnectedToNetworkWithRetries() (string, error) {
 	return ssid, err
 }
 
-func (server *ManagementAPI) ManageHotspot() {
+func (api *ManagementAPI) ManageHotspot() {
 	// Check if we are connected to a network
 	ssid, err := checkIsConnectedToNetworkWithRetries()
 	if err != nil {
@@ -223,24 +223,29 @@ func (api *ManagementAPI) GetRecording(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
-
 	ext := filepath.Ext(name)
 	switch ext {
 	case ".cptv":
-		w.Header().Set("Content-Type", "application/x-cptv")
-	case ".wav":
-		w.Header().Set("Content-Type", "audio/wav")
+		sendFile(w, recordingPath, name, "application/x-cptv")
+	case ".mp3":
+		sendFile(w, recordingPath, name, "audio/mp4")
 	default:
-		w.Header().Set("Content-Type", "application/json")
+		sendFile(w, recordingPath, name, "application/json")
 	}
-	f, err := os.Open(recordingPath)
+}
+
+func sendFile(w http.ResponseWriter, path, name, contentType string) {
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+	w.Header().Set("Content-Type", contentType)
+
+	f, err := os.Open(path)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Println(err)
 		return
 	}
 	defer f.Close()
+
 	w.WriteHeader(http.StatusOK)
 	io.Copy(w, bufio.NewReader(f))
 }
@@ -399,10 +404,12 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 	newConfigRaw := r.FormValue("config")
 	newConfig := map[string]interface{}{}
 	if err := json.Unmarshal([]byte(newConfigRaw), &newConfig); err != nil {
+		log.Printf("Error with unmarshal: %s", err)
 		badRequest(&w, err)
 		return
 	}
 	if err := api.config.SetFromMap(section, newConfig, false); err != nil {
+		log.Printf("Error with SetFromMap: %s", err)
 		badRequest(&w, err)
 		return
 	}
@@ -416,50 +423,26 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	configDefaults := map[string]interface{}{
-		goconfig.AudioRecordingKey:   goconfig.DefaultAudioRecording(),
-		goconfig.AudioBaitKey:        goconfig.DefaultAudioBait(),
-		goconfig.GPIOKey:             goconfig.DefaultGPIO(),
-		goconfig.LeptonKey:           goconfig.DefaultLepton(),
-		goconfig.ModemdKey:           goconfig.DefaultModemd(),
-		goconfig.PortsKey:            goconfig.DefaultPorts(),
-		goconfig.TestHostsKey:        goconfig.DefaultTestHosts(),
-		goconfig.ThermalMotionKey:    goconfig.DefaultThermalMotion(lepton3.Model35), // TODO don't assume that model 3.5 is being used
-		goconfig.ThermalRecorderKey:  goconfig.DefaultThermalRecorder(),
-		goconfig.ThermalThrottlerKey: goconfig.DefaultThermalThrottler(),
-		goconfig.WindowsKey:          goconfig.DefaultWindows(),
+	defaultValues := map[string]interface{}{}
+	for k, v := range goconfig.GetDefaults() {
+		defaultValues[toCamelCase(k)] = v
 	}
 
-	configValues := map[string]interface{}{
-		goconfig.AudioRecordingKey:   &goconfig.AudioRecording{},
-		goconfig.AudioBaitKey:        &goconfig.AudioBait{},
-		goconfig.GPIOKey:             &goconfig.GPIO{},
-		goconfig.LeptonKey:           &goconfig.Lepton{},
-		goconfig.ModemdKey:           &goconfig.Modemd{},
-		goconfig.PortsKey:            &goconfig.Ports{},
-		goconfig.TestHostsKey:        &goconfig.TestHosts{},
-		goconfig.ThermalMotionKey:    &goconfig.ThermalMotion{},
-		goconfig.ThermalRecorderKey:  &goconfig.ThermalRecorder{},
-		goconfig.ThermalThrottlerKey: &goconfig.ThermalThrottler{},
-		goconfig.WindowsKey:          &goconfig.Windows{},
-	}
-
-	for section, sectionStruct := range configValues {
-		if err := api.config.Unmarshal(section, sectionStruct); err != nil {
-			serverError(&w, err)
-			return
-		}
+	values, err := api.config.GetAllValues()
+	if err != nil {
+		serverError(&w, err)
+		return
 	}
 
 	configValuesCC := map[string]interface{}{}
-	for k, v := range configValues {
+	for k, v := range values {
 		configValuesCC[toCamelCase(k)] = v
 	}
-	configValues = configValuesCC
+	values = configValuesCC
 
 	valuesAndDefaults := map[string]interface{}{
-		"values":   configValues,
-		"defaults": configDefaults,
+		"values":   values,
+		"defaults": defaultValues,
 	}
 
 	jsonString, err := json.Marshal(valuesAndDefaults)
@@ -579,9 +562,9 @@ func getCptvNames(dir string) []string {
 	return names
 }
 
-func getWavNames(dir string) []string {
-	matches, _ := filepath.Glob(filepath.Join(dir, wavGlob))
-	failedUploadMatches, _ := filepath.Glob(filepath.Join(dir, failedUploadsFolder, wavGlob))
+func getAacNames(dir string) []string {
+	matches, _ := filepath.Glob(filepath.Join(dir, aacGlob))
+	failedUploadMatches, _ := filepath.Glob(filepath.Join(dir, failedUploadsFolder, aacGlob))
 	matches = append(matches, failedUploadMatches...)
 	names := make([]string, len(matches))
 	for i, filename := range matches {
@@ -1282,6 +1265,10 @@ func (api *ManagementAPI) SetSaltGrains(w http.ResponseWriter, r *http.Request) 
 			}
 		}
 
+		if !saltutil.IsSaltIdSet() {
+			http.Error(w, "Salt is not yet ready to set grains", http.StatusInternalServerError)
+			return
+		}
 		cmd := exec.Command("salt-call", "grains.setval", key, value)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			http.Error(w, fmt.Sprintf("failed to set grain: %s, output: %s", err, output), http.StatusInternalServerError)
@@ -1604,36 +1591,39 @@ func (api *ManagementAPI) DownloadAudioFile(w http.ResponseWriter, r *http.Reque
 	// Get the file name from the request
 	fileName := mux.Vars(r)["fileName"]
 	if fileName == "" {
-		log.Printf("Error getting file name from request: %v", fileName)
-		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, "Failed to get file name from request\n")
+		http.Error(w, "Failed to get file name from request", http.StatusBadRequest)
 		return
 	}
 
-	// Open the file
-	audioFolderPath := goconfig.ThermalRecorder{}.OutputDir + "/audio"
-	filePath := audioFolderPath + "/" + fileName
-	file, err := os.Open(filePath)
+	// Construct the full path to the aac file
+	audioFolderPath := api.recordingDir
+	aacFilePath := filepath.Join(audioFolderPath, fileName)
+	defer os.Remove(aacFilePath) // Clean up the temporary file when done
+
+	// Open the converted M4A file
+	aacFile, err := os.Open(aacFilePath)
 	if err != nil {
-		log.Printf("Error opening audio file: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Failed to open audio file\n")
+		log.Printf("Error opening converted M4A file: %v", err)
+		http.Error(w, "Failed to open converted audio file", http.StatusInternalServerError)
 		return
 	}
-	defer file.Close()
+	defer aacFile.Close()
 
 	// Set the response headers
-	w.Header().Set("Content-Disposition", "attachment; filename="+fileName)
-	w.Header().Set("Content-Type", r.Header.Get("Content-Type"))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
+	w.Header().Set("Content-Type", "audio/mp4")
 
 	// Send the file as a response
-	w.WriteHeader(http.StatusOK)
-	io.Copy(w, file)
+	if _, err := io.Copy(w, aacFile); err != nil {
+		log.Printf("Error sending M4A file: %v", err)
+		http.Error(w, "Failed to send audio file", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (api *ManagementAPI) GetAudioRecordings(w http.ResponseWriter, r *http.Request) {
 	log.Println("get audio recordings")
-	names := getWavNames(api.recordingDir)
+	names := getAacNames(api.recordingDir)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(names)
 }
@@ -1665,6 +1655,10 @@ func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !saltutil.IsSaltIdSet() {
+		http.Error(w, "Salt is not yet ready to upload logs", http.StatusInternalServerError)
+		return
+	}
 	if err := exec.Command("salt-call", "cp.push", logFileName+".gz").Run(); err != nil {
 		log.Printf("Error pushing log file with salt: %v", err)
 		serverError(&w, err)
