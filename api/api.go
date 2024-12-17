@@ -879,16 +879,19 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 	videoName := "/var/spool/cptv/test-recordings/" + req.Video
 	log.Printf("Playing %s", videoName)
 
-	out, err := exec.Command("systemctl", "stop", "thermal-recorder").CombinedOutput()
-	if err != nil {
-		log.Fatalf("Failed to run command: %s, %s", err, out)
+	recorderService := "thermal-recorder-py"
+	tc2AgentService := "tc2-agent"
+	if err := manageService("stop", recorderService); err != nil {
+		serverError(&w, err)
+		return
 	}
-	out, err = exec.Command("systemctl", "stop", "tc2-agent").CombinedOutput()
-	if err != nil {
-		log.Fatalf("Failed to run command: %s, %s", err, out)
+	if err := manageService("stop", tc2AgentService); err != nil {
+		serverError(&w, err)
+		return
 	}
 
-	cmd := exec.Command("/home/pi/classifier/bin/python3", "/home/pi/classifier-pipeline/piclassify.py", "-c", "/home/pi/classifier-pipeline/pi-classifier.yaml", "--file", videoName)
+	// sudo /home/pi/.venv/classifier/bin/pi_classify --file 20241205-035935.cptv --fps 9
+	cmd := exec.Command("/home/pi/.venv/classifier/bin/pi_classify", "--fps", "9", "--file", videoName)
 	log.Println(strings.Join(cmd.Args, " "))
 
 	stdout, err := cmd.StdoutPipe()
@@ -913,14 +916,25 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 		log.Fatalf("Command finished with error: %s", err)
 	}
 
-	out, err = exec.Command("systemctl", "start", "thermal-recorder").CombinedOutput()
-	if err != nil {
-		log.Fatalf("Failed to run command: %s, %s", err, out)
+	if err := manageService("start", recorderService); err != nil {
+		serverError(&w, err)
+		return
 	}
-	out, err = exec.Command("systemctl", "start", "tc2-agent").CombinedOutput()
-	if err != nil {
-		log.Fatalf("Failed to run command: %s, %s", err, out)
+	if err := manageService("start", tc2AgentService); err != nil {
+		serverError(&w, err)
+		return
 	}
+}
+
+// Start or stop a service
+func manageService(action, serviceName string) error {
+	cmd := exec.Command("systemctl", action, serviceName)
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to %s service %s: %v", action, serviceName, err)
+	}
+	log.Printf("Service %s %sd successfully.\n", serviceName, action)
+	return nil
 }
 
 // Network API
