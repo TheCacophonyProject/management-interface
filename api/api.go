@@ -890,7 +890,6 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// sudo /home/pi/.venv/classifier/bin/pi_classify --file 20241205-035935.cptv --fps 9
 	cmd := exec.Command("/home/pi/.venv/classifier/bin/pi_classify", "--fps", "9", "--file", videoName)
 	log.Println(strings.Join(cmd.Args, " "))
 
