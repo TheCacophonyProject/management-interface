@@ -143,6 +143,40 @@ window.onload = function () {
     processFrame,
     onConnectionStateChange
   );
+
+  document.getElementById('upload-test-recording-form')!.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.target as HTMLFormElement);
+
+    const uploadButton = document.getElementById('upload-test-recording-form')!.querySelector('button[type="submit"]') as HTMLButtonElement;
+    uploadButton.disabled = true;
+    uploadButton.innerText = 'Uploading...';
+
+    fetch('/api/upload-test-recording', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        Authorization: "Basic YWRtaW46ZmVhdGhlcnM=",
+      },
+    })
+    .then((response) => {
+      if (response.ok) {
+        console.log('Recording uploaded successfully!');
+        updateTestVideos();
+        alert('Recording uploaded successfully!');
+      } else {
+        console.error('Error uploading recording:', response.statusText);
+      }
+    })
+    .catch((error) => {
+      console.error('Error uploading recording:', error);
+    })
+    .finally(() => {
+      // Re-enable the upload button and change its text back
+      uploadButton.disabled = false;
+      uploadButton.innerText = 'Upload Test Recording';
+    });
+  });
   updateTestVideos();
 };
 
@@ -506,6 +540,7 @@ function updateTestVideos(): void {
       const dropdown = document.getElementById(
         "test-video-options"
       ) as HTMLSelectElement;
+      dropdown.innerHTML = '';
       videos.forEach((video) => {
         const option = document.createElement("option");
         option.value = video;

@@ -857,6 +857,38 @@ type VideoRequest struct {
 	Video string `json:"video"`
 }
 
+func (api *ManagementAPI) UploadTestRecording(w http.ResponseWriter, r *http.Request) {
+	log.Info("Uploading test recording")
+	if err := r.ParseMultipartForm(100 << 20); err != nil {
+		parseFormErrorResponse(&w, err)
+		return
+	}
+	file, handler, err := r.FormFile("recording")
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+	defer file.Close()
+
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+
+	err = os.MkdirAll("/var/spool/cptv/test-recordings", 0755)
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+
+	err = os.WriteFile("/var/spool/cptv/test-recordings/"+handler.Filename, fileBytes, 0644)
+	if err != nil {
+		serverError(&w, err)
+		return
+	}
+}
+
 func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		parseFormErrorResponse(&w, err)
