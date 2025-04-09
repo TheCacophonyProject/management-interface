@@ -19,13 +19,23 @@ async function updateSignalTC2() {
   }
 
   if (response.simCard) {
-    if (response.simCard.simCardStatus == "READY") {
+    if (response.simCard.simCardStatus == "ready") {
       $("#modem-status").html("");
+    } else if (response.simCard.simCardStatus == "failed") {
+      $("#modem-status").html("No Sim card");
+    } else if (response.simCard.simCardStatus == "finding") {
+      $("#modem-status").html("Connecting to sim card");
     } else {
-      $("#modem-status").html("No Sim Card");
+      $("#modem-status").html("Unknown sim card status");
     }
   } else {
-    $("#modem-status").html("");
+    if (response.failedToFindModem) {
+      $("#modem-status").html("No Modem");
+    } else if (response.failedToFindSimCard) {
+      $("#modem-status").html("No Sim card");
+    } else {
+      $("#modem-status").html("Unknown Modem status");
+    }
   }
 
   if (!response.signal) {
