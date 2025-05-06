@@ -41,6 +41,7 @@ func (api *ManagementAPI) GetAudioRecording(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(AudioRecording{
 		AudioMode: audioRecording.AudioMode,
+		AudioSeed: strconv.FormatUint(uint64(audioRecording.AudioSeed), 10),
 	})
 }
 
