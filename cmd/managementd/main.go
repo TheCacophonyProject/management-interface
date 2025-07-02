@@ -214,11 +214,22 @@ func main() {
 	apiRouter.HandleFunc("/audio/audio-status", apiObj.AudioRecordingStatus).Methods("GET")
 	apiRouter.HandleFunc("/audio/recordings", apiObj.GetAudioRecordings).Methods("GET")
 
-	apiRouter.Use(basicAuth)
+	apiRouter.HandleFunc("/offload-status", apiObj.RecordingOffloadStatus).Methods("GET")
+	// TODO
+	apiRouter.HandleFunc("/cancel-offload", apiObj.RecordingOffloadStatus).Methods("PUT")
+	apiRouter.HandleFunc("/thermal/long-recording", apiObj.TakeLongAudioRecording).Methods("PUT")
+	apiRouter.HandleFunc("/thermal/test-recording", apiObj.TakeTestAudioRecording).Methods("PUT")
+	// TODO: I also want to be able to restart rp2040 from managementd
+	//  This is essentially an "offload now" button (needs to clear cancel offload flag in tc2-agent)
+	apiRouter.HandleFunc("/restart-rp2040", apiObj.TakeTestAudioRecording).Methods("PUT")
+
+	// FIXME: Reenable after testing
+	// apiRouter.Use(basicAuth)
 
 	apiRouter.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			netmanagerclient.KeepHotspotOnFor(60 * 5)
+
 			out, err := exec.Command("stay-on-for", "5").CombinedOutput() // Stops camera from going to sleep for 5 minutes.
 			if err != nil {
 				log.Printf("error running stay-on-for: %s, error: %s", string(out), err)

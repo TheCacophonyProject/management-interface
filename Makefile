@@ -1,6 +1,6 @@
 .PHONY: build-arm
 build-arm: install-packr
-	GOARCH=arm GOARM=7 packr build -ldflags="-s -w" ./cmd/managementd
+	GOOS=linux GOARCH=arm64 packr build -ldflags="-s -w" ./cmd/managementd
 
 .PHONY: install-packr
 install-packr:
