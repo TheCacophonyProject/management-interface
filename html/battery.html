@@ -18,7 +18,7 @@
 
     <div class="container">
         <div class="container pt-5 pl-0">
-            <h2>Modem Details<br></h2>
+            <h2>Battery Details<br></h2>
         </div>
         <hr>
 
@@ -31,10 +31,73 @@
           <p id="mainBattery" class="col-9 monospace"></p>
         </div>
         <div class="row">
+          <p class="col-3 text-right">Battery Percentage:</p>
+          <p id="batteryPercentage" class="col-9 monospace"></p>
+        </div>
+        <div class="row">
           <p class="col-3 text-right">RTC Battery:</p>
           <p id="rtcBattery" class="col-9 monospace"></p>
         </div>
+        <div class="row">
+          <p class="col-3 text-right">Battery Type:</p>
+          <p id="batteryType" class="col-9 monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-3 text-right">Chemistry:</p>
+          <p id="batteryChemistry" class="col-9 monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-3 text-right">Configuration:</p>
+          <p id="configurationStatus" class="col-9 monospace"></p>
+        </div>
 
+    </div>
+
+    <div class="container pt-5 pl-0">
+        <h3>Battery Configuration<br></h3>
+    </div>
+    <hr>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Manual Battery Type Override</h5>
+                        <p class="card-text">
+                            By default, the battery type is automatically detected based on voltage readings. 
+                            If the detection is incorrect, you can manually specify the battery chemistry.
+                        </p>
+                        
+                        <div class="form-group">
+                            <label for="batteryTypeSelect">Battery Type:</label>
+                            <select class="form-control" id="batteryTypeSelect">
+                                <option value="">Loading...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-primary" id="saveBatteryTypeBtn" onclick="saveBatteryType()">
+                                Save Manual Override
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="clearBatteryTypeBtn" onclick="clearBatteryType()">
+                                Use Auto-Detection
+                            </button>
+                        </div>
+                        
+                        <div id="batteryConfigStatus" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="alert alert-info" role="alert">
+                    <h6>Available Battery Types:</h6>
+                    <ul id="availableBatteryTypes" class="list-unstyled">
+                        <li>Loading...</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="container pt-1 pl-0">

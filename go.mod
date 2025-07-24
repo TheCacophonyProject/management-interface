@@ -6,7 +6,7 @@ require (
 	github.com/TheCacophonyProject/audiobait/v3 v3.0.1
 	github.com/TheCacophonyProject/event-reporter v1.3.2-0.20200210010421-ca3fcb76a231
 	github.com/TheCacophonyProject/go-api v1.2.2
-	github.com/TheCacophonyProject/go-config v1.22.0
+	github.com/TheCacophonyProject/go-config v1.25.2
 	github.com/TheCacophonyProject/go-cptv v0.0.0-20211109233846-8c32a5d161f7
 	github.com/TheCacophonyProject/lepton3 v0.0.0-20211005194419-22311c15d6ee
 	github.com/TheCacophonyProject/rtc-utils v1.2.0
@@ -25,7 +25,6 @@ require (
 	github.com/TheCacophonyProject/trap-controller v0.0.0-20230227002937-262a1adfaa47
 	github.com/alexflint/go-arg v1.4.3
 	golang.org/x/text v0.16.0
-
 )
 
 require (
@@ -66,3 +65,5 @@ require (
 )
 
 replace periph.io/x/periph => github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incompatible
+
+replace github.com/TheCacophonyProject/go-config => ../go-config

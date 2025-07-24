@@ -794,10 +794,15 @@ func (api *ManagementAPI) GetServiceStatus(w http.ResponseWriter, r *http.Reques
 }
 
 type BatteryReading struct {
-	Time           string `json:"time"`
-	MainBattery    string `json:"mainBattery"`
-	MainBatteryLow string `json:"mainBatteryLow"`
-	RTCBattery     string `json:"rtcBattery"`
+	Time             string `json:"time"`
+	MainBattery      string `json:"mainBattery"`
+	MainBatteryLow   string `json:"mainBatteryLow"`
+	RTCBattery       string `json:"rtcBattery"`
+	BatteryType      string `json:"batteryType"`
+	BatteryChemistry string `json:"batteryChemistry"`
+	BatteryPercentage string `json:"batteryPercentage"`
+	VoltageSource    string `json:"voltageSource"`
+	ErrorStatus      string `json:"errorStatus"`
 }
 
 func getLastBatteryReading() (BatteryReading, error) {
@@ -818,16 +823,34 @@ func getLastBatteryReading() (BatteryReading, error) {
 	}
 
 	parts := strings.Split(lastLine, ",")
-	if len(parts) != 4 {
+	if len(parts) < 4 {
 		return BatteryReading{}, errors.New("unexpected format in battery-readings.csv")
 	}
 
-	return BatteryReading{
-		Time:           parts[0],
-		MainBattery:    parts[1],
-		MainBatteryLow: parts[2],
-		RTCBattery:     parts[3],
-	}, nil
+	reading := BatteryReading{
+		Time:           strings.TrimSpace(parts[0]),
+		MainBattery:    strings.TrimSpace(parts[1]),
+		MainBatteryLow: strings.TrimSpace(parts[2]),
+		RTCBattery:     strings.TrimSpace(parts[3]),
+	}
+
+	if len(parts) >= 5 {
+		reading.BatteryType = strings.TrimSpace(parts[4])
+	}
+	if len(parts) >= 6 {
+		reading.BatteryChemistry = strings.TrimSpace(parts[5])
+	}
+	if len(parts) >= 7 {
+		reading.BatteryPercentage = strings.TrimSpace(parts[6])
+	}
+	if len(parts) >= 8 {
+		reading.VoltageSource = strings.TrimSpace(parts[7])
+	}
+	if len(parts) >= 9 {
+		reading.ErrorStatus = strings.TrimSpace(parts[8])
+	}
+
+	return reading, nil
 }
 
 func (api *ManagementAPI) GetTestVideos(w http.ResponseWriter, r *http.Request) {
@@ -1185,6 +1208,104 @@ func (api *ManagementAPI) GetBattery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(battery)
+}
+
+// GetBatteryConfig returns the current battery configuration
+func (api *ManagementAPI) GetBatteryConfig(w http.ResponseWriter, r *http.Request) {
+	var batteryConfig goconfig.Battery
+	if err := api.config.Unmarshal(goconfig.BatteryKey, &batteryConfig); err != nil {
+		log.Printf("Failed to read battery config: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	// Get current configured battery type
+	currentType := batteryConfig.GetBatteryType()
+	var currentTypeName, currentChemistry string
+	if currentType != nil {
+		currentTypeName = currentType.Name
+		currentChemistry = currentType.Chemistry
+	}
+
+	// Get available battery types
+	availableTypes := goconfig.GetAvailableBatteryTypes()
+
+	response := map[string]interface{}{
+		"currentType":        currentTypeName,
+		"currentChemistry":   currentChemistry,
+		"manuallyConfigured": batteryConfig.IsManuallyConfigured(),
+		"availableTypes":     availableTypes,
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// SetBatteryConfig sets manual battery type override
+func (api *ManagementAPI) SetBatteryConfig(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		BatteryType string `json:"batteryType"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		badRequest(&w, err)
+		return
+	}
+
+	if req.BatteryType == "" {
+		badRequest(&w, errors.New("batteryType field is required"))
+		return
+	}
+
+	// Load current battery config
+	var batteryConfig goconfig.Battery
+	if err := api.config.Unmarshal(goconfig.BatteryKey, &batteryConfig); err != nil {
+		log.Printf("Failed to read battery config: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	// Set manual battery type
+	if err := batteryConfig.SetManualBatteryType(req.BatteryType); err != nil {
+		badRequest(&w, err)
+		return
+	}
+
+	// Save updated config
+	if err := api.config.Set(goconfig.BatteryKey, &batteryConfig); err != nil {
+		log.Printf("Failed to save battery config: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	log.Printf("Battery type manually set to: %s", req.BatteryType)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "success", "batteryType": req.BatteryType})
+}
+
+// ClearBatteryConfig clears manual battery configuration and returns to auto-detection
+func (api *ManagementAPI) ClearBatteryConfig(w http.ResponseWriter, r *http.Request) {
+	// Load current battery config
+	var batteryConfig goconfig.Battery
+	if err := api.config.Unmarshal(goconfig.BatteryKey, &batteryConfig); err != nil {
+		log.Printf("Failed to read battery config: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	// Clear manual configuration
+	batteryConfig.ClearManualConfiguration()
+
+	// Save updated config
+	if err := api.config.Set(goconfig.BatteryKey, &batteryConfig); err != nil {
+		log.Printf("Failed to save battery config: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	log.Printf("Battery configuration cleared, returning to auto-detection")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Auto-detection enabled"})
 }
 
 func getModemDbus() (dbus.BusObject, error) {
