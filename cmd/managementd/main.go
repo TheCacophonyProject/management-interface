@@ -123,9 +123,10 @@ func main() {
 	router.HandleFunc("/network", managementinterface.NetworkHandler).Methods("GET")
 	router.HandleFunc("/interface-status/{name:[a-zA-Z0-9-* ]+}", managementinterface.CheckInterfaceHandler).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
-	router.HandleFunc("/audiorecording", managementinterface.GenAudioRecordingHandler(config.config)).Methods("GET") // Form to view and/or set audio recording manually.
-	router.HandleFunc("/location", managementinterface.GenLocationHandler(config.config)).Methods("GET")             // Form to view and/or set location manually.
-	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET")                                      // Form to view and/or adjust time settings.
+	router.HandleFunc("/audiorecording", managementinterface.GenAudioRecordingHandler(config.config)).Methods("GET")      // Form to view and/or set audio recording manually.
+	router.HandleFunc("/low-power-thermal-recording", managementinterface.LowPowerThermalRecordingHandler).Methods("GET") // Form to view and/or set audio recording manually.
+	router.HandleFunc("/location", managementinterface.GenLocationHandler(config.config)).Methods("GET")                  // Form to view and/or set location manually.
+	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET")                                           // Form to view and/or adjust time settings.
 	router.HandleFunc("/about", managementinterface.AboutHandlerGen(config.config)).Methods("GET")
 	router.HandleFunc("/advanced", managementinterface.AdvancedMenuHandler).Methods("GET")
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
@@ -215,16 +216,13 @@ func main() {
 	apiRouter.HandleFunc("/audio/recordings", apiObj.GetAudioRecordings).Methods("GET")
 
 	apiRouter.HandleFunc("/offload-status", apiObj.RecordingOffloadStatus).Methods("GET")
-	// TODO
-	apiRouter.HandleFunc("/cancel-offload", apiObj.RecordingOffloadStatus).Methods("PUT")
-	apiRouter.HandleFunc("/thermal/long-recording", apiObj.TakeLongAudioRecording).Methods("PUT")
-	apiRouter.HandleFunc("/thermal/test-recording", apiObj.TakeTestAudioRecording).Methods("PUT")
-	// TODO: I also want to be able to restart rp2040 from managementd
-	//  This is essentially an "offload now" button (needs to clear cancel offload flag in tc2-agent)
-	apiRouter.HandleFunc("/restart-rp2040", apiObj.TakeTestAudioRecording).Methods("PUT")
+	apiRouter.HandleFunc("/cancel-offload", apiObj.CancelOffload).Methods("PUT")
+	apiRouter.HandleFunc("/thermal/long-test-recording", apiObj.TakeLongTestThermalRecording).Methods("PUT")
+	apiRouter.HandleFunc("/thermal/short-test-recording", apiObj.TakeShortTestThermalRecording).Methods("PUT")
+	apiRouter.HandleFunc("/thermal/thermal-status", apiObj.TestThermalRecordingStatus).Methods("GET")
+	apiRouter.HandleFunc("/offload-now", apiObj.ForceRp2040Offload).Methods("PUT")
 
-	// FIXME: Reenable after testing
-	// apiRouter.Use(basicAuth)
+	apiRouter.Use(basicAuth)
 
 	apiRouter.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

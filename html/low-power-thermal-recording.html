@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Audio Recording</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+</head>
+
+<body>
+{{template "navbar"}}
+
+<div class="container">
+  <div class="container pt-5 pl-0">
+    <h2>Low Power Thermal Test Recording<br></h2>
+  </div>
+  <h2> 60 Second Test Recording</h2>
+  <div class="row">
+    <div class="col-3">
+      <button id="thermal-short-test-button"  class="btn btn-primary mb-4">Take 10s Low power thermal test recording</button>
+    </div>
+    <div class="col-3">
+      <label id="thermal-short-test-status"></label>
+    </div>
+  </div>
+  <h2> 5 Minute Test Recording</h2>
+  <div class="row">
+    <div class="col-3">
+      <button id="thermal-long-test-button" class="btn btn-primary mb-4">Take 60s Low power thermal recording</button>
+    </div>
+    <div class="col-3">
+      <label id="thermal-long-test-status"></label>
+    </div>
+  </div>
+
+  <h2> Force offload from RP2040</h2>
+  <div class="row">
+    <div class="col-3">
+      <button id="force-offload-button" class="btn btn-primary mb-4">Offload files from RP2040 now</button>
+    </div>
+    <div class="col-3">
+      <label id="forced-offload-status"></label>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+<script src="/static/js/bootstrap.min.js"></script>
+
+<script>
+  const shortTestRecording = document.getElementById('thermal-short-test-button');
+  const longTestRecording = document.getElementById('thermal-long-test-button');
+  const forceOffloadButton = document.getElementById('force-offload-button');
+  const statusShort = document.getElementById('thermal-short-test-status');
+  const statusLong = document.getElementById('thermal-long-test-status');
+  const buttons = [shortTestRecording, longTestRecording];
+  const disableButtons = () => {
+    for (const button of buttons) {
+      button.setAttribute('disabled', 'disabled');
+    }
+  }
+  const enableButtons = () => {
+    for (const button of buttons) {
+      button.removeAttribute('disabled');
+    }
+  }
+
+  longTestRecording.addEventListener('click', () => requestLowPowerThermalTestRecording("/api/thermal/long-test-recording?seconds=300", statusLong));
+  shortTestRecording.addEventListener('click', () => requestLowPowerThermalTestRecording("/api/thermal/short-test-recording", statusShort));
+  forceOffloadButton.addEventListener('click', async () => {
+    const response = await fetch("/api/offload-now", {
+      method: "PUT",
+      headers: {
+        "Authorization": `Basic ${btoa("admin:feathers")}`
+      }
+    });
+    console.log(await response.text());
+  });
+  const requestLowPowerThermalTestRecording = async (url, statusEl) => {
+    disableButtons();
+    let pollStatus;
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "Authorization": `Basic ${btoa("admin:feathers")}`
+      }
+    });
+    if (!response.ok) {
+      statusEl.textContent = await response.text();
+      enableButtons();
+    } else {
+      pollStatus = setInterval(async () => {
+        const status = await fetch("/api/thermal/thermal-status", {
+          method: "GET",
+          headers: {
+            "Authorization": `Basic ${btoa("admin:feathers")}`
+          }
+        });
+        if (status.ok) {
+          // Update status text
+          const result = await status.json();
+          console.log(result);
+          switch (Number(result.status)) {
+            case 1: {
+              statusEl.textContent = "";
+              enableButtons();
+              clearInterval(pollStatus);
+              break;
+            }
+            case 2:
+            case 6: {
+              statusEl.textContent = "Waiting to take recording";
+              break;
+            }
+            case 3:
+            case 5: {
+              statusEl.textContent = "Recording in progress";
+              break;
+            }
+            case 4: {
+              statusEl.textContent = "Other Recording already in progress";
+              enableButtons();
+              clearInterval(pollStatus);
+            }
+          }
+        }
+      }, 1000);
+    }
+  }
+
+</script>
+
+</body>
+</html>

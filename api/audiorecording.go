@@ -84,7 +84,7 @@ func (api *ManagementAPI) AudioRecordingStatus(w http.ResponseWriter, r *http.Re
 	err = tc2AgentDbus.Call("org.cacophony.TC2Agent.audiostatus", 0).Store(&mode, &status)
 	if err != nil {
 		log.Println(err)
-		http.Error(w, "Failed to request test audio recording", http.StatusInternalServerError)
+		http.Error(w, "Failed to request test audio recording status", http.StatusInternalServerError)
 		return
 	}
 	rp2040status := map[string]int{"mode": mode, "status": status}
