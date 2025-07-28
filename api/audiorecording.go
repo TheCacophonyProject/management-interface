@@ -24,7 +24,6 @@ import (
 	"strconv"
 
 	goconfig "github.com/TheCacophonyProject/go-config"
-	"github.com/godbus/dbus"
 )
 
 func (api *ManagementAPI) GetAudioRecording(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +71,7 @@ func (api *ManagementAPI) SetAudioRecording(w http.ResponseWriter, r *http.Reque
 }
 
 func (api *ManagementAPI) AudioRecordingStatus(w http.ResponseWriter, r *http.Request) {
-	tc2AgentDbus, err := getTC2AgentDbus()
+	tc2AgentDbus, err := GetTC2AgentDbus()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
@@ -84,7 +83,7 @@ func (api *ManagementAPI) AudioRecordingStatus(w http.ResponseWriter, r *http.Re
 	err = tc2AgentDbus.Call("org.cacophony.TC2Agent.audiostatus", 0).Store(&mode, &status)
 	if err != nil {
 		log.Println(err)
-		http.Error(w, "Failed to request test audio recording", http.StatusInternalServerError)
+		http.Error(w, "Failed to request test audio recording status", http.StatusInternalServerError)
 		return
 	}
 	rp2040status := map[string]int{"mode": mode, "status": status}
@@ -95,7 +94,7 @@ func (api *ManagementAPI) AudioRecordingStatus(w http.ResponseWriter, r *http.Re
 }
 
 func (api *ManagementAPI) TakeLongAudioRecording(w http.ResponseWriter, r *http.Request) {
-	tc2AgentDbus, err := getTC2AgentDbus()
+	tc2AgentDbus, err := GetTC2AgentDbus()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
@@ -120,7 +119,7 @@ func (api *ManagementAPI) TakeLongAudioRecording(w http.ResponseWriter, r *http.
 }
 
 func (api *ManagementAPI) TakeTestAudioRecording(w http.ResponseWriter, r *http.Request) {
-	tc2AgentDbus, err := getTC2AgentDbus()
+	tc2AgentDbus, err := GetTC2AgentDbus()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
@@ -138,12 +137,4 @@ func (api *ManagementAPI) TakeTestAudioRecording(w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusOK)
 
 	json.NewEncoder(w).Encode(result)
-}
-
-func getTC2AgentDbus() (dbus.BusObject, error) {
-	conn, err := dbus.SystemBus()
-	if err != nil {
-		return nil, err
-	}
-	return conn.Object("org.cacophony.TC2Agent", "/org/cacophony/TC2Agent"), nil
 }

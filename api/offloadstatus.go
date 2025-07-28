@@ -24,25 +24,37 @@ import (
 )
 
 func (api *ManagementAPI) RecordingOffloadStatus(w http.ResponseWriter, r *http.Request) {
-	tc2AgentDbus, err := getTC2AgentDbus()
+	tc2AgentDbus, err := GetTC2AgentDbus()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
 		return
 	}
 	type OffloadNotInProgress struct {
-		InProgress bool `json:"offload-in-progress"`
+		InProgress      bool `json:"offload-in-progress"`
+		FilesTotal      int  `json:"files-total"`
+		FilesRemaining  int  `json:"files-remaining"`
+		EventsTotal     int  `json:"events-total"`
+		EventsRemaining int  `json:"events-remaining"`
 	}
 	type OffloadInProgress struct {
 		InProgress       bool `json:"offload-in-progress"`
 		SecondsRemaining int  `json:"seconds-remaining"`
 		PercentComplete  int  `json:"percent-complete"`
+		FilesTotal       int  `json:"files-total"`
+		FilesRemaining   int  `json:"files-remaining"`
+		EventsTotal      int  `json:"events-total"`
+		EventsRemaining  int  `json:"events-remaining"`
 	}
 
 	var isOffloading int
 	var percentComplete int
 	var secondsRemaining int
-	err = tc2AgentDbus.Call("org.cacophony.TC2Agent.offloadstatus", 0).Store(&isOffloading, &percentComplete, &secondsRemaining)
+	var filesTotal int
+	var filesRemaining int
+	var eventsTotal int
+	var eventsRemaining int
+	err = tc2AgentDbus.Call("org.cacophony.TC2Agent.offloadstatus", 0).Store(&isOffloading, &percentComplete, &secondsRemaining, &filesTotal, &filesRemaining, &eventsTotal, &eventsRemaining)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to request recording offload status", http.StatusInternalServerError)
@@ -54,11 +66,76 @@ func (api *ManagementAPI) RecordingOffloadStatus(w http.ResponseWriter, r *http.
 			InProgress:       true,
 			PercentComplete:  percentComplete,
 			SecondsRemaining: secondsRemaining,
+			FilesTotal:       filesTotal,
+			FilesRemaining:   filesRemaining,
+			EventsTotal:      eventsTotal,
+			EventsRemaining:  eventsRemaining,
 		})
 	} else {
 		json.NewEncoder(w).Encode(OffloadNotInProgress{
-			InProgress: false,
+			InProgress:      false,
+			FilesTotal:      filesTotal,
+			FilesRemaining:  filesRemaining,
+			EventsTotal:     eventsTotal,
+			EventsRemaining: eventsRemaining,
 		})
 	}
 
+}
+
+func (api *ManagementAPI) CancelOffload(w http.ResponseWriter, r *http.Request) {
+	tc2AgentDbus, err := GetTC2AgentDbus()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
+		return
+	}
+	var result string
+	err = tc2AgentDbus.Call("org.cacophony.TC2Agent.canceloffload", 0).Store(&result)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to cancel offload", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(w).Encode(result)
+}
+
+func (api *ManagementAPI) ForceRp2040Offload(w http.ResponseWriter, r *http.Request) {
+	tc2AgentDbus, err := GetTC2AgentDbus()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
+		return
+	}
+	var result string
+	err = tc2AgentDbus.Call("org.cacophony.TC2Agent.forcerp2040offload", 0).Store(&result)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to request forced offload of rp2040", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(w).Encode(result)
+}
+
+func (api *ManagementAPI) PrioritiseFrameServe(w http.ResponseWriter, r *http.Request) {
+	tc2AgentDbus, err := GetTC2AgentDbus()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
+		return
+	}
+	var result string
+	err = tc2AgentDbus.Call("org.cacophony.TC2Agent.prioritiseframeserve", 0).Store(&result)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to request frame serve priority from rp2040", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(w).Encode(result)
 }

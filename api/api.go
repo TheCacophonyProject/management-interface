@@ -1712,3 +1712,11 @@ func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 }
+
+func GetTC2AgentDbus() (dbus.BusObject, error) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		return nil, err
+	}
+	return conn.Object("org.cacophony.TC2Agent", "/org/cacophony/TC2Agent"), nil
+}

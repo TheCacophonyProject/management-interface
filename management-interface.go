@@ -473,6 +473,10 @@ func CameraHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "camera.html", nil)
 }
 
+func LowPowerThermalRecordingHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl.ExecuteTemplate(w, "low-power-thermal-recording.html", nil)
+}
+
 // CameraSnapshot - Still image from Lepton camera
 func CameraSnapshot(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "/var/spool/cptv/still.png")

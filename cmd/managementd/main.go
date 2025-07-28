@@ -24,6 +24,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/godbus/dbus"
 	"io"
 	"net"
 	"net/http"
@@ -66,6 +67,12 @@ var (
 	log         = logging.NewLogger("info")
 )
 
+func hasActiveClients() bool {
+	socketsLock.RLock()
+	defer socketsLock.RUnlock()
+	return len(sockets) > 0
+}
+
 type Args struct {
 	logging.LogArgs
 }
@@ -78,6 +85,14 @@ func procArgs() Args {
 	args := Args{}
 	arg.MustParse(&args)
 	return args
+}
+
+func GetTC2AgentDbus() (dbus.BusObject, error) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		return nil, err
+	}
+	return conn.Object("org.cacophony.TC2Agent", "/org/cacophony/TC2Agent"), nil
 }
 
 // Set up and handle page requests.
@@ -123,9 +138,10 @@ func main() {
 	router.HandleFunc("/network", managementinterface.NetworkHandler).Methods("GET")
 	router.HandleFunc("/interface-status/{name:[a-zA-Z0-9-* ]+}", managementinterface.CheckInterfaceHandler).Methods("GET")
 	router.HandleFunc("/disk-memory", managementinterface.DiskMemoryHandler).Methods("GET")
-	router.HandleFunc("/audiorecording", managementinterface.GenAudioRecordingHandler(config.config)).Methods("GET") // Form to view and/or set audio recording manually.
-	router.HandleFunc("/location", managementinterface.GenLocationHandler(config.config)).Methods("GET")             // Form to view and/or set location manually.
-	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET")                                      // Form to view and/or adjust time settings.
+	router.HandleFunc("/audiorecording", managementinterface.GenAudioRecordingHandler(config.config)).Methods("GET")      // Form to view and/or set audio recording manually.
+	router.HandleFunc("/low-power-thermal-recording", managementinterface.LowPowerThermalRecordingHandler).Methods("GET") // Form to view and/or set audio recording manually.
+	router.HandleFunc("/location", managementinterface.GenLocationHandler(config.config)).Methods("GET")                  // Form to view and/or set location manually.
+	router.HandleFunc("/clock", managementinterface.TimeHandler).Methods("GET")                                           // Form to view and/or adjust time settings.
 	router.HandleFunc("/about", managementinterface.AboutHandlerGen(config.config)).Methods("GET")
 	router.HandleFunc("/advanced", managementinterface.AdvancedMenuHandler).Methods("GET")
 	router.HandleFunc("/camera", managementinterface.CameraHandler).Methods("GET")
@@ -214,11 +230,20 @@ func main() {
 	apiRouter.HandleFunc("/audio/audio-status", apiObj.AudioRecordingStatus).Methods("GET")
 	apiRouter.HandleFunc("/audio/recordings", apiObj.GetAudioRecordings).Methods("GET")
 
+	apiRouter.HandleFunc("/offload-status", apiObj.RecordingOffloadStatus).Methods("GET")
+	apiRouter.HandleFunc("/cancel-offload", apiObj.CancelOffload).Methods("PUT")
+	apiRouter.HandleFunc("/thermal/long-test-recording", apiObj.TakeLongTestThermalRecording).Methods("PUT")
+	apiRouter.HandleFunc("/thermal/short-test-recording", apiObj.TakeShortTestThermalRecording).Methods("PUT")
+	apiRouter.HandleFunc("/thermal/thermal-status", apiObj.TestThermalRecordingStatus).Methods("GET")
+	apiRouter.HandleFunc("/offload-now", apiObj.ForceRp2040Offload).Methods("PUT")
+	apiRouter.HandleFunc("/serve-frames-now", apiObj.PrioritiseFrameServe).Methods("PUT")
+
 	apiRouter.Use(basicAuth)
 
 	apiRouter.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			netmanagerclient.KeepHotspotOnFor(60 * 5)
+
 			out, err := exec.Command("stay-on-for", "5").CombinedOutput() // Stops camera from going to sleep for 5 minutes.
 			if err != nil {
 				log.Printf("error running stay-on-for: %s, error: %s", string(out), err)
@@ -243,8 +268,31 @@ func main() {
 			}
 			log.Print("waiting for frames from tc2-agent")
 
+			listener.(*net.UnixListener).SetDeadline(time.Now().Add(5 * time.Second))
 			conn, err := listener.Accept()
 			if err != nil {
+				if err.(net.Error).Timeout() {
+					log.Printf("socket accept timed out, retrying...")
+
+					if hasActiveClients() {
+						listener.(*net.UnixListener).SetDeadline(time.Now().Add(30 * time.Second))
+						// If there are users connected via web sockets, force the frames to get served.
+						log.Println("Websocket has clients, forcing frame priority")
+						tc2AgentDbus, err := GetTC2AgentDbus()
+						if err != nil {
+							log.Println(err)
+							return
+						}
+						var result string
+						err = tc2AgentDbus.Call("org.cacophony.TC2Agent.prioritiseframeserve", 0).Store(&result)
+						if err != nil {
+							log.Println(err)
+							return
+						}
+					}
+
+					continue
+				}
 				log.Printf("socket accept failed: %v", err)
 				continue
 			}
@@ -252,6 +300,7 @@ func main() {
 			// Prevent concurrent connections.
 			listener.Close()
 
+			log.Printf("accepted connection from client")
 			err = handleConn(conn)
 			frameCh <- &FrameData{Disconnected: true}
 			log.Printf("camera connection ended with: %v", err)
@@ -359,10 +408,38 @@ func WebsocketServer(ws *websocket.Conn) {
 				if !connected.Load() {
 					_ = websocket.Message.Send(ws, "disconnected")
 				}
-
 				socketsLock.Unlock()
 				if firstSocket {
 					log.Print("Get new client register")
+					{
+						tc2AgentDbus, err := GetTC2AgentDbus()
+						if err != nil {
+							log.Println(err)
+							return
+						}
+						var isOffloading int
+						var percentComplete int
+						var secondsRemaining int
+						var filesTotal int
+						var filesRemaining int
+						var eventsTotal int
+						var eventsRemaining int
+						err = tc2AgentDbus.Call("org.cacophony.TC2Agent.offloadstatus", 0).Store(&isOffloading, &percentComplete, &secondsRemaining, &filesTotal, &filesRemaining, &eventsTotal, &eventsRemaining)
+						if err != nil {
+							log.Println(err)
+							return
+						}
+						if isOffloading == 1 {
+							log.Printf("rp2040 is offloading files")
+							var result string
+							err = tc2AgentDbus.Call("org.cacophony.TC2Agent.canceloffload", 0).Store(&result)
+							if err != nil {
+								log.Println(err)
+								return
+							}
+							log.Printf("requested offload cancellation")
+						}
+					}
 					haveClients <- true
 				}
 			}
@@ -372,7 +449,6 @@ func WebsocketServer(ws *websocket.Conn) {
 				}
 			}
 		}
-		// TODO(jon): This blocks, so lets avoid busy-waiting
 		time.Sleep(1 * time.Millisecond)
 	}
 }
