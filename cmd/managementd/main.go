@@ -275,6 +275,7 @@ func main() {
 					log.Printf("socket accept timed out, retrying...")
 
 					if hasActiveClients() {
+						listener.(*net.UnixListener).SetDeadline(time.Now().Add(30 * time.Second))
 						// If there are users connected via web sockets, force the frames to get served.
 						log.Println("Websocket has clients, forcing frame priority")
 						tc2AgentDbus, err := GetTC2AgentDbus()
@@ -410,6 +411,35 @@ func WebsocketServer(ws *websocket.Conn) {
 				socketsLock.Unlock()
 				if firstSocket {
 					log.Print("Get new client register")
+					{
+						tc2AgentDbus, err := GetTC2AgentDbus()
+						if err != nil {
+							log.Println(err)
+							return
+						}
+						var isOffloading int
+						var percentComplete int
+						var secondsRemaining int
+						var filesTotal int
+						var filesRemaining int
+						var eventsTotal int
+						var eventsRemaining int
+						err = tc2AgentDbus.Call("org.cacophony.TC2Agent.offloadstatus", 0).Store(&isOffloading, &percentComplete, &secondsRemaining, &filesTotal, &filesRemaining, &eventsTotal, &eventsRemaining)
+						if err != nil {
+							log.Println(err)
+							return
+						}
+						if isOffloading == 1 {
+							log.Printf("rp2040 is offloading files")
+							var result string
+							err = tc2AgentDbus.Call("org.cacophony.TC2Agent.canceloffload", 0).Store(&result)
+							if err != nil {
+								log.Println(err)
+								return
+							}
+							log.Printf("requested offload cancellation")
+						}
+					}
 					haveClients <- true
 				}
 			}
