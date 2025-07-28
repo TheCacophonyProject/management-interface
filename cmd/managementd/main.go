@@ -284,6 +284,10 @@ func main() {
 						}
 						var result string
 						err = tc2AgentDbus.Call("org.cacophony.TC2Agent.prioritiseframeserve", 0).Store(&result)
+						if err != nil {
+							log.Println(err)
+							return
+						}
 					}
 
 					continue
