@@ -12,7 +12,7 @@
 
 <div class="container">
   <div class="container pt-5 pl-0">
-    <h2>Low Power Thermal Test Recording<br></h2>
+    <h2>Low Power Thermal Test Utils<br></h2>
   </div>
   <h2> 60 Second Test Recording</h2>
   <div class="row">
@@ -42,6 +42,20 @@
       <label id="forced-offload-status"></label>
     </div>
   </div>
+
+  <h2> Prioritise camera preview from RP2040</h2>
+  <div class="row">
+    <div class="col-3">
+      <button id="prioritise-frames-button" class="btn btn-primary mb-4">Prioritise camera preview from RP2040 now</button>
+    </div>
+  </div>
+
+  <h2> Cancel in progress file offload</h2>
+  <div class="row">
+    <div class="col-3">
+      <button id="cancel-offload-button" class="btn btn-primary mb-4">Cancel file offload session now</button>
+    </div>
+  </div>
 </div>
 
 <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
@@ -51,6 +65,8 @@
   const shortTestRecording = document.getElementById('thermal-short-test-button');
   const longTestRecording = document.getElementById('thermal-long-test-button');
   const forceOffloadButton = document.getElementById('force-offload-button');
+  const cancelOffloadButton = document.getElementById('cancel-offload-button');
+  const prioritiseFramesButton = document.getElementById('prioritise-frames-button');
   const statusShort = document.getElementById('thermal-short-test-status');
   const statusLong = document.getElementById('thermal-long-test-status');
   const buttons = [shortTestRecording, longTestRecording];
@@ -69,6 +85,24 @@
   shortTestRecording.addEventListener('click', () => requestLowPowerThermalTestRecording("/api/thermal/short-test-recording", statusShort));
   forceOffloadButton.addEventListener('click', async () => {
     const response = await fetch("/api/offload-now", {
+      method: "PUT",
+      headers: {
+        "Authorization": `Basic ${btoa("admin:feathers")}`
+      }
+    });
+    console.log(await response.text());
+  });
+  cancelOffloadButton.addEventListener('click', async () => {
+    const response = await fetch("/api/cancel-offload", {
+      method: "PUT",
+      headers: {
+        "Authorization": `Basic ${btoa("admin:feathers")}`
+      }
+    });
+    console.log(await response.text());
+  });
+  prioritiseFramesButton.addEventListener('click', async () => {
+    const response = await fetch("/api/serve-frames-now", {
       method: "PUT",
       headers: {
         "Authorization": `Basic ${btoa("admin:feathers")}`
@@ -99,7 +133,6 @@
         if (status.ok) {
           // Update status text
           const result = await status.json();
-          console.log(result);
           switch (Number(result.status)) {
             case 1: {
               statusEl.textContent = "";
@@ -114,6 +147,8 @@
             }
             case 3:
             case 5: {
+              // FIXME: This doesn't seem to update correctly, why?
+              //  Is the issue in the tc2-agent polling side?
               statusEl.textContent = "Recording in progress";
               break;
             }
@@ -127,7 +162,6 @@
       }, 1000);
     }
   }
-
 </script>
 
 </body>

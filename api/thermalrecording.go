@@ -25,7 +25,7 @@ import (
 )
 
 func (api *ManagementAPI) TestThermalRecordingStatus(w http.ResponseWriter, r *http.Request) {
-	tc2AgentDbus, err := getTC2AgentDbus()
+	tc2AgentDbus, err := GetTC2AgentDbus()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
@@ -48,7 +48,7 @@ func (api *ManagementAPI) TestThermalRecordingStatus(w http.ResponseWriter, r *h
 }
 
 func (api *ManagementAPI) TakeLongTestThermalRecording(w http.ResponseWriter, r *http.Request) {
-	tc2AgentDbus, err := getTC2AgentDbus()
+	tc2AgentDbus, err := GetTC2AgentDbus()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
@@ -73,7 +73,7 @@ func (api *ManagementAPI) TakeLongTestThermalRecording(w http.ResponseWriter, r 
 }
 
 func (api *ManagementAPI) TakeShortTestThermalRecording(w http.ResponseWriter, r *http.Request) {
-	tc2AgentDbus, err := getTC2AgentDbus()
+	tc2AgentDbus, err := GetTC2AgentDbus()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)

@@ -24,7 +24,7 @@ import (
 )
 
 func (api *ManagementAPI) RecordingOffloadStatus(w http.ResponseWriter, r *http.Request) {
-	tc2AgentDbus, err := getTC2AgentDbus()
+	tc2AgentDbus, err := GetTC2AgentDbus()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
@@ -84,7 +84,7 @@ func (api *ManagementAPI) RecordingOffloadStatus(w http.ResponseWriter, r *http.
 }
 
 func (api *ManagementAPI) CancelOffload(w http.ResponseWriter, r *http.Request) {
-	tc2AgentDbus, err := getTC2AgentDbus()
+	tc2AgentDbus, err := GetTC2AgentDbus()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
@@ -103,7 +103,7 @@ func (api *ManagementAPI) CancelOffload(w http.ResponseWriter, r *http.Request) 
 }
 
 func (api *ManagementAPI) ForceRp2040Offload(w http.ResponseWriter, r *http.Request) {
-	tc2AgentDbus, err := getTC2AgentDbus()
+	tc2AgentDbus, err := GetTC2AgentDbus()
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
@@ -114,6 +114,25 @@ func (api *ManagementAPI) ForceRp2040Offload(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to request forced offload of rp2040", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(w).Encode(result)
+}
+
+func (api *ManagementAPI) PrioritiseFrameServe(w http.ResponseWriter, r *http.Request) {
+	tc2AgentDbus, err := GetTC2AgentDbus()
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to connect to DBus", http.StatusInternalServerError)
+		return
+	}
+	var result string
+	err = tc2AgentDbus.Call("org.cacophony.TC2Agent.prioritiseframeserve", 0).Store(&result)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to request frame serve priority from rp2040", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)

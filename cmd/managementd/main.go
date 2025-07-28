@@ -24,6 +24,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/godbus/dbus"
 	"io"
 	"net"
 	"net/http"
@@ -66,6 +67,12 @@ var (
 	log         = logging.NewLogger("info")
 )
 
+func hasActiveClients() bool {
+	socketsLock.RLock()
+	defer socketsLock.RUnlock()
+	return len(sockets) > 0
+}
+
 type Args struct {
 	logging.LogArgs
 }
@@ -78,6 +85,14 @@ func procArgs() Args {
 	args := Args{}
 	arg.MustParse(&args)
 	return args
+}
+
+func GetTC2AgentDbus() (dbus.BusObject, error) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		return nil, err
+	}
+	return conn.Object("org.cacophony.TC2Agent", "/org/cacophony/TC2Agent"), nil
 }
 
 // Set up and handle page requests.
@@ -221,6 +236,7 @@ func main() {
 	apiRouter.HandleFunc("/thermal/short-test-recording", apiObj.TakeShortTestThermalRecording).Methods("PUT")
 	apiRouter.HandleFunc("/thermal/thermal-status", apiObj.TestThermalRecordingStatus).Methods("GET")
 	apiRouter.HandleFunc("/offload-now", apiObj.ForceRp2040Offload).Methods("PUT")
+	apiRouter.HandleFunc("/serve-frames-now", apiObj.PrioritiseFrameServe).Methods("PUT")
 
 	apiRouter.Use(basicAuth)
 
@@ -252,8 +268,26 @@ func main() {
 			}
 			log.Print("waiting for frames from tc2-agent")
 
+			listener.(*net.UnixListener).SetDeadline(time.Now().Add(5 * time.Second))
 			conn, err := listener.Accept()
 			if err != nil {
+				if err.(net.Error).Timeout() {
+					log.Printf("socket accept timed out, retrying...")
+
+					if hasActiveClients() {
+						// If there are users connected via web sockets, force the frames to get served.
+						log.Println("Websocket has clients, forcing frame priority")
+						tc2AgentDbus, err := GetTC2AgentDbus()
+						if err != nil {
+							log.Println(err)
+							return
+						}
+						var result string
+						err = tc2AgentDbus.Call("org.cacophony.TC2Agent.prioritiseframeserve", 0).Store(&result)
+					}
+
+					continue
+				}
 				log.Printf("socket accept failed: %v", err)
 				continue
 			}
@@ -261,6 +295,7 @@ func main() {
 			// Prevent concurrent connections.
 			listener.Close()
 
+			log.Printf("accepted connection from client")
 			err = handleConn(conn)
 			frameCh <- &FrameData{Disconnected: true}
 			log.Printf("camera connection ended with: %v", err)
@@ -368,7 +403,6 @@ func WebsocketServer(ws *websocket.Conn) {
 				if !connected.Load() {
 					_ = websocket.Message.Send(ws, "disconnected")
 				}
-
 				socketsLock.Unlock()
 				if firstSocket {
 					log.Print("Get new client register")
@@ -381,7 +415,6 @@ func WebsocketServer(ws *websocket.Conn) {
 				}
 			}
 		}
-		// TODO(jon): This blocks, so lets avoid busy-waiting
 		time.Sleep(1 * time.Millisecond)
 	}
 }
