@@ -1237,9 +1237,9 @@ func (api *ManagementAPI) GetBatteryConfig(w http.ResponseWriter, r *http.Reques
 	availableChemistries := goconfig.GetAvailableChemistries()
 
 	response := map[string]interface{}{
-		"currentChemistry":   batteryConfig.Chemistry,
-		"currentCellCount":   batteryConfig.ManualCellCount,
-		"manuallyConfigured": batteryConfig.IsManuallyConfigured(),
+		"currentChemistry":     batteryConfig.Chemistry,
+		"currentCellCount":     batteryConfig.ManualCellCount,
+		"manuallyConfigured":   batteryConfig.IsManuallyConfigured(),
 		"availableChemistries": availableChemistries,
 	}
 
@@ -1277,7 +1277,7 @@ func (api *ManagementAPI) SetBatteryConfig(w http.ResponseWriter, r *http.Reques
 		badRequest(&w, err)
 		return
 	}
-	
+
 	// Debug logging
 	log.Printf("Battery config before save - ManuallyConfigured: %v, Chemistry: '%s', CellCount: %d",
 		batteryConfig.IsManuallyConfigured(), batteryConfig.Chemistry, batteryConfig.ManualCellCount)
@@ -1298,7 +1298,7 @@ func (api *ManagementAPI) SetBatteryConfig(w http.ResponseWriter, r *http.Reques
 	log.Printf("Battery manually configured - Chemistry: %s, CellCount: %d", req.Chemistry, req.CellCount)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": "success", 
+		"status":    "success",
 		"chemistry": req.Chemistry,
 		"cellCount": req.CellCount,
 	})
@@ -1864,20 +1864,28 @@ func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {
 // signalBatteryConfigChange creates a signal file to notify tc2-hat-controller of config changes
 func signalBatteryConfigChange() error {
 	signalFile := "/tmp/battery-config-changed"
-	
+
 	// Create or touch the signal file
 	file, err := os.OpenFile(signalFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to create signal file: %w", err)
 	}
 	defer file.Close()
-	
+
 	// Write timestamp for debugging
 	_, err = file.WriteString(fmt.Sprintf("Battery config changed at: %s\n", time.Now().Format(time.RFC3339)))
 	if err != nil {
 		return fmt.Errorf("failed to write to signal file: %w", err)
 	}
-	
+
 	log.Printf("Created battery config change signal file")
 	return nil
+}
+
+func GetTC2AgentDbus() (dbus.BusObject, error) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		return nil, err
+	}
+	return conn.Object("org.cacophony.TC2Agent", "/org/cacophony/TC2Agent"), nil
 }
