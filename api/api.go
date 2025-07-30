@@ -794,15 +794,19 @@ func (api *ManagementAPI) GetServiceStatus(w http.ResponseWriter, r *http.Reques
 }
 
 type BatteryReading struct {
-	Time             string `json:"time"`
-	MainBattery      string `json:"mainBattery"`
-	MainBatteryLow   string `json:"mainBatteryLow"`
-	RTCBattery       string `json:"rtcBattery"`
-	BatteryType      string `json:"batteryType"`
-	BatteryChemistry string `json:"batteryChemistry"`
-	BatteryPercentage string `json:"batteryPercentage"`
-	VoltageSource    string `json:"voltageSource"`
-	ErrorStatus      string `json:"errorStatus"`
+	Time                string `json:"time"`
+	MainBattery         string `json:"mainBattery"`
+	MainBatteryLow      string `json:"mainBatteryLow"`
+	RTCBattery          string `json:"rtcBattery"`
+	BatteryType         string `json:"batteryType"`
+	BatteryChemistry    string `json:"batteryChemistry"`
+	BatteryCellCount    string `json:"batteryCellCount"`
+	BatteryPercentage   string `json:"batteryPercentage"`
+	VoltageSource       string `json:"voltageSource"`
+	ErrorStatus         string `json:"errorStatus"`
+	DischargeRate       string `json:"dischargeRate"`
+	HoursRemaining      string `json:"hoursRemaining"`
+	DepletionConfidence string `json:"depletionConfidence"`
 }
 
 func getLastBatteryReading() (BatteryReading, error) {
@@ -834,11 +838,12 @@ func getLastBatteryReading() (BatteryReading, error) {
 		RTCBattery:     strings.TrimSpace(parts[3]),
 	}
 
+	// CSV format: timestamp, HV, LV, RTC, chemistry, cells, percent, rail, error, discharge_rate, hours_remaining, confidence
 	if len(parts) >= 5 {
-		reading.BatteryType = strings.TrimSpace(parts[4])
+		reading.BatteryChemistry = strings.TrimSpace(parts[4])
 	}
 	if len(parts) >= 6 {
-		reading.BatteryChemistry = strings.TrimSpace(parts[5])
+		reading.BatteryCellCount = strings.TrimSpace(parts[5])
 	}
 	if len(parts) >= 7 {
 		reading.BatteryPercentage = strings.TrimSpace(parts[6])
@@ -848,6 +853,15 @@ func getLastBatteryReading() (BatteryReading, error) {
 	}
 	if len(parts) >= 9 {
 		reading.ErrorStatus = strings.TrimSpace(parts[8])
+	}
+	if len(parts) >= 10 {
+		reading.DischargeRate = strings.TrimSpace(parts[9])
+	}
+	if len(parts) >= 11 {
+		reading.HoursRemaining = strings.TrimSpace(parts[10])
+	}
+	if len(parts) >= 12 {
+		reading.DepletionConfidence = strings.TrimSpace(parts[11])
 	}
 
 	return reading, nil
@@ -1212,39 +1226,32 @@ func (api *ManagementAPI) GetBattery(w http.ResponseWriter, r *http.Request) {
 
 // GetBatteryConfig returns the current battery configuration
 func (api *ManagementAPI) GetBatteryConfig(w http.ResponseWriter, r *http.Request) {
-	var batteryConfig goconfig.Battery
+	batteryConfig := goconfig.DefaultBattery()
 	if err := api.config.Unmarshal(goconfig.BatteryKey, &batteryConfig); err != nil {
 		log.Printf("Failed to read battery config: %v", err)
 		serverError(&w, err)
 		return
 	}
 
-	// Get current configured battery type
-	currentType := batteryConfig.GetBatteryType()
-	var currentTypeName, currentChemistry string
-	if currentType != nil {
-		currentTypeName = currentType.Name
-		currentChemistry = currentType.Chemistry
-	}
-
-	// Get available battery types
-	availableTypes := goconfig.GetAvailableBatteryTypes()
+	// Get available chemistries
+	availableChemistries := goconfig.GetAvailableChemistries()
 
 	response := map[string]interface{}{
-		"currentType":        currentTypeName,
-		"currentChemistry":   currentChemistry,
+		"currentChemistry":   batteryConfig.Chemistry,
+		"currentCellCount":   batteryConfig.ManualCellCount,
 		"manuallyConfigured": batteryConfig.IsManuallyConfigured(),
-		"availableTypes":     availableTypes,
+		"availableChemistries": availableChemistries,
 	}
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
 
-// SetBatteryConfig sets manual battery type override
+// SetBatteryConfig sets manual battery chemistry and cell count override
 func (api *ManagementAPI) SetBatteryConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		BatteryType string `json:"batteryType"`
+		Chemistry string `json:"chemistry"`
+		CellCount int    `json:"cellCount"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1252,24 +1259,28 @@ func (api *ManagementAPI) SetBatteryConfig(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if req.BatteryType == "" {
-		badRequest(&w, errors.New("batteryType field is required"))
+	if req.Chemistry == "" && req.CellCount == 0 {
+		badRequest(&w, errors.New("at least one of chemistry or cellCount must be provided"))
 		return
 	}
 
-	// Load current battery config
-	var batteryConfig goconfig.Battery
+	// Load current battery config, starting with defaults
+	batteryConfig := goconfig.DefaultBattery()
 	if err := api.config.Unmarshal(goconfig.BatteryKey, &batteryConfig); err != nil {
 		log.Printf("Failed to read battery config: %v", err)
 		serverError(&w, err)
 		return
 	}
 
-	// Set manual battery type
-	if err := batteryConfig.SetManualBatteryType(req.BatteryType); err != nil {
+	// Set manual configuration
+	if err := batteryConfig.SetManualConfiguration(req.Chemistry, req.CellCount); err != nil {
 		badRequest(&w, err)
 		return
 	}
+	
+	// Debug logging
+	log.Printf("Battery config before save - ManuallyConfigured: %v, Chemistry: '%s', CellCount: %d",
+		batteryConfig.IsManuallyConfigured(), batteryConfig.Chemistry, batteryConfig.ManualCellCount)
 
 	// Save updated config
 	if err := api.config.Set(goconfig.BatteryKey, &batteryConfig); err != nil {
@@ -1278,15 +1289,25 @@ func (api *ManagementAPI) SetBatteryConfig(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	log.Printf("Battery type manually set to: %s", req.BatteryType)
+	// Signal tc2-hat-controller to reload config immediately
+	if err := signalBatteryConfigChange(); err != nil {
+		log.Printf("Failed to signal battery config change: %v", err)
+		// Don't fail the request, just log the warning
+	}
+
+	log.Printf("Battery manually configured - Chemistry: %s, CellCount: %d", req.Chemistry, req.CellCount)
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "success", "batteryType": req.BatteryType})
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "success", 
+		"chemistry": req.Chemistry,
+		"cellCount": req.CellCount,
+	})
 }
 
 // ClearBatteryConfig clears manual battery configuration and returns to auto-detection
 func (api *ManagementAPI) ClearBatteryConfig(w http.ResponseWriter, r *http.Request) {
-	// Load current battery config
-	var batteryConfig goconfig.Battery
+	// Load current battery config, starting with defaults
+	batteryConfig := goconfig.DefaultBattery()
 	if err := api.config.Unmarshal(goconfig.BatteryKey, &batteryConfig); err != nil {
 		log.Printf("Failed to read battery config: %v", err)
 		serverError(&w, err)
@@ -1301,6 +1322,12 @@ func (api *ManagementAPI) ClearBatteryConfig(w http.ResponseWriter, r *http.Requ
 		log.Printf("Failed to save battery config: %v", err)
 		serverError(&w, err)
 		return
+	}
+
+	// Signal tc2-hat-controller to reload config immediately
+	if err := signalBatteryConfigChange(); err != nil {
+		log.Printf("Failed to signal battery config change: %v", err)
+		// Don't fail the request, just log the warning
 	}
 
 	log.Printf("Battery configuration cleared, returning to auto-detection")
@@ -1832,4 +1859,25 @@ func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// signalBatteryConfigChange creates a signal file to notify tc2-hat-controller of config changes
+func signalBatteryConfigChange() error {
+	signalFile := "/tmp/battery-config-changed"
+	
+	// Create or touch the signal file
+	file, err := os.OpenFile(signalFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create signal file: %w", err)
+	}
+	defer file.Close()
+	
+	// Write timestamp for debugging
+	_, err = file.WriteString(fmt.Sprintf("Battery config changed at: %s\n", time.Now().Format(time.RFC3339)))
+	if err != nil {
+		return fmt.Errorf("failed to write to signal file: %w", err)
+	}
+	
+	log.Printf("Created battery config change signal file")
+	return nil
 }
