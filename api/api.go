@@ -401,6 +401,7 @@ func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 // SetConfig is a way of writing new config to the device. It can only update one section at a time
 func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 	section := r.FormValue("section")
+	log.Info("API request: SetConfig, section: ", section)
 	newConfigRaw := r.FormValue("config")
 	newConfig := map[string]interface{}{}
 	if err := json.Unmarshal([]byte(newConfigRaw), &newConfig); err != nil {
@@ -418,6 +419,7 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 
 // GetConfig will return the config settings and the defaults
 func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
+	log.Info("API request: GetConfig")
 	if err := api.config.Reload(); err != nil {
 		serverError(&w, err)
 		return
@@ -467,7 +469,7 @@ func toCamelCase(s string) string {
 // ClearConfigSection will delete the config from a section so the default values will be used.
 func (api *ManagementAPI) ClearConfigSection(w http.ResponseWriter, r *http.Request) {
 	section := r.FormValue("section")
-	log.Printf("clearing config section %s", section)
+	log.Info("API request: ClearConfigSection, section: ", section)
 
 	if err := api.config.Unset(section); err != nil {
 		serverError(&w, err)
