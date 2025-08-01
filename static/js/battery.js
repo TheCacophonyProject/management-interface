@@ -119,13 +119,16 @@ function updateBatteryConfigUI() {
   if (batteryConfig.currentChemistry) {
     $("#chemistrySelect").val(batteryConfig.currentChemistry);
   }
-  if (batteryConfig.currentCellCount && batteryConfig.currentCellCount > 0) {
+  if (batteryConfig.currentCellCount > 0) {
     $("#cellCountInput").val(batteryConfig.currentCellCount);
 
     // Update voltage range display if we have both chemistry and cell count
     if (batteryConfig.currentChemistry) {
       updateVoltageRange(batteryConfig.currentChemistry, batteryConfig.currentCellCount);
     }
+  } else {
+    // Clear field for auto-detection
+    $("#cellCountInput").val("");
   }
 }
 
@@ -148,6 +151,24 @@ function populateChemistrySelect() {
     const selected = batteryConfig.currentChemistry === chem.chemistry ? "selected" : "";
     select.append(`<option value="${chem.chemistry}" ${selected}>${chem.chemistry} (${chem.minVoltage}V-${chem.maxVoltage}V)</option>`);
   });
+
+  // Add change event listener to handle cell count input state
+  select.off('change.cellCountToggle').on('change.cellCountToggle', function() {
+    const cellCountInput = $("#cellCountInput");
+    if ($(this).val() === "") {
+      cellCountInput.prop('disabled', true).val("");
+    } else {
+      cellCountInput.prop('disabled', false);
+    }
+  });
+
+  // Set initial state
+  const cellCountInput = $("#cellCountInput");
+  if (select.val() === "") {
+    cellCountInput.prop('disabled', true);
+  } else {
+    cellCountInput.prop('disabled', false);
+  }
 }
 
 function updateAvailableChemistries() {
@@ -172,9 +193,15 @@ async function saveBatteryConfig() {
   const selectedChemistry = $("#chemistrySelect").val();
   const cellCountStr = $("#cellCountInput").val();
   const cellCount = cellCountStr ? parseInt(cellCountStr) : 0;
+  debugger;
 
   if (!selectedChemistry && !cellCount) {
     showBatteryConfigStatus("Please select a chemistry or enter cell count", "warning");
+    return;
+  }
+
+  if (cellCount && !selectedChemistry) {
+    showBatteryConfigStatus("Cell count requires chemistry selection", "warning");
     return;
   }
 
@@ -188,7 +215,10 @@ async function saveBatteryConfig() {
 
     const body = {};
     if (selectedChemistry) body.chemistry = selectedChemistry;
-    if (cellCount) body.cellCount = cellCount;
+    // Send cellCount when user has entered a value or explicitly emptied the field for auto-detection
+    if (cellCountStr !== "") {
+      body.cellCount = cellCount;
+    }
 
     const response = await fetch("/api/battery/config", {
       method: "POST",
