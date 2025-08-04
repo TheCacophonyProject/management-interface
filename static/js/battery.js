@@ -7,6 +7,11 @@ window.onload = function () {
   getState();
   getBatteryConfig();
   setInterval(getState, 10000);
+  
+  // Add input event listener for cell count field
+  $("#cellCountInput").on('input', function() {
+    updateVoltageRangePreview();
+  });
 };
 
 async function getState() {
@@ -157,8 +162,10 @@ function populateChemistrySelect() {
     const cellCountInput = $("#cellCountInput");
     if ($(this).val() === "") {
       cellCountInput.prop('disabled', true).val("");
+      hideVoltageRangePreview();
     } else {
       cellCountInput.prop('disabled', false);
+      updateVoltageRangePreview();
     }
   });
 
@@ -168,6 +175,8 @@ function populateChemistrySelect() {
     cellCountInput.prop('disabled', true);
   } else {
     cellCountInput.prop('disabled', false);
+    // Update preview if we have values
+    updateVoltageRangePreview();
   }
 }
 
@@ -357,8 +366,40 @@ function clearManualConfigDisplay() {
   $("#batteryChemistry").html("Auto-detecting...");
   $("#batteryCellCount").html("Auto-detecting...");
   $("#batteryVoltageRange").html("Auto-detecting...");
+  hideVoltageRangePreview();
 }
 
 function downloadBatteryCsv() {
   window.location.href = "/battery-csv";
+}
+
+function updateVoltageRangePreview() {
+  const chemistry = $("#chemistrySelect").val();
+  const cellCountStr = $("#cellCountInput").val();
+  const cellCount = cellCountStr ? parseInt(cellCountStr) : 0;
+  
+  if (!chemistry || !cellCount || cellCount < 1 || cellCount > 24) {
+    hideVoltageRangePreview();
+    return;
+  }
+  
+  if (!batteryConfig || !batteryConfig.availableChemistries) {
+    hideVoltageRangePreview();
+    return;
+  }
+  
+  const chemProfile = batteryConfig.availableChemistries.find(chem => chem.chemistry === chemistry);
+  if (!chemProfile) {
+    hideVoltageRangePreview();
+    return;
+  }
+  
+  const minVoltage = (chemProfile.minVoltage * cellCount).toFixed(1);
+  const maxVoltage = (chemProfile.maxVoltage * cellCount).toFixed(1);
+  
+  $("#voltageRangePreview").html(`Expected voltage range: ${minVoltage}V - ${maxVoltage}V`).show();
+}
+
+function hideVoltageRangePreview() {
+  $("#voltageRangePreview").hide();
 }
