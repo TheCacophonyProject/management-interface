@@ -3,6 +3,18 @@
 let batteryConfig = null;
 let manualConfigActive = false;
 
+// Chemistry display name mapping
+const chemistryDisplayNames = {
+  "lead-acid": "Lead-Acid",
+  "lifepo4": "LiFePO4", 
+  "li-ion": "Li-Ion",
+  "lipo": "LiPo"
+};
+
+function getChemistryDisplayName(chemistry) {
+  return chemistryDisplayNames[chemistry] || chemistry;
+}
+
 window.onload = function () {
   getState();
   getBatteryConfig();
@@ -30,7 +42,7 @@ async function getState() {
 
     // Update chemistry from API reading data if available (but preserve manual config)
     if (response.batteryChemistry && !manualConfigActive) {
-      $("#batteryChemistry").html(response.batteryChemistry);
+      $("#batteryChemistry").html(getChemistryDisplayName(response.batteryChemistry));
     }
 
     // Update cell count if available (but preserve manual config)
@@ -154,7 +166,7 @@ function populateChemistrySelect() {
   // Add available chemistries
   batteryConfig.availableChemistries.forEach(function (chem) {
     const selected = batteryConfig.currentChemistry === chem.chemistry ? "selected" : "";
-    select.append(`<option value="${chem.chemistry}" ${selected}>${chem.chemistry} (${chem.minVoltage}V-${chem.maxVoltage}V)</option>`);
+    select.append(`<option value="${chem.chemistry}" ${selected}>${getChemistryDisplayName(chem.chemistry)} (${chem.minVoltage}V-${chem.maxVoltage}V)</option>`);
   });
 
   // Add change event listener to handle cell count input state
@@ -192,7 +204,7 @@ function updateAvailableChemistries() {
     const marker = isCurrent ? " (current)" : "";
 
     list.append(`<li class="${className}">
-      <small>${chem.chemistry}<br>
+      <small>${getChemistryDisplayName(chem.chemistry)}<br>
       ${chem.minVoltage}V - ${chem.maxVoltage}V per cell${marker}</small>
     </li>`);
   });
@@ -247,7 +259,7 @@ async function saveBatteryConfig() {
     console.log("Battery configuration saved:", result);
 
     let message = "Battery configuration saved: ";
-    if (selectedChemistry) message += `Chemistry: ${selectedChemistry}`;
+    if (selectedChemistry) message += `Chemistry: ${getChemistryDisplayName(selectedChemistry)}`;
     if (selectedChemistry && cellCount) message += ", ";
     if (cellCount) message += `Cell count: ${cellCount}`;
 
@@ -350,7 +362,7 @@ function updateDisplayWithManualConfig(chemistry, cellCount) {
   const currentCellCount = cellCount || (batteryConfig ? batteryConfig.currentCellCount : null);
 
   if (chemistry) {
-    $("#batteryChemistry").html(chemistry);
+    $("#batteryChemistry").html(getChemistryDisplayName(chemistry));
   }
 
   if (cellCount && cellCount > 0) {
