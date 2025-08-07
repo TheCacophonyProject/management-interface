@@ -398,18 +398,24 @@ func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// SetConfig is a way of writing new config to the device. It can only update one section at a time
+// SetConfig is a way of writing new config to the device.
 func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
+	log.Info("API request: SetConfig")
+	newConfig := map[string]any{}
+
 	section := r.FormValue("section")
-	log.Info("API request: SetConfig, section: ", section)
-	newConfigRaw := r.FormValue("config")
-	newConfig := map[string]interface{}{}
-	if err := json.Unmarshal([]byte(newConfigRaw), &newConfig); err != nil {
-		log.Printf("Error with unmarshal: %s", err)
-		badRequest(&w, err)
-		return
+	configRaw := r.FormValue("config")
+	if section != "" {
+		newConfig[section] = configRaw
+	} else {
+		err := json.Unmarshal([]byte(configRaw), &newConfig)
+		if err != nil {
+			badRequest(&w, err)
+			return
+		}
 	}
-	if err := api.config.SetFromMap(section, newConfig, false); err != nil {
+
+	if err := api.config.SetMultipleSections(newConfig); err != nil {
 		log.Printf("Error with SetFromMap: %s", err)
 		badRequest(&w, err)
 		return
