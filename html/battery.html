@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <title>Battery Details</title>
+    <title>Latest Battery Reading</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="/static/css/bootstrap.min.css">
@@ -18,7 +18,7 @@
 
     <div class="container">
         <div class="container pt-5 pl-0">
-            <h2>Modem Details<br></h2>
+            <h2>Latest Battery Reading<br></h2>
         </div>
         <hr>
 
@@ -31,10 +31,99 @@
           <p id="mainBattery" class="col-9 monospace"></p>
         </div>
         <div class="row">
+          <p class="col-3 text-right">Battery Percentage:</p>
+          <p id="batteryPercentage" class="col-9 monospace"></p>
+        </div>
+        <div class="row">
           <p class="col-3 text-right">RTC Battery:</p>
           <p id="rtcBattery" class="col-9 monospace"></p>
         </div>
+        <div class="row">
+          <p class="col-3 text-right">Chemistry:</p>
+          <p id="batteryChemistry" class="col-9 monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-3 text-right">Cell Count:</p>
+          <p id="batteryCellCount" class="col-9 monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-3 text-right">Voltage Range:</p>
+          <p id="batteryVoltageRange" class="col-9 monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-3 text-right">Discharge Rate:</p>
+          <p id="batteryDischargeRate" class="col-9 monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-3 text-right">Time Remaining:</p>
+          <p id="batteryTimeRemaining" class="col-9 monospace"></p>
+        </div>
+        <div class="row">
+          <p class="col-3 text-right">Configuration:</p>
+          <p id="configurationStatus" class="col-9 monospace"></p>
+        </div>
 
+    </div>
+
+    <div class="container pt-5 pl-0">
+        <h3>Battery Configuration<br></h3>
+    </div>
+    <hr>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Manual Battery Configuration</h5>
+                        <p class="card-text">
+                            By default, the battery chemistry and cell count are automatically detected based on voltage readings. 
+                            If the detection is incorrect, you can manually specify these values.
+                        </p>
+                        
+                        <div class="form-group">
+                            <label for="chemistrySelect">Chemistry:</label>
+                            <select class="form-control" id="chemistrySelect">
+                                <option value="">Auto-detect</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="cellCountInput">Cell Count:</label>
+                            <input type="number" class="form-control" id="cellCountInput" 
+                                   min="1" max="24" placeholder="Auto-detect">
+                            <small class="form-text text-muted">Requires chemistry selection. Leave empty for auto-detection (1-24 cells)</small>
+                            <small id="voltageRangePreview" class="form-text text-info" style="display: none;"></small>
+                        </div>
+                        
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-primary" id="saveBatteryConfigBtn" onclick="saveBatteryConfig()">
+                                Save Configuration
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="clearBatteryConfigBtn" onclick="clearBatteryConfig()">
+                                Use Auto-Detection
+                            </button>
+                        </div>
+                        
+                        <div id="batteryConfigStatus" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="alert alert-info" role="alert">
+                    <h6>Available Chemistries:</h6>
+                    <ul id="availableChemistries" class="list-unstyled">
+                        <li>Loading...</li>
+                    </ul>
+                    <hr>
+                    <h6>Depletion Estimate:</h6>
+                    <div id="depletionInfo">
+                        <p class="mb-1">Confidence: <span id="depletionConfidence">-</span></p>
+                        <p class="mb-0">Method: <span id="depletionMethod">-</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="container pt-1 pl-0">

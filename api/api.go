@@ -802,10 +802,19 @@ func (api *ManagementAPI) GetServiceStatus(w http.ResponseWriter, r *http.Reques
 }
 
 type BatteryReading struct {
-	Time           string `json:"time"`
-	MainBattery    string `json:"mainBattery"`
-	MainBatteryLow string `json:"mainBatteryLow"`
-	RTCBattery     string `json:"rtcBattery"`
+	Time                string `json:"time"`
+	MainBattery         string `json:"mainBattery"`
+	MainBatteryLow      string `json:"mainBatteryLow"`
+	RTCBattery          string `json:"rtcBattery"`
+	BatteryType         string `json:"batteryType"`
+	BatteryChemistry    string `json:"batteryChemistry"`
+	BatteryCellCount    string `json:"batteryCellCount"`
+	BatteryPercentage   string `json:"batteryPercentage"`
+	VoltageSource       string `json:"voltageSource"`
+	ErrorStatus         string `json:"errorStatus"`
+	DischargeRate       string `json:"dischargeRate"`
+	HoursRemaining      string `json:"hoursRemaining"`
+	DepletionConfidence string `json:"depletionConfidence"`
 }
 
 func getLastBatteryReading() (BatteryReading, error) {
@@ -826,16 +835,44 @@ func getLastBatteryReading() (BatteryReading, error) {
 	}
 
 	parts := strings.Split(lastLine, ",")
-	if len(parts) != 4 {
+	if len(parts) < 4 {
 		return BatteryReading{}, errors.New("unexpected format in battery-readings.csv")
 	}
 
-	return BatteryReading{
-		Time:           parts[0],
-		MainBattery:    parts[1],
-		MainBatteryLow: parts[2],
-		RTCBattery:     parts[3],
-	}, nil
+	reading := BatteryReading{
+		Time:           strings.TrimSpace(parts[0]),
+		MainBattery:    strings.TrimSpace(parts[1]),
+		MainBatteryLow: strings.TrimSpace(parts[2]),
+		RTCBattery:     strings.TrimSpace(parts[3]),
+	}
+
+	// CSV format: timestamp, HV, LV, RTC, chemistry, cells, percent, rail, error, discharge_rate, hours_remaining, confidence
+	if len(parts) >= 5 {
+		reading.BatteryChemistry = strings.TrimSpace(parts[4])
+	}
+	if len(parts) >= 6 {
+		reading.BatteryCellCount = strings.TrimSpace(parts[5])
+	}
+	if len(parts) >= 7 {
+		reading.BatteryPercentage = strings.TrimSpace(parts[6])
+	}
+	if len(parts) >= 8 {
+		reading.VoltageSource = strings.TrimSpace(parts[7])
+	}
+	if len(parts) >= 9 {
+		reading.ErrorStatus = strings.TrimSpace(parts[8])
+	}
+	if len(parts) >= 10 {
+		reading.DischargeRate = strings.TrimSpace(parts[9])
+	}
+	if len(parts) >= 11 {
+		reading.HoursRemaining = strings.TrimSpace(parts[10])
+	}
+	if len(parts) >= 12 {
+		reading.DepletionConfidence = strings.TrimSpace(parts[11])
+	}
+
+	return reading, nil
 }
 
 func (api *ManagementAPI) GetTestVideos(w http.ResponseWriter, r *http.Request) {
@@ -1193,6 +1230,105 @@ func (api *ManagementAPI) GetBattery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(battery)
+}
+
+// GetBatteryConfig returns the current battery configuration
+func (api *ManagementAPI) GetBatteryConfig(w http.ResponseWriter, r *http.Request) {
+	batteryConfig := goconfig.DefaultBattery()
+	if err := api.config.Unmarshal(goconfig.BatteryKey, &batteryConfig); err != nil {
+		log.Printf("Failed to read battery config: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	// Get available chemistries
+	availableChemistries := goconfig.GetAvailableChemistries()
+
+	response := map[string]interface{}{
+		"currentChemistry":     batteryConfig.Chemistry,
+		"currentCellCount":     batteryConfig.ManualCellCount,
+		"manuallyConfigured":   batteryConfig.IsManuallyConfigured(),
+		"availableChemistries": availableChemistries,
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// SetBatteryConfig sets manual battery chemistry and cell count override
+func (api *ManagementAPI) SetBatteryConfig(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Chemistry string `json:"chemistry"`
+		CellCount int    `json:"cellCount"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		badRequest(&w, err)
+		return
+	}
+
+	if req.Chemistry == "" && req.CellCount == 0 {
+		badRequest(&w, errors.New("at least one of chemistry or cellCount must be provided"))
+		return
+	}
+
+	// Load current battery config, starting with defaults
+	batteryConfig := goconfig.DefaultBattery()
+	if err := api.config.Unmarshal(goconfig.BatteryKey, &batteryConfig); err != nil {
+		log.Printf("Failed to read battery config: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	// Set manual configuration
+	if err := batteryConfig.SetManualConfiguration(req.Chemistry, req.CellCount); err != nil {
+		badRequest(&w, err)
+		return
+	}
+
+	// Debug logging
+	log.Printf("Battery config before save - ManuallyConfigured: %v, Chemistry: '%s', CellCount: %d",
+		batteryConfig.IsManuallyConfigured(), batteryConfig.Chemistry, batteryConfig.ManualCellCount)
+
+	// Save updated config
+	if err := api.config.Set(goconfig.BatteryKey, &batteryConfig); err != nil {
+		log.Printf("Failed to save battery config: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	log.Printf("Battery manually configured - Chemistry: %s, CellCount: %d", req.Chemistry, req.CellCount)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":    "success",
+		"chemistry": req.Chemistry,
+		"cellCount": req.CellCount,
+	})
+}
+
+// ClearBatteryConfig clears manual battery configuration and returns to auto-detection
+func (api *ManagementAPI) ClearBatteryConfig(w http.ResponseWriter, r *http.Request) {
+	// Load current battery config, starting with defaults
+	batteryConfig := goconfig.DefaultBattery()
+	if err := api.config.Unmarshal(goconfig.BatteryKey, &batteryConfig); err != nil {
+		log.Printf("Failed to read battery config: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	// Clear manual configuration
+	batteryConfig.ClearManualConfiguration()
+
+	// Save updated config
+	if err := api.config.Set(goconfig.BatteryKey, &batteryConfig); err != nil {
+		log.Printf("Failed to save battery config: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	log.Printf("Battery configuration cleared, returning to auto-detection")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Auto-detection enabled"})
 }
 
 func getModemDbus() (dbus.BusObject, error) {
