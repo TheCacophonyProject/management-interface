@@ -1297,12 +1297,6 @@ func (api *ManagementAPI) SetBatteryConfig(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Signal tc2-hat-controller to reload config immediately
-	if err := signalBatteryConfigChange(); err != nil {
-		log.Printf("Failed to signal battery config change: %v", err)
-		// Don't fail the request, just log the warning
-	}
-
 	log.Printf("Battery manually configured - Chemistry: %s, CellCount: %d", req.Chemistry, req.CellCount)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1330,12 +1324,6 @@ func (api *ManagementAPI) ClearBatteryConfig(w http.ResponseWriter, r *http.Requ
 		log.Printf("Failed to save battery config: %v", err)
 		serverError(&w, err)
 		return
-	}
-
-	// Signal tc2-hat-controller to reload config immediately
-	if err := signalBatteryConfigChange(); err != nil {
-		log.Printf("Failed to signal battery config change: %v", err)
-		// Don't fail the request, just log the warning
 	}
 
 	log.Printf("Battery configuration cleared, returning to auto-detection")
@@ -1867,27 +1855,6 @@ func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-}
-
-// signalBatteryConfigChange creates a signal file to notify tc2-hat-controller of config changes
-func signalBatteryConfigChange() error {
-	signalFile := "/tmp/battery-config-changed"
-
-	// Create or touch the signal file
-	file, err := os.OpenFile(signalFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to create signal file: %w", err)
-	}
-	defer file.Close()
-
-	// Write timestamp for debugging
-	_, err = file.WriteString(fmt.Sprintf("Battery config changed at: %s\n", time.Now().Format(time.RFC3339)))
-	if err != nil {
-		return fmt.Errorf("failed to write to signal file: %w", err)
-	}
-
-	log.Printf("Created battery config change signal file")
-	return nil
 }
 
 func GetTC2AgentDbus() (dbus.BusObject, error) {
