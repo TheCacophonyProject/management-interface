@@ -406,7 +406,13 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 	section := r.FormValue("section")
 	configRaw := r.FormValue("config")
 	if section != "" {
-		newConfig[section] = configRaw
+		sectionsConfig := map[string]any{}
+		err := json.Unmarshal([]byte(configRaw), &sectionsConfig)
+		if err != nil {
+			badRequest(&w, err)
+			return
+		}
+		newConfig[section] = sectionsConfig
 	} else {
 		err := json.Unmarshal([]byte(configRaw), &newConfig)
 		if err != nil {
@@ -415,6 +421,7 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	log.Debugf("set config: %+v", newConfig)
 	if err := api.config.SetMultipleSections(newConfig); err != nil {
 		log.Printf("Error with SetFromMap: %s", err)
 		badRequest(&w, err)
