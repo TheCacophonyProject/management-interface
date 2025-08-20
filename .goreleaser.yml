@@ -15,7 +15,6 @@ builds:
     goos:
       - linux
     goarch:
-      - arm
       - arm64
     goarm:
       - "7"
@@ -25,17 +24,6 @@ builds:
         - packr
         - tsc
       post: packr clean
-  - id: "signal-strength"
-    binary: "signal-strength"
-    main: "./cmd/signal-strength"
-    goos:
-      - linux
-    goarch:
-      - arm
-      - arm64
-    goarm:
-      - "7"
-    ldflags: -s -w
 
 nfpms:
   - vendor: The Cacophony Project
