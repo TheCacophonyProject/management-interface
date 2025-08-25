@@ -43,6 +43,8 @@ async function loadConfig() {
     document.querySelector("#input-do-tracking").checked = data.values.thermalMotion.DoTracking;
     document.querySelector("#input-run-classifier").checked = data.values.thermalMotion.RunClassifier;
     document.querySelector("#input-tracking-events").checked = data.values.thermalMotion.TrackingEvents;
+    document.querySelector("#input-postprocess").checked = data.values.thermalMotion.PostProcess;
+    document.querySelector("#input-postprocess-events").checked = data.values.thermalMotion.PostProcessEvents;
 
     // Set values for comms
     document.querySelector("#input-comms-enable").checked = data.values.comms.Enable;
@@ -103,6 +105,9 @@ async function saveThermalMotionConfig() {
     "do-tracking": document.querySelector("#input-do-tracking").checked,
     "run-classifier": document.querySelector("#input-run-classifier").checked,
     "tracking-events": document.querySelector("#input-tracking-events").checked,
+    "postprocess": document.querySelector("#input-postprocess").checked,
+    "postprocess-events": document.querySelector("#input-postprocess-events").checked,
+
   };
 
   await saveConfig("thermal-motion", data);
