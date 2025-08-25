@@ -413,7 +413,7 @@ func AboutHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config)
 		tmpl.ExecuteTemplate(w, "about.html", resp)
 	}
 	log.Printf("Packages are %v", packages)
-	keys := make([]string, len(packages), len(packages))
+	keys := make([]string, len(packages))
 	var index = 0
 	for key := range packages {
 		keys[index] = key
@@ -421,7 +421,7 @@ func AboutHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config)
 	}
 	slices.Sort(keys)
 
-	data := make([][]string, len(packages), len(packages))
+	data := make([][]string, len(packages))
 	index = 0
 	for index, key := range keys {
 		data[index] = []string{key, packages[key].(string)}
