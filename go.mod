@@ -6,7 +6,7 @@ require (
 	github.com/TheCacophonyProject/audiobait/v3 v3.0.1
 	github.com/TheCacophonyProject/event-reporter v1.3.2-0.20200210010421-ca3fcb76a231
 	github.com/TheCacophonyProject/go-api v1.2.2
-	github.com/TheCacophonyProject/go-config v1.22.0
+	github.com/TheCacophonyProject/go-config v1.28.0
 	github.com/TheCacophonyProject/go-cptv v0.0.0-20211109233846-8c32a5d161f7
 	github.com/TheCacophonyProject/lepton3 v0.0.0-20211005194419-22311c15d6ee
 	github.com/TheCacophonyProject/rtc-utils v1.2.0
@@ -64,7 +64,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	periph.io/x/periph v3.6.8+incompatible // indirect
 )
-
-replace github.com/TheCacophonyProject/go-config => /home/gp/cacophony/go-config
 
 replace periph.io/x/periph => github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incompatible
