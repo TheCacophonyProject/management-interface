@@ -32,7 +32,7 @@ import (
 	"strings"
 	"time"
 
-	versionreporter "github.com/TheCacophonyProject/event-reporter/version-reporter"
+	versionreporter "github.com/TheCacophonyProject/event-reporter/v3/version-reporter"
 
 	"github.com/TheCacophonyProject/audiobait/v3/audiofilelibrary"
 	"github.com/TheCacophonyProject/audiobait/v3/playlist"
