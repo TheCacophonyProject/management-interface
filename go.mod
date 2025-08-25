@@ -1,8 +1,6 @@
 module github.com/TheCacophonyProject/management-interface
 
-go 1.23.0
-
-toolchain go1.23.2
+go 1.25.0
 
 require (
 	github.com/TheCacophonyProject/audiobait/v3 v3.0.1
@@ -65,5 +63,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	periph.io/x/periph v3.6.8+incompatible // indirect
 )
+
+replace github.com/TheCacophonyProject/event-reporter => ../event-reporter
 
 replace periph.io/x/periph => github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incompatible
