@@ -27,9 +27,12 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	versionreporter "github.com/TheCacophonyProject/event-reporter/v3/version-reporter"
 
 	"github.com/TheCacophonyProject/audiobait/v3/audiofilelibrary"
 	"github.com/TheCacophonyProject/audiobait/v3/playlist"
@@ -363,20 +366,6 @@ func WifiNetworkHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "wifi-networks.html", wifiProps)
 }
 
-// Return info on the packages that are currently installed on the device.
-func getInstalledPackages() (string, error) {
-	if runtime.GOOS == "windows" {
-		return "", nil
-	}
-
-	out, err := exec.Command("/usr/bin/dpkg-query", "--show", "--showformat", "${Package}|${Version}|${Maintainer}\n").Output()
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
-}
-
 // AboutHandlerGen is a wrapper for the AboutHandler function.
 func AboutHandlerGen(conf *goconfig.Config) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -418,23 +407,26 @@ func AboutHandler(w http.ResponseWriter, r *http.Request, conf *goconfig.Config)
 	}
 
 	// Get installed packages.
-	packagesData, err := getInstalledPackages()
+	packages, err := versionreporter.GetInstalledPackages()
 	if err != nil {
 		resp.ErrorMessage = errorMessage(err)
 		tmpl.ExecuteTemplate(w, "about.html", resp)
 	}
-	// Want to separate this into separate fields so that can display in a table in HTML
-	dataRows := [][]string{}
-	rows := strings.Split(packagesData, "\n")
-	for _, row := range rows {
-		// We only want packages related to cacophony.
-		if !strings.Contains(strings.ToUpper(row), "CACOPHONY") {
-			continue
-		}
-		words := strings.Split(strings.TrimSpace(row), "|")
-		dataRows = append(dataRows, words[:2])
+	log.Printf("Packages are %v", packages)
+	keys := make([]string, len(packages))
+	var index = 0
+	for key := range packages {
+		keys[index] = key
+		index++
 	}
-	resp.PackageDataRows = dataRows
+	slices.Sort(keys)
+
+	data := make([][]string, len(packages))
+	index = 0
+	for index, key := range keys {
+		data[index] = []string{key, packages[key].(string)}
+	}
+	resp.PackageDataRows = data
 
 	tmpl.ExecuteTemplate(w, "about.html", resp)
 }

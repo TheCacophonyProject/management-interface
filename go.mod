@@ -1,12 +1,10 @@
 module github.com/TheCacophonyProject/management-interface
 
-go 1.23.0
-
-toolchain go1.23.2
+go 1.25.0
 
 require (
 	github.com/TheCacophonyProject/audiobait/v3 v3.0.1
-	github.com/TheCacophonyProject/event-reporter v1.3.2-0.20200210010421-ca3fcb76a231
+	github.com/TheCacophonyProject/event-reporter/v3 v3.11.0
 	github.com/TheCacophonyProject/go-api v1.2.2
 	github.com/TheCacophonyProject/go-config v1.28.0
 	github.com/TheCacophonyProject/go-cptv v0.0.0-20211109233846-8c32a5d161f7
@@ -30,7 +28,7 @@ require (
 )
 
 require (
-	github.com/TheCacophonyProject/event-reporter/v3 v3.8.1 // indirect
+	github.com/TheCacophonyProject/event-reporter v1.3.2-0.20200210010421-ca3fcb76a231 // indirect
 	github.com/TheCacophonyProject/window v0.0.0-20200312071457-7fc8799fdce7 // indirect
 	github.com/alexflint/go-scalar v1.1.0 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
