@@ -46,7 +46,6 @@ async function loadConfig() {
     document.querySelector("#input-postprocess").checked = data.values.thermalMotion.PostProcess;
     document.querySelector("#input-postprocess-events").checked = data.values.thermalMotion.PostProcessEvents;
 
-
     // Set values for comms
     document.querySelector("#input-comms-enable").checked = data.values.comms.Enable;
     document.querySelector("#input-comms-trap-default").checked = data.values.comms.TrapEnabledByDefault;
