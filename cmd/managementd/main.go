@@ -161,6 +161,9 @@ func main() {
 		log.Fatal(err)
 		return
 	}
+
+	// Log all API requests (method, path, status, size, duration, client IP)
+	apiRouter.Use(api.RequestLoggingMiddleware)
 	apiRouter.HandleFunc("/device-info", apiObj.GetDeviceInfo).Methods("GET")
 	apiRouter.HandleFunc("/recordings", apiObj.GetRecordings).Methods("GET")
 	apiRouter.HandleFunc("/recording/{id}", apiObj.GetRecording).Methods("GET")

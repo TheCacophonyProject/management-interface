@@ -19,21 +19,22 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package api
 
 import (
-	"bufio"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
-	"net"
-	"net/http"
-	"net/url"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
-	"strconv"
-	"strings"
-	"time"
+    "bufio"
+    "bytes"
+    "encoding/json"
+    "errors"
+    "fmt"
+    "io"
+    "net"
+    "net/http"
+    "net/url"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "runtime"
+    "strconv"
+    "strings"
+    "time"
 
 	goapi "github.com/TheCacophonyProject/go-api"
 	goconfig "github.com/TheCacophonyProject/go-config"
@@ -68,6 +69,258 @@ type ManagementAPI struct {
 	hotspotTimer *time.Ticker
 	recordingDir string
 	appVersion   string
+}
+
+// loggingResponseWriter wraps http.ResponseWriter to capture status and size.
+type loggingResponseWriter struct {
+    http.ResponseWriter
+    status       int
+    size         int
+    buf          bytes.Buffer
+    firstWriteAt time.Time
+}
+
+func (lrw *loggingResponseWriter) WriteHeader(code int) {
+    lrw.status = code
+    lrw.ResponseWriter.WriteHeader(code)
+}
+
+func (lrw *loggingResponseWriter) Write(b []byte) (int, error) {
+    if lrw.status == 0 {
+        lrw.status = http.StatusOK
+    }
+    if lrw.firstWriteAt.IsZero() {
+        lrw.firstWriteAt = time.Now()
+    }
+    n, err := lrw.ResponseWriter.Write(b)
+    lrw.size += n
+    if lrw.buf.Len() < 2048 {
+        // capture up to 2KB of body for logging
+        remaining := 2048 - lrw.buf.Len()
+        if remaining > 0 {
+            if remaining > len(b) {
+                remaining = len(b)
+            }
+            lrw.buf.Write(b[:remaining])
+        }
+    }
+    return n, err
+}
+
+// RequestLoggingMiddleware logs method, path, status, size, duration and client IP.
+func RequestLoggingMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        start := time.Now()
+        lrw := &loggingResponseWriter{ResponseWriter: w}
+
+        // Correlate with request ID if provided; otherwise generate one.
+        reqID := r.Header.Get("X-Request-ID")
+        if reqID == "" {
+            reqID = randString(12)
+        }
+        lrw.Header().Set("X-Request-ID", reqID)
+
+        // Compute basic route info early for request-body decisions
+        routePath := ""
+        if route := mux.CurrentRoute(r); route != nil {
+            if p, err := route.GetPathTemplate(); err == nil {
+                routePath = p
+            }
+        }
+
+        // Optionally capture request body for selected endpoints
+        reqContentType := r.Header.Get("Content-Type")
+        reqBodyPreview := ""
+        if shouldLogRequestBody(r.Method, routePath) {
+            rawBody, _ := io.ReadAll(r.Body)
+            r.Body.Close()
+            // Restore body for downstream handlers
+            r.Body = io.NopCloser(bytes.NewReader(rawBody))
+
+            // Sanitize/mask and create preview
+            reqBodyPreview = sanitizeRequestBodyPreview(rawBody, reqContentType)
+            if len(reqBodyPreview) > 512 {
+                reqBodyPreview = reqBodyPreview[:512] + "..."
+            }
+        }
+
+        next.ServeHTTP(lrw, r)
+        if lrw.status == 0 {
+            lrw.status = http.StatusOK
+        }
+        duration := time.Since(start)
+        ttfb := time.Duration(0)
+        if !lrw.firstWriteAt.IsZero() {
+            ttfb = lrw.firstWriteAt.Sub(start)
+        }
+
+        // Prefer X-Forwarded-For if present; fall back to RemoteAddr
+        ip := r.Header.Get("X-Forwarded-For")
+        if ip == "" {
+            ip = r.RemoteAddr
+        } else {
+            if idx := strings.Index(ip, ","); idx >= 0 {
+                ip = strings.TrimSpace(ip[:idx])
+            }
+        }
+
+        // Route info if available
+        routeName := ""
+        if route := mux.CurrentRoute(r); route != nil {
+            if n := route.GetName(); n != "" {
+                routeName = n
+            }
+        }
+
+        // Response content preview for errors or small text/json payloads
+        contentType := lrw.Header().Get("Content-Type")
+        var preview string
+        if lrw.status >= 400 || strings.HasPrefix(contentType, "application/json") || strings.HasPrefix(contentType, "text/") {
+            s := lrw.buf.String()
+            if len(s) > 512 {
+                s = s[:512] + "..."
+            }
+            // Trim to a single line to keep logs tidy
+            preview = strings.ReplaceAll(strings.ReplaceAll(s, "\n", "\\n"), "\r", "")
+        }
+
+        log.Printf("reqid=%s method=%s path=%s route=%s name=%s status=%d %s bytes=%d dur=%s ttfb=%s ip=%s ua=%q ctype=%q req_ct=%q req=%q resp=%q",
+            reqID,
+            r.Method,
+            r.URL.RequestURI(),
+            routePath,
+            routeName,
+            lrw.status,
+            http.StatusText(lrw.status),
+            lrw.size,
+            duration,
+            ttfb,
+            ip,
+            r.UserAgent(),
+            contentType,
+            reqContentType,
+            reqBodyPreview,
+            preview,
+        )
+    })
+}
+
+// shouldLogRequestBody returns true for selected endpoints where request bodies are useful and small.
+func shouldLogRequestBody(method, routePath string) bool {
+    if method != http.MethodPost {
+        return false
+    }
+    switch routePath {
+    case "/config":
+        return true
+    default:
+        return false
+    }
+}
+
+var sensitiveKeys = map[string]struct{}{
+    "password":     {},
+    "pass":         {},
+    "psk":          {},
+    "secret":       {},
+    "token":        {},
+    "apikey":       {},
+    "api_key":      {},
+    "authorization": {},
+    "bearer":       {},
+    "key":          {},
+}
+
+func sanitizeRequestBodyPreview(body []byte, contentType string) string {
+    ct := strings.ToLower(contentType)
+    if strings.HasPrefix(ct, "application/json") {
+        if s, ok := maskJSON(body); ok {
+            return s
+        }
+        return string(body)
+    }
+    if strings.HasPrefix(ct, "application/x-www-form-urlencoded") || strings.HasPrefix(ct, "multipart/form-data") || ct == "" {
+        // Attempt to parse form-encoded; specifically handle config key
+        q, err := url.ParseQuery(string(body))
+        if err != nil {
+            return string(body)
+        }
+        sanitized := url.Values{}
+        for k, vals := range q {
+            lk := strings.ToLower(k)
+            switch lk {
+            case "config":
+                if len(vals) > 0 {
+                    if masked, ok := maskJSON([]byte(vals[0])); ok {
+                        sanitized.Set(k, masked)
+                    } else {
+                        sanitized.Set(k, vals[0])
+                    }
+                }
+            default:
+                if _, exists := sensitiveKeys[lk]; exists {
+                    sanitized[k] = maskValues(vals)
+                } else {
+                    sanitized[k] = vals
+                }
+            }
+        }
+        return sanitized.Encode()
+    }
+    // Fallback: return as-is
+    return string(body)
+}
+
+func maskValues(in []string) []string {
+    out := make([]string, len(in))
+    for i, v := range in {
+        out[i] = maskString(v)
+    }
+    return out
+}
+
+func maskString(s string) string {
+    if s == "" {
+        return ""
+    }
+    if len(s) <= 4 {
+        return strings.Repeat("*", len(s))
+    }
+    return s[:2] + strings.Repeat("*", len(s)-4) + s[len(s)-2:]
+}
+
+func maskJSON(raw []byte) (string, bool) {
+    var v interface{}
+    if err := json.Unmarshal(raw, &v); err != nil {
+        return "", false
+    }
+    mv := maskJSONValue(v)
+    b, err := json.Marshal(mv)
+    if err != nil {
+        return "", false
+    }
+    return string(b), true
+}
+
+func maskJSONValue(v interface{}) interface{} {
+    switch t := v.(type) {
+    case map[string]interface{}:
+        for k, val := range t {
+            if _, ok := sensitiveKeys[strings.ToLower(k)]; ok {
+                t[k] = maskString(fmt.Sprintf("%v", val))
+            } else {
+                t[k] = maskJSONValue(val)
+            }
+        }
+        return t
+    case []interface{}:
+        for i, val := range t {
+            t[i] = maskJSONValue(val)
+        }
+        return t
+    default:
+        return t
+    }
 }
 
 func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *logging.Logger) (*ManagementAPI, error) {
