@@ -37,20 +37,24 @@ func (c Config) String() string {
 
 // ParseConfig parses the config
 func ParseConfig(configDir string) (*Config, error) {
-	config, err := goconfig.New(configDir)
-	if err != nil {
-		return nil, err
-	}
+    config, err := goconfig.New(configDir)
+    if err != nil {
+        return nil, err
+    }
 
-	ports := goconfig.DefaultPorts()
-	if err := config.Unmarshal(goconfig.PortsKey, &ports); err != nil {
-		return nil, err
-	}
+    ports := goconfig.DefaultPorts()
+    if err := config.Unmarshal(goconfig.PortsKey, &ports); err != nil {
+        return nil, err
+    }
+    // Debug: show ports from config
+    // Note: uses fmt.Println via Stringer if needed by caller; we just log values here
+    fmt.Printf("managementd: unmarshaled ports: %+v\n", ports)
 
-	thermalRecorder := goconfig.DefaultThermalRecorder()
-	if err := config.Unmarshal(goconfig.ThermalRecorderKey, &thermalRecorder); err != nil {
-		return nil, err
-	}
+    thermalRecorder := goconfig.DefaultThermalRecorder()
+    if err := config.Unmarshal(goconfig.ThermalRecorderKey, &thermalRecorder); err != nil {
+        return nil, err
+    }
+    fmt.Printf("managementd: unmarshaled thermal-recorder: %+v\n", thermalRecorder)
 
 	return &Config{
 		Port:    ports.Managementd,

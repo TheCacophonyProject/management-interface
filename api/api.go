@@ -416,13 +416,15 @@ func getLastSaltUpdate() string {
 
 // GetDeviceInfo returns information about this device
 func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) {
-	var device goconfig.Device
-	if err := api.config.Unmarshal(goconfig.DeviceKey, &device); err != nil {
-		log.Printf("/device-info failed: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "failed to read device config\n")
-		return
-	}
+    var device goconfig.Device
+    if err := api.config.Unmarshal(goconfig.DeviceKey, &device); err != nil {
+        log.Printf("/device-info failed: %v", err)
+        w.WriteHeader(http.StatusInternalServerError)
+        io.WriteString(w, "failed to read device config\n")
+        return
+    }
+    // Debug: device values read from config
+    log.Printf("config.Unmarshal device: %+v", device)
 
 	type deviceInfo struct {
 		ServerURL   string `json:"serverURL"`
@@ -433,25 +435,28 @@ func (api *ManagementAPI) GetDeviceInfo(w http.ResponseWriter, r *http.Request) 
 		LastUpdated string `json:"lastUpdated"`
 		Type        string `json:"type"`
 	}
-	info := deviceInfo{
-		ServerURL:   device.Server,
-		GroupName:   device.Group,
-		Devicename:  device.Name,
-		DeviceID:    device.ID,
-		SaltID:      strings.TrimSpace(readFile("/etc/salt/minion_id")),
-		LastUpdated: getLastSaltUpdate(),
-		Type:        getDeviceType(),
-	}
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(info)
+    info := deviceInfo{
+        ServerURL:   device.Server,
+        GroupName:   device.Group,
+        Devicename:  device.Name,
+        DeviceID:    device.ID,
+        SaltID:      strings.TrimSpace(readFile("/etc/salt/minion_id")),
+        LastUpdated: getLastSaltUpdate(),
+        Type:        getDeviceType(),
+    }
+    log.Printf("device-info response: %+v", info)
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(info)
 }
 
 // GetRecordings returns a list of recordings in a array.
 func (api *ManagementAPI) GetRecordings(w http.ResponseWriter, r *http.Request) {
-	log.Println("get recordings")
-	names := getCptvNames(api.recordingDir)
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(names)
+    log.Println("get recordings")
+    names := getCptvNames(api.recordingDir)
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(names)
 }
 
 func (api *ManagementAPI) GetSignalStrength(w http.ResponseWriter, r *http.Request) {
@@ -678,11 +683,11 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 
 // GetConfig will return the config settings and the defaults
 func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
-	log.Info("API request: GetConfig")
-	if err := api.config.Reload(); err != nil {
-		serverError(&w, err)
-		return
-	}
+    log.Info("API request: GetConfig")
+    if err := api.config.Reload(); err != nil {
+        serverError(&w, err)
+        return
+    }
 
 	defaultValues := map[string]interface{}{}
 	for k, v := range goconfig.GetDefaults() {
@@ -706,12 +711,14 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 		"defaults": defaultValues,
 	}
 
-	jsonString, err := json.Marshal(valuesAndDefaults)
-	if err != nil {
-		serverError(&w, err)
-		return
-	}
-	w.Write(jsonString)
+    jsonString, err := json.Marshal(valuesAndDefaults)
+    if err != nil {
+        serverError(&w, err)
+        return
+    }
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    w.Write(jsonString)
 }
 
 func toCamelCase(s string) string {
@@ -736,22 +743,23 @@ func (api *ManagementAPI) ClearConfigSection(w http.ResponseWriter, r *http.Requ
 }
 
 func (api *ManagementAPI) GetLocation(w http.ResponseWriter, r *http.Request) {
-	var location goconfig.Location
-	if err := api.config.Unmarshal(goconfig.LocationKey, &location); err != nil {
-		serverError(&w, err)
-		return
-	}
-	type Location struct {
-		Latitude  float32 `json:"latitude"`
-		Longitude float32 `json:"longitude"`
-		Altitude  float32 `json:"altitude"`
-		Accuracy  float32 `json:"accuracy"`
-		Timestamp string  `json:"timestamp"`
-	}
+    var location goconfig.Location
+    if err := api.config.Unmarshal(goconfig.LocationKey, &location); err != nil {
+        serverError(&w, err)
+        return
+    }
+    log.Printf("config.Unmarshal location: %+v", location)
+    type Location struct {
+        Latitude  float32 `json:"latitude"`
+        Longitude float32 `json:"longitude"`
+        Altitude  float32 `json:"altitude"`
+        Accuracy  float32 `json:"accuracy"`
+        Timestamp string  `json:"timestamp"`
+    }
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(Location{
-		Latitude:  location.Latitude,
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(Location{
+        Latitude:  location.Latitude,
 		Longitude: location.Longitude,
 		Altitude:  location.Altitude,
 		Accuracy:  location.Accuracy,
@@ -1487,22 +1495,23 @@ func (api *ManagementAPI) GetBattery(w http.ResponseWriter, r *http.Request) {
 
 // GetBatteryConfig returns the current battery configuration
 func (api *ManagementAPI) GetBatteryConfig(w http.ResponseWriter, r *http.Request) {
-	batteryConfig := goconfig.DefaultBattery()
-	if err := api.config.Unmarshal(goconfig.BatteryKey, &batteryConfig); err != nil {
-		log.Printf("Failed to read battery config: %v", err)
-		serverError(&w, err)
-		return
-	}
+    batteryConfig := goconfig.DefaultBattery()
+    if err := api.config.Unmarshal(goconfig.BatteryKey, &batteryConfig); err != nil {
+        log.Printf("Failed to read battery config: %v", err)
+        serverError(&w, err)
+        return
+    }
+    log.Printf("config.Unmarshal battery: %+v", batteryConfig)
+    // Get available chemistries
+    availableChemistries := goconfig.GetAvailableChemistries()
 
-	// Get available chemistries
-	availableChemistries := goconfig.GetAvailableChemistries()
-
-	response := map[string]interface{}{
-		"currentChemistry":     batteryConfig.Chemistry,
-		"currentCellCount":     batteryConfig.ManualCellCount,
-		"manuallyConfigured":   batteryConfig.IsManuallyConfigured(),
-		"availableChemistries": availableChemistries,
-	}
+    response := map[string]interface{}{
+        "currentChemistry":     batteryConfig.Chemistry,
+        "currentCellCount":     batteryConfig.ManualCellCount,
+        "manuallyConfigured":   batteryConfig.IsManuallyConfigured(),
+        "availableChemistries": availableChemistries,
+    }
+    log.Printf("battery-config response: %+v", response)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
@@ -2064,10 +2073,11 @@ func (api *ManagementAPI) DownloadAudioFile(w http.ResponseWriter, r *http.Reque
 }
 
 func (api *ManagementAPI) GetAudioRecordings(w http.ResponseWriter, r *http.Request) {
-	log.Println("get audio recordings")
-	names := getAacNames(api.recordingDir)
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(names)
+    log.Println("get audio recordings")
+    names := getAacNames(api.recordingDir)
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(names)
 }
 
 func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {

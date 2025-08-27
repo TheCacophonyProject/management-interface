@@ -87,10 +87,10 @@ func (api *ManagementAPI) AudioRecordingStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 	rp2040status := map[string]int{"mode": mode, "status": status}
+	log.Printf("audio-status: %+v", rp2040status)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(rp2040status)
-
 }
 
 func (api *ManagementAPI) TakeLongAudioRecording(w http.ResponseWriter, r *http.Request) {
