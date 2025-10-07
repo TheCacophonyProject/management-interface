@@ -6,7 +6,7 @@ require (
 	github.com/TheCacophonyProject/audiobait/v3 v3.0.1
 	github.com/TheCacophonyProject/event-reporter/v3 v3.11.0
 	github.com/TheCacophonyProject/go-api v1.2.2
-	github.com/TheCacophonyProject/go-config v1.28.0
+	github.com/TheCacophonyProject/go-config v1.29.0
 	github.com/TheCacophonyProject/go-cptv v0.0.0-20211109233846-8c32a5d161f7
 	github.com/TheCacophonyProject/lepton3 v0.0.0-20211005194419-22311c15d6ee
 	github.com/TheCacophonyProject/rtc-utils v1.2.0
