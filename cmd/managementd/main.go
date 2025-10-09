@@ -65,12 +65,37 @@ var (
 	frameCh     = make(chan *FrameData, 4)
 	connected   atomic.Bool
 	log         = logging.NewLogger("info")
+	stayOnForMu sync.Mutex
+	lastStayOn  time.Time
 )
 
 func hasActiveClients() bool {
 	socketsLock.RLock()
 	defer socketsLock.RUnlock()
 	return len(sockets) > 0
+}
+
+func maybeTriggerStayOnFor() {
+	stayOnForMu.Lock()
+	shouldRun := lastStayOn.IsZero() || time.Since(lastStayOn) >= 5*time.Minute
+	if shouldRun {
+		lastStayOn = time.Now()
+	}
+	stayOnForMu.Unlock()
+
+	if !shouldRun {
+		return
+	}
+
+	go func() {
+		out, err := exec.Command("stay-on-for", "5").CombinedOutput()
+		if err != nil {
+			log.Printf("error running stay-on-for: %s, error: %v", string(out), err)
+			stayOnForMu.Lock()
+			lastStayOn = time.Time{}
+			stayOnForMu.Unlock()
+		}
+	}()
 }
 
 type Args struct {
@@ -215,6 +240,8 @@ func main() {
 	apiRouter.HandleFunc("/network/wifi/forget", apiObj.ForgetWifiNetwork).Methods("DELETE")
 	apiRouter.HandleFunc("/network/wifi/current", apiObj.GetCurrentWifiNetwork).Methods("GET")
 	apiRouter.HandleFunc("/network/wifi/current", apiObj.DisconnectFromWifi).Methods("DELETE")
+	apiRouter.HandleFunc("/network/hotspot", apiObj.GetHotspotInterface).Methods("GET")
+	apiRouter.HandleFunc("/network/hotspot", apiObj.SetHotspotInterface).Methods("POST")
 	apiRouter.HandleFunc("/wifi-check", apiObj.CheckWifiInternetConnection).Methods("GET")
 	apiRouter.HandleFunc("/modem-check", apiObj.CheckModemInternetConnection).Methods("GET")
 	apiRouter.HandleFunc("/wifi-networks", apiObj.GetWifiNetworks).Methods("GET")
@@ -246,11 +273,7 @@ func main() {
 	apiRouter.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			netmanagerclient.KeepHotspotOnFor(60 * 5)
-
-			out, err := exec.Command("stay-on-for", "5").CombinedOutput() // Stops camera from going to sleep for 5 minutes.
-			if err != nil {
-				log.Printf("error running stay-on-for: %s, error: %s", string(out), err)
-			}
+			maybeTriggerStayOnFor()
 			next.ServeHTTP(w, r)
 		})
 	})

@@ -215,39 +215,42 @@ func (api *ManagementAPI) GetSignalStrength(w http.ResponseWriter, r *http.Reque
 // GetRecording downloads a recordings
 func (api *ManagementAPI) GetRecording(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["id"]
-	log.Printf("get recording '%s'", name)
-	recordingPath := getRecordingPath(name, api.recordingDir)
-	if recordingPath == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, "file not found\n")
+	path := getRecordingPath(name, api.recordingDir)
+	if path == "" {
+		http.Error(w, "file not found\n", http.StatusBadRequest)
 		return
 	}
 
-	ext := filepath.Ext(name)
-	switch ext {
+	ct := "application/octet-stream"
+	switch filepath.Ext(name) {
 	case ".cptv":
-		sendFile(w, recordingPath, name, "application/x-cptv")
+		ct = "application/x-cptv"
 	case ".mp3":
-		sendFile(w, recordingPath, name, "audio/mp4")
-	default:
-		sendFile(w, recordingPath, name, "application/json")
+		ct = "audio/mp4"
 	}
+	sendFile(w, r, path, name, ct)
 }
 
-func sendFile(w http.ResponseWriter, path, name, contentType string) {
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
-	w.Header().Set("Content-Type", contentType)
-
+func sendFile(w http.ResponseWriter, r *http.Request, path, name, contentType string) {
 	f, err := os.Open(path)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		log.Println(err)
 		return
 	}
 	defer f.Close()
 
-	w.WriteHeader(http.StatusOK)
-	io.Copy(w, bufio.NewReader(f))
+	fi, err := f.Stat()
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+	w.Header().Set("Content-Type", contentType)
+	// This enables zero-copy where possible + proper Content-Length + Range
+	http.ServeContent(w, r, name, fi.ModTime(), f)
 }
 
 // DeleteRecording deletes the given recording file id
@@ -1056,13 +1059,137 @@ func (api *ManagementAPI) GetNetworkInterfaces(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(result)
 }
 
+var errNoWifiInterface = errors.New("no active wifi interface found")
+
+// getActiveWifiInterface returns the first Wi-Fi interface that appears to be active.
+func getActiveWifiInterface() (string, error) {
+	if iface, err := getActiveWifiInterfaceNMCLI(); err == nil {
+		log.Printf("Detected Wi-Fi interface via nmcli: %s", iface)
+		return iface, nil
+	} else if err != nil {
+		log.Printf("nmcli detection failed: %v", err)
+	}
+	iface, err := getActiveWifiInterfaceFromNet()
+	if err == nil {
+		log.Printf("Detected Wi-Fi interface via net fallback: %s", iface)
+	}
+	return iface, err
+}
+
+func getActiveWifiInterfaceNMCLI() (string, error) {
+	cmd := exec.Command("nmcli", "-t", "-f", "DEVICE,TYPE,STATE", "device", "status")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for _, line := range lines {
+		log.Printf("nmcli status line: %s", line)
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, ":")
+		if len(parts) < 3 {
+			continue
+		}
+		device, devType, state := parts[0], parts[1], parts[2]
+		if devType == "wifi" && strings.HasPrefix(state, "connected") {
+			return device, nil
+		}
+	}
+
+	return "", errNoWifiInterface
+}
+
+func getActiveWifiInterfaceFromNet() (string, error) {
+	log.Println("Falling back to net.Interfaces() for Wi-Fi detection")
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+
+	var wifiIfaces []net.Interface
+	for _, iface := range interfaces {
+		if strings.HasPrefix(iface.Name, "wl") {
+			wifiIfaces = append(wifiIfaces, iface)
+		}
+	}
+
+	for _, iface := range wifiIfaces {
+		if interfaceHasUsableIP(iface) {
+			return iface.Name, nil
+		}
+	}
+
+	for _, iface := range wifiIfaces {
+		if interfaceIsOperational(iface.Name) {
+			return iface.Name, nil
+		}
+	}
+
+	if len(wifiIfaces) > 0 {
+		return wifiIfaces[0].Name, nil
+	}
+
+	return "", errNoWifiInterface
+}
+
+func interfaceIsOperational(name string) bool {
+	log.Printf("Checking operstate for interface %s", name)
+	stateBytes, err := os.ReadFile(filepath.Join("/sys/class/net", name, "operstate"))
+	if err != nil {
+		iface, ifaceErr := net.InterfaceByName(name)
+		if ifaceErr != nil {
+			log.Printf("operstate read failed for %s: %v, also failed to read interface flags: %v", name, err, ifaceErr)
+			return false
+		}
+		log.Printf("operstate read failed for %s: %v; flags: %s", name, err, iface.Flags.String())
+		return iface.Flags&net.FlagUp != 0
+	}
+	state := strings.TrimSpace(string(stateBytes))
+	log.Printf("operstate for %s is %s", name, state)
+	return state == "up" || state == "unknown"
+}
+
+func interfaceHasUsableIP(iface net.Interface) bool {
+	if !interfaceIsOperational(iface.Name) {
+		return false
+	}
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return false
+	}
+	for _, addr := range addrs {
+		addrParts := strings.SplitN(addr.String(), "/", 2)
+		ip := net.ParseIP(addrParts[0])
+		if ip == nil {
+			continue
+		}
+		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 func getCurrentWifiNetwork() (string, error) {
-	cmd := exec.Command("iwgetid", "wlan0", "-r")
+	iface, err := getActiveWifiInterface()
+	if err != nil {
+		if errors.Is(err, errNoWifiInterface) {
+			return "", nil
+		}
+		return "", err
+	}
+
+	cmd := exec.Command("iwgetid", iface, "-r")
 	output, err := cmd.Output()
 	if err != nil {
 		if len(output) == 0 {
 			return "", nil
 		}
+		log.Printf("iwgetid failed on %s: %v", iface, err)
 		return "", err
 	}
 
@@ -1073,13 +1200,12 @@ func getCurrentWifiNetwork() (string, error) {
 func CheckInternetConnection(interfaceName string) bool {
 	iface, err := net.InterfaceByName(interfaceName)
 	if err != nil {
-		fmt.Println("Error getting interface details:", err)
 		return false
 	}
 	args := []string{"-I", iface.Name, "-c", "3", "-n", "-W", "15", "1.1.1.1"}
 
 	if err := exec.Command("ping", args...).Run(); err != nil {
-		fmt.Println("Error pinging:", err)
+		log.Printf("ping via %s failed: %v", iface.Name, err)
 		return false
 	}
 	return true
@@ -1100,7 +1226,19 @@ func (api *ManagementAPI) CheckModemInternetConnection(w http.ResponseWriter, r 
 func (api *ManagementAPI) CheckWifiInternetConnection(w http.ResponseWriter, r *http.Request) {
 	// Check if connected to Wi-Fi
 	log.Println("Checking Wi-Fi connection")
-	connected := CheckInternetConnection("wlan0")
+	iface, err := getActiveWifiInterface()
+	if err != nil {
+		if !errors.Is(err, errNoWifiInterface) {
+			log.Printf("Error determining active Wi-Fi interface: %v", err)
+		} else {
+			log.Println("No active Wi-Fi interface detected")
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]bool{"connected": false})
+		return
+	}
+	log.Printf("Using Wi-Fi interface: %s", iface)
+	connected := CheckInternetConnection(iface)
 	log.Printf("Wi-Fi connection: %v", connected)
 
 	// Send the current network as a JSON response
@@ -1148,7 +1286,6 @@ func (api *ManagementAPI) ConnectToWifi(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-
 		if err := netmanagerclient.EnableWifi(true); err != nil {
 			log.Printf("Error enabling Wi-Fi: %v", err)
 			http.Error(w, "Failed to enable Wi-Fi: "+err.Error(), http.StatusInternalServerError)
@@ -1209,14 +1346,18 @@ func (api *ManagementAPI) ForgetWifiNetwork(w http.ResponseWriter, r *http.Reque
 	log.Printf("Will forget Wi-Fi network: %s", wifiDetails.SSID)
 	w.WriteHeader(http.StatusOK)
 	io.WriteString(w, "will forget Wi-Fi network shortly\n")
-	go func() {
-		currentSSID, _ := getCurrentWifiNetwork()
-		// Forget the network
-		currentlyConnetedTo := currentSSID == wifiDetails.SSID
-		if err := netmanagerclient.RemoveWifiNetwork(wifiDetails.SSID, currentlyConnetedTo, currentlyConnetedTo); err != nil {
+	currentSSID, err := getCurrentWifiNetwork()
+	if err != nil {
+		log.Printf("Error getting current Wi-Fi network: %v", err)
+		currentSSID = ""
+	}
+	currentlyConnected := currentSSID == wifiDetails.SSID
+	go func(ssid string, connected bool) {
+		if err := netmanagerclient.RemoveWifiNetwork(ssid, connected, connected); err != nil {
 			log.Printf("Error removing Wi-Fi network: %v", err)
+			return
 		}
-	}()
+	}(wifiDetails.SSID, currentlyConnected)
 }
 
 func streamOutput(pipe io.ReadCloser) {
@@ -1695,6 +1836,72 @@ func (api *ManagementAPI) EnableHotspot(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusOK)
 }
 
+func (api *ManagementAPI) GetHotspotInterface(w http.ResponseWriter, r *http.Request) {
+	available, err := netmanagerclient.GetHotspotInterfaces()
+	if err != nil {
+		if errors.Is(err, netmanagerclient.ErrHotspotInterfaceUnsupported) {
+			w.WriteHeader(http.StatusNotImplemented)
+			io.WriteString(w, "hotspot interface selection not supported by current net manager\n")
+			return
+		}
+		serverError(&w, err)
+		return
+	}
+	selected, err := netmanagerclient.GetHotspotInterface()
+	if err != nil {
+		if errors.Is(err, netmanagerclient.ErrHotspotInterfaceUnsupported) {
+			w.WriteHeader(http.StatusNotImplemented)
+			io.WriteString(w, "hotspot interface selection not supported by current net manager\n")
+			return
+		}
+		serverError(&w, err)
+		return
+	}
+	resp := map[string]interface{}{
+		"available": available,
+		"selected":  selected,
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (api *ManagementAPI) SetHotspotInterface(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Interface string `json:"interface"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		badRequest(&w, fmt.Errorf("failed to decode request body: %w", err))
+		return
+	}
+
+	target := strings.TrimSpace(payload.Interface)
+	if strings.EqualFold(target, "auto") {
+		target = ""
+	}
+
+	if err := netmanagerclient.SetHotspotInterface(target); err != nil {
+		var dbusErr *dbus.Error
+		switch {
+		case errors.Is(err, netmanagerclient.ErrHotspotInterfaceUnsupported):
+			w.WriteHeader(http.StatusNotImplemented)
+			io.WriteString(w, "hotspot interface selection not supported by current net manager\n")
+			return
+		case errors.As(err, &dbusErr):
+			msg := err.Error()
+			if len(dbusErr.Body) > 0 {
+				if bodyMsg, ok := dbusErr.Body[0].(string); ok && bodyMsg != "" {
+					msg = bodyMsg
+				}
+			}
+			badRequest(&w, errors.New(msg))
+			return
+		}
+		serverError(&w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func (api *ManagementAPI) GetConnectionStatus(w http.ResponseWriter, r *http.Request) {
 	state, err := netmanagerclient.ReadState()
 	if err != nil {
@@ -1732,7 +1939,6 @@ func (api *ManagementAPI) SaveWifiNetwork(w http.ResponseWriter, r *http.Request
 			http.Error(w, "Failed to connect to Wi-Fi: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-
 		scanWifis, err := netmanagerclient.ScanWiFiNetworks()
 		if err != nil {
 			log.Printf("Error scanning Wi-Fi networks: %v", err)

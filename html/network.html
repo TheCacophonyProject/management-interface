@@ -23,6 +23,25 @@
             </div>
             <hr>
 
+            <div class="row">
+                <div class="col w-100" >
+                    <div class="card mb-3" style="max-width: 600px">
+                      <div class="card-body">
+                        <h5 class="card-title">Hotspot Interface</h5>
+                        <p class="card-text text-muted">Select which Wi-Fi interface should host the access point. Choose automatic to let the device decide.</p>
+                        <div class="form-group">
+                          <label for="hotspotInterfaceSelect">Access point interface</label>
+                          <select id="hotspotInterfaceSelect" class="form-control" disabled>
+                            <option>Loading...</option>
+                          </select>
+                        </div>
+                        <button id="hotspotInterfaceApply" class="btn btn-secondary" disabled>Apply</button>
+                        <span id="hotspotInterfaceFeedback" class="ml-3 text-muted"></span>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
             {{range .Interfaces}}
             <div class="row">
                 <div class="col w-100" >
@@ -95,6 +114,7 @@
 
         <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
         <script src="/static/js/bootstrap.min.js"></script>
+        <script src="/static/js/network.js"></script>
         
         <script>
           $(document).ready(function(){

@@ -20,7 +20,7 @@ require (
 
 require (
 	github.com/TheCacophonyProject/go-utils v0.1.3
-	github.com/TheCacophonyProject/rpi-net-manager v0.4.0-deb12
+	github.com/TheCacophonyProject/rpi-net-manager v0.7.0
 	github.com/TheCacophonyProject/thermal-recorder v1.22.1-0.20230627011240-89964c0511f7
 	github.com/TheCacophonyProject/trap-controller v0.0.0-20230227002937-262a1adfaa47
 	github.com/alexflint/go-arg v1.4.3
