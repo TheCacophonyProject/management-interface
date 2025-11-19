@@ -86,6 +86,7 @@ func maybeTriggerStayOnFor() {
 		stayOnForMu.Lock()
 		defer stayOnForMu.Unlock()
 		if time.Since(lastStayOn) > time.Minute {
+			log.Debug("triggering stay-on-for 5 minutes")
 			out, err := exec.Command("stay-on-for", "5").CombinedOutput()
 			if err != nil {
 				log.Errorf("error running stay-on-for: %s, error: %v", string(out), err)
