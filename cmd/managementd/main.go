@@ -24,7 +24,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/godbus/dbus"
 	"io"
 	"net"
 	"net/http"
@@ -33,6 +32,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/godbus/dbus"
 
 	"github.com/gobuffalo/packr"
 
@@ -75,25 +76,23 @@ func hasActiveClients() bool {
 	return len(sockets) > 0
 }
 
+// maybeTriggerStayOnFor will run the stay-on-for command if needed.
+// The stay-on-for command will stop tc2-hat-attiny from shutting down the RPi.
+// This should be called when there is an API request, as that indicates that a user is using the camera.
+// We throttle this to once every minute to avoid unnecessary calls.
+// Because of the use of mutex we run this is a goroutine to avoid blocking the main thread.
 func maybeTriggerStayOnFor() {
-	stayOnForMu.Lock()
-	shouldRun := lastStayOn.IsZero() || time.Since(lastStayOn) >= 5*time.Minute
-	if shouldRun {
-		lastStayOn = time.Now()
-	}
-	stayOnForMu.Unlock()
-
-	if !shouldRun {
-		return
-	}
-
 	go func() {
-		out, err := exec.Command("stay-on-for", "5").CombinedOutput()
-		if err != nil {
-			log.Printf("error running stay-on-for: %s, error: %v", string(out), err)
-			stayOnForMu.Lock()
-			lastStayOn = time.Time{}
-			stayOnForMu.Unlock()
+		stayOnForMu.Lock()
+		defer stayOnForMu.Unlock()
+		if time.Since(lastStayOn) > time.Minute {
+			log.Debug("triggering stay-on-for 5 minutes")
+			out, err := exec.Command("stay-on-for", "5").CombinedOutput()
+			if err != nil {
+				log.Errorf("error running stay-on-for: %s, error: %v", string(out), err)
+			} else {
+				lastStayOn = time.Now()
+			}
 		}
 	}()
 }

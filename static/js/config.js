@@ -22,13 +22,9 @@ async function loadConfig() {
     // Set placeholders and values for windows
     document.querySelector("#input-start-recording").placeholder = data.defaults.windows.StartRecording;
     document.querySelector("#input-stop-recording").placeholder = data.defaults.windows.StopRecording;
-    document.querySelector("#input-power-on").placeholder = data.defaults.windows.PowerOn;
-    document.querySelector("#input-power-off").placeholder = data.defaults.windows.PowerOff;
 
     document.querySelector("#input-start-recording").value = data.values.windows.StartRecording;
     document.querySelector("#input-stop-recording").value = data.values.windows.StopRecording;
-    document.querySelector("#input-power-on").value = data.values.windows.PowerOn;
-    document.querySelector("#input-power-off").value = data.values.windows.PowerOff;
 
     // Set placeholders and values for modem
     document.querySelector("#input-initial-on-duration").placeholder = formatDuration(data.defaults.modemd.InitialOnDuration);
@@ -83,8 +79,6 @@ async function saveWindowsConfig() {
   const data = {
     "start-recording": document.querySelector("#input-start-recording").value || undefined,
     "stop-recording": document.querySelector("#input-stop-recording").value || undefined,
-    "power-on": document.querySelector("#input-power-on").value || undefined,
-    "power-off": document.querySelector("#input-power-off").value || undefined,
   };
 
   await saveConfig("windows", data);
