@@ -101,8 +101,8 @@ async function saveModemConfig() {
 function updateThermalMotionState() {
   const lowPower = document.querySelector("#input-low-power-mode").checked;
   document.querySelector("#input-instant-classify").disabled = !lowPower;
-  const thermalMotionInputs = document.querySelectorAll(
-    "#input-do-tracking, #input-run-classifier, #input-tracking-events, #input-postprocess, #input-postprocess-events"
+  const thermalMotionInputs = document.querySelector("#thermal-recorder-options").querySelectorAll(
+    "#input-do-tracking, #input-run-classifier, #input-tracking-events"
   );
   thermalMotionInputs.forEach((el) => (el.disabled = lowPower));
 }
