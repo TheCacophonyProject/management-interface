@@ -2,21 +2,11 @@
   "compilerOptions": {
     "target": "esnext",
     "module": "esnext",
+    "moduleResolution": "bundler",
     "allowJs": true,
     "strict": true,
-    "importHelpers": true,
-    "moduleResolution": "node",
-    "experimentalDecorators": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
     "sourceMap": true,
-    "baseUrl": ".",
     "rootDir": ".",
-    "paths": {
-      "@/*": [
-        "src/*"
-      ]
-    },
     "types": ["jquery"],
     "lib": [
       "esnext",
@@ -30,6 +20,6 @@
     "./api/*.ts"
   ],
   "exclude": [
-    "node_modules",
+    "node_modules"
   ]
 }
