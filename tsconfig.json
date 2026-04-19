@@ -17,6 +17,7 @@
         "src/*"
       ]
     },
+    "types": ["jquery"],
     "lib": [
       "esnext",
       "dom",
