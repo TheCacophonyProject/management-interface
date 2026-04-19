@@ -36,6 +36,10 @@ async function loadConfig() {
     document.querySelector("#input-connection-timeout").value = formatDuration(data.values.modemd.ConnectionTimeout);
 
     // Set values for thermal motion
+    document.querySelector("#input-instant-classify").checked = data.values.thermalRecorder.InstantClassify;
+    document.querySelector("#input-low-power-mode").checked = data.values.thermalRecorder.UseLowPowerMode;
+    updateThermalMotionState();
+
     document.querySelector("#input-do-tracking").checked = data.values.thermalMotion.DoTracking;
     document.querySelector("#input-run-classifier").checked = data.values.thermalMotion.RunClassifier;
     document.querySelector("#input-tracking-events").checked = data.values.thermalMotion.TrackingEvents;
@@ -92,6 +96,22 @@ async function saveModemConfig() {
   };
 
   await saveConfig("modemd", data);
+}
+
+function updateThermalMotionState() {
+  const lowPower = document.querySelector("#input-low-power-mode").checked;
+  document.querySelector("#input-instant-classify").disabled = !lowPower;
+  const thermalMotionInputs = document.querySelector("#thermal-recorder-options").querySelectorAll(
+    "#input-do-tracking, #input-run-classifier, #input-tracking-events"
+  );
+  thermalMotionInputs.forEach((el) => (el.disabled = lowPower));
+}
+
+async function saveThermalRecorderConfig(){
+  const data = {    "instant-classify": document.querySelector("#input-instant-classify").checked,
+    "use-low-power-mode":document.querySelector("#input-low-power-mode").checked
+  }
+  await saveConfig("thermal-recorder",data);  
 }
 
 async function saveThermalMotionConfig() {
