@@ -251,6 +251,7 @@ func main() {
 	apiRouter.HandleFunc("/enable-hotspot", apiObj.EnableHotspot).Methods("POST")
 	apiRouter.HandleFunc("/wifi-status", apiObj.GetConnectionStatus).Methods("GET")
 	apiRouter.HandleFunc("/upload-logs", apiObj.UploadLogs).Methods("PUT")
+	apiRouter.HandleFunc("/erase-flash", apiObj.EraseFlash).Methods("POST")
 
 	apiRouter.HandleFunc("/audiorecording", apiObj.SetAudioRecording).Methods("POST")
 	apiRouter.HandleFunc("/audiorecording", apiObj.GetAudioRecording).Methods("GET")

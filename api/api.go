@@ -1362,6 +1362,9 @@ func streamOutput(pipe io.ReadCloser) {
 	for scanner.Scan() {
 		log.Println(scanner.Text())
 	}
+	if err := scanner.Err(); err != nil {
+		log.Errorf("Error when printing output: %v", err)
+	}
 }
 
 func (api *ManagementAPI) GetBattery(w http.ResponseWriter, r *http.Request) {
@@ -2065,6 +2068,28 @@ func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *ManagementAPI) EraseFlash(w http.ResponseWriter, r *http.Request) {
+	if err := manageService("stop", "tc2-agent"); err != nil {
+		serverError(&w, err)
+		return
+	}
+	cmd := exec.Command("tc2-hat-rp2040", "--erase-flash")
+	stdout, _ := cmd.StdoutPipe()
+	stderr, _ := cmd.StderrPipe()
+	go streamOutput(stdout)
+	go streamOutput(stderr)
+	if err := cmd.Run(); err != nil {
+		serverError(&w, err)
+		manageService("start", "tc2-agent")
+		return
+	}
+	if err := manageService("start", "tc2-agent"); err != nil {
+		serverError(&w, err)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
