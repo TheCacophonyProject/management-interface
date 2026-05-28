@@ -15,7 +15,7 @@ require (
 	github.com/godbus/dbus v4.1.0+incompatible
 	github.com/gorilla/mux v1.8.0
 	github.com/nathan-osman/go-sunrise v1.0.0 // indirect
-	golang.org/x/net v0.23.0
+	golang.org/x/net v0.38.0
 )
 
 require (
