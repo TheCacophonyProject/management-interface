@@ -197,6 +197,102 @@
             <button id="save-button" type="button" onclick="saveCommsConfig()" class="btn btn-primary">Save Comms Config</button>
         </div>
 
+        <div class="container pt-5 pl-0">
+            <h3>Trap Config<br></h3>
+        </div>
+
+        <div class="row">
+            <div class="col-xs-8">
+                <div class="table-responsive">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <td>APIR Displacement Threshold</td>
+                                <td><input type="number" step="any" id="input-trap-apir-d-threshold" placeholder="0.3"></td>
+                            </tr>
+                            <tr>
+                                <td>APIR Gradient Threshold</td>
+                                <td><input type="number" step="any" id="input-trap-apir-dt-threshold" placeholder="450"></td>
+                            </tr>
+                            <tr>
+                                <td>Max Current (mA)</td>
+                                <td><input type="number" id="input-trap-max-current" placeholder="1000"></td>
+                            </tr>
+                            <tr>
+                                <td>Spool Reset Delay (minutes)</td>
+                                <td><input type="number" id="input-trap-spool-reset-delay" placeholder="10"></td>
+                            </tr>
+                            <tr>
+                                <td>Latitude</td>
+                                <td><input type="number" step="any" id="input-trap-latitude" placeholder="-43.532055"></td>
+                            </tr>
+                            <tr>
+                                <td>Longitude</td>
+                                <td><input type="number" step="any" id="input-trap-longitude" placeholder="172.636230"></td>
+                            </tr>
+                            <tr>
+                                <td>Test Loop Interval (minutes)</td>
+                                <td><input type="number" id="input-trap-test-loop-interval" placeholder="180"></td>
+                            </tr>
+                            <tr>
+                                <td>Switch 1 Disable</td>
+                                <td>
+                                    <select class="form-select" id="input-trap-switch-1-disable">
+                                        <option value="IGNORE">IGNORE</option>
+                                        <option value="OPEN">OPEN</option>
+                                        <option value="CLOSED">CLOSED</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Switch 2 Disable</td>
+                                <td>
+                                    <select class="form-select" id="input-trap-switch-2-disable">
+                                        <option value="IGNORE">IGNORE</option>
+                                        <option value="OPEN">OPEN</option>
+                                        <option value="CLOSED">CLOSED</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Switch Logic</td>
+                                <td>
+                                    <select class="form-select" id="input-trap-switch-logic">
+                                        <option value="OR">OR</option>
+                                        <option value="AND">AND</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Observation Mode</td>
+                                <td><input type="checkbox" id="input-trap-observation-mode"></td>
+                            </tr>
+                            <tr>
+                                <td>Motion Message Gap (seconds)</td>
+                                <td><input type="number" id="input-trap-motion-message-gap" placeholder="10"></td>
+                            </tr>
+                            <tr>
+                                <td>Post Reset Cooldown (seconds)</td>
+                                <td><input type="number" id="input-trap-post-reset-cooldown" placeholder="20"></td>
+                            </tr>
+                            <tr>
+                                <td>Spool Reed Check</td>
+                                <td><input type="checkbox" id="input-trap-spool-reed-check"></td>
+                            </tr>
+                            <tr>
+                                <td>Program</td>
+                                <td><input type="number" id="input-trap-program" placeholder="1"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="container pt-1 pl-0">
+            <button type="button" onclick="saveTrapConfig()" class="btn btn-primary">Save Trap Config</button>
+        </div>
+
     </div>
 
     <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
