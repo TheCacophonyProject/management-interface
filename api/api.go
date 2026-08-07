@@ -994,12 +994,12 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 
 	err = cmd.Start()
 	if err != nil {
-		log.Fatalf("Failed to start command: %s", err)
-	}
-
-	err = cmd.Wait()
-	if err != nil {
-		log.Fatalf("Command finished with error: %s", err)
+		log.Printf("Failed to start command: %s\n", err)
+	} else {
+		err = cmd.Wait()
+		if err != nil {
+			log.Printf("Command finished with error: %s\n", err)
+		}
 	}
 
 	if err := manageService("start", recorderService); err != nil {

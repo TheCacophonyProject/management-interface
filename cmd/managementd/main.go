@@ -321,13 +321,11 @@ func handleFrameListener() error {
 			tc2AgentDbus, err := GetTC2AgentDbus()
 			if err != nil {
 				log.Error("Failed to get TC2AgentDbus")
-				return err
 			}
 			var result string
 			err = tc2AgentDbus.Call("org.cacophony.TC2Agent.prioritiseframeserve", 0).Store(&result)
 			if err != nil {
 				log.Errorf("Failed to request frame serve priority from rp2040, %s", result)
-				return err
 			}
 		}
 
@@ -454,7 +452,6 @@ func WebsocketServer(ws *websocket.Conn) {
 						tc2AgentDbus, err := GetTC2AgentDbus()
 						if err != nil {
 							log.Println(err)
-							return
 						}
 						var isOffloading int
 						var percentComplete int
@@ -466,7 +463,6 @@ func WebsocketServer(ws *websocket.Conn) {
 						err = tc2AgentDbus.Call("org.cacophony.TC2Agent.offloadstatus", 0).Store(&isOffloading, &percentComplete, &secondsRemaining, &filesTotal, &filesRemaining, &eventsTotal, &eventsRemaining)
 						if err != nil {
 							log.Println(err)
-							return
 						}
 						if isOffloading == 1 {
 							log.Printf("rp2040 is offloading files")
@@ -474,7 +470,6 @@ func WebsocketServer(ws *websocket.Conn) {
 							err = tc2AgentDbus.Call("org.cacophony.TC2Agent.canceloffload", 0).Store(&result)
 							if err != nil {
 								log.Println(err)
-								return
 							}
 							log.Printf("requested offload cancellation")
 						}
