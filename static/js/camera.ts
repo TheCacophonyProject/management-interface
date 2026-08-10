@@ -500,6 +500,7 @@ export class CameraConnection {
             const parsed = JSON.parse(event.data);
             if (parsed.type === "Classification") {
               this.onClassification(parsed.classification as ClassificationEvent);
+              snapshotCount = 0;  // Don't stop preview when getting classifications
             }
           } catch (e) {
             console.log("got message", event.data);
@@ -597,6 +598,7 @@ function playTestVideo(): void {
   } else {
     alert("Please select a video option first!");
   }
+  restartCameraViewing();
 }
 
 function sendVideoRequest(videoName: string): void {
