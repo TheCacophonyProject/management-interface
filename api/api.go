@@ -977,7 +977,7 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	cmd := exec.Command("/home/pi/.venv/classifier/bin/pi_classify", "--fps", "9", "--file", videoName)
+	cmd := exec.Command("/home/pi/.venv/classifier/bin/pi_classify", "--seed", "0", "--fps", "9", "--file", videoName)
 	log.Println(strings.Join(cmd.Args, " "))
 
 	stdout, err := cmd.StdoutPipe()
