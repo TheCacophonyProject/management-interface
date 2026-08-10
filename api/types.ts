@@ -52,6 +52,15 @@ export interface Frame {
   frame: Uint16Array;
 }
 
+export interface ClassificationEvent {
+  ClipId: number;
+  TrackId: number;
+  What: string;
+  Confidence: number;
+  Live: boolean;
+  Time: string;
+}
+
 interface CameraStats {
   skippedFramesServer: number;
   skippedFramesClient: number;

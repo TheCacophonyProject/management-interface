@@ -1,4 +1,10 @@
-import { FrameInfo, Frame, Region, CameraInfo } from "../../api/types";
+import {
+  FrameInfo,
+  Frame,
+  Region,
+  CameraInfo,
+  ClassificationEvent,
+} from "../../api/types";
 
 async function getAudioMode() {
   return fetch("/api/audiorecording", {
@@ -103,8 +109,25 @@ function restartCameraViewing() {
       window.location.hostname,
       window.location.port,
       processFrame,
-      onConnectionStateChange
+      onConnectionStateChange,
+      addClassificationToList
     );
+  }
+}
+
+const classificationListLimit = 50;
+function addClassificationToList(ce: ClassificationEvent) {
+  const list = document.getElementById("classification-list");
+  if (list == null) {
+    return;
+  }
+  const item = document.createElement("li");
+  const time = new Date(ce.Time).toLocaleTimeString();
+  const status = ce.Live ? "live" : "final";
+  item.innerText = `${ce.What} — ${ce.Confidence}% (${status}) · ${time}`;
+  list.insertBefore(item, list.firstChild);
+  while (list.childElementCount > classificationListLimit) {
+    list.removeChild(list.lastChild as ChildNode);
   }
 }
 
@@ -141,7 +164,8 @@ window.onload = function () {
     window.location.hostname,
     window.location.port,
     processFrame,
-    onConnectionStateChange
+    onConnectionStateChange,
+    addClassificationToList
   );
 
   document.getElementById('upload-test-recording-form')!.addEventListener('submit', (event) => {
@@ -361,7 +385,8 @@ export class CameraConnection {
     public onFrame: (frame: Frame) => void,
     public onConnectionStateChange: (
       connectionState: CameraConnectionState
-    ) => void
+    ) => void,
+    public onClassification: (classification: ClassificationEvent) => void
   ) {
     this.audioOnly = false;
     this.closing = false;
@@ -470,8 +495,17 @@ export class CameraConnection {
           } else {
             getAudioStatus();
           }
+        } else {
+          try {
+            const parsed = JSON.parse(event.data);
+            if (parsed.type === "Classification") {
+              this.onClassification(parsed.classification as ClassificationEvent);
+              snapshotCount = 0;  // Don't stop preview when getting classifications
+            }
+          } catch (e) {
+            console.log("got message", event.data);
+          }
         }
-        console.log("got message", event.data);
       }
       snapshotCount++;
 
@@ -564,6 +598,7 @@ function playTestVideo(): void {
   } else {
     alert("Please select a video option first!");
   }
+  restartCameraViewing();
 }
 
 function sendVideoRequest(videoName: string): void {
