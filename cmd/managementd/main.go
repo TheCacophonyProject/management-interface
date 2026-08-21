@@ -369,78 +369,165 @@ func handleFrameListenerLoop() {
 	}
 }
 
+// activeConn tracks whichever connection is currently feeding frameCh.
+// A "thermal-recorder-py" connection (test video playback) is allowed to
+// take over from whatever is currently connected; anything else is rejected
+// while a connection is active.
+type activeConn struct {
+	source string
+	abort  chan struct{}
+	done   chan struct{}
+}
+
+var (
+	activeMu sync.Mutex
+	active   *activeConn
+)
+
 func handleFrameListener() error {
+	// Remove old frame socket
+	if err := os.Remove(frameSocket); err != nil && !os.IsNotExist(err) {
+		log.Errorf("Couldn't remove frame socket '%s'", frameSocket)
+		return err
+	}
+
+	// Make new socket
+	listener, err := net.Listen("unix", frameSocket)
+	if err != nil {
+		log.Errorf("Couldn't make socket '%s'", frameSocket)
+		return err
+	}
+	defer listener.Close()
+	unixListener := listener.(*net.UnixListener)
+
 	for {
-		// Remove old frame socket
-		err := os.Remove(frameSocket)
-		if err != nil && !os.IsNotExist(err) {
-			log.Errorf("Couldn't remove frame socket '%s'", frameSocket)
-			return err
+		activeMu.Lock()
+		ac := active
+		activeMu.Unlock()
+
+		if ac != nil && ac.source != "tc2-agent" {
+			// A non-tc2-agent source (e.g. thermal-recorder-py) is
+			// streaming and can't be preempted; stop accepting new
+			// connections until it disconnects.
+			<-ac.done
+			continue
 		}
 
-		// Make new socket
-		listener, err := net.Listen("unix", frameSocket)
-		if err != nil {
-			log.Errorf("Couldn't make socket '%s'", frameSocket)
-			return err
-		}
-
-		// Prioritise frames if there are active clients
-		log.Info("Waiting for frames from tc2-agent")
-		deadLineDuration := 5 * time.Second
-		if hasActiveClients() {
-			deadLineDuration = 30 * time.Second
-			tc2AgentDbus, err := GetTC2AgentDbus()
-			if err != nil {
-				log.Error("Failed to get TC2AgentDbus")
+		if ac == nil {
+			// Prioritise frames if there are active clients
+			log.Info("Waiting for frames from tc2-agent")
+			deadLineDuration := 5 * time.Second
+			if hasActiveClients() {
+				deadLineDuration = 30 * time.Second
+				tc2AgentDbus, err := GetTC2AgentDbus()
+				if err != nil {
+					log.Error("Failed to get TC2AgentDbus")
+				} else {
+					var result string
+					if err := tc2AgentDbus.Call("org.cacophony.TC2Agent.prioritiseframeserve", 0).Store(&result); err != nil {
+						log.Errorf("Failed to request frame serve priority from rp2040, %s", result)
+					}
+				}
 			}
-			var result string
-			err = tc2AgentDbus.Call("org.cacophony.TC2Agent.prioritiseframeserve", 0).Store(&result)
-			if err != nil {
-				log.Errorf("Failed to request frame serve priority from rp2040, %s", result)
-			}
+			unixListener.SetDeadline(time.Now().Add(deadLineDuration))
+		} else {
+			// tc2-agent already streaming; keep listening (without a
+			// deadline) for a possible takeover connection.
+			unixListener.SetDeadline(time.Time{})
 		}
 
 		// Wait for and accept connection
-		listener.(*net.UnixListener).SetDeadline(time.Now().Add(deadLineDuration))
 		conn, err := listener.Accept()
-		if err != nil && err.(net.Error).Timeout() {
-			log.Info("Socket accept timed out, retrying...")
-			continue
-		} else if err != nil {
+		if err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				log.Info("Socket accept timed out, retrying...")
+				continue
+			}
 			log.Errorf("Socket accept failed: %v", err)
 			return err
 		}
-		// Prevent concurrent connections.
-		listener.Close()
 
-		// Handle connection
-		log.Info("Accepted connection from client")
-		err = handleConn(conn)
-		frameCh <- &FrameData{Disconnected: true}
-		log.Infof("Camera connection ended with: %v", err)
-		connected.Store(false)
+		go handleIncomingConn(conn)
 	}
 }
 
-func handleConn(conn net.Conn) error {
+// handleIncomingConn reads a new connection's header, decides whether it
+// should become the active frame source, and if so hands it off to
+// handleConn. A "thermal-recorder-py" connection preempts whatever is
+// currently active; any other source is rejected while one is active.
+func handleIncomingConn(conn net.Conn) {
 	reader := bufio.NewReader(conn)
-	var err error
-	headerInfo, err = headers.ReadHeaderInfo(reader)
+	hi, err := headers.ReadHeaderInfo(reader)
 	if err != nil {
-		return err
+		log.Errorf("Failed to read header from new connection: %v", err)
+		conn.Close()
+		return
 	}
 
-	log.Printf("connection from %s %s (%dx%d@%dfps) frame size %d", headerInfo.Brand(), headerInfo.Model(), headerInfo.ResX(), headerInfo.ResY(), headerInfo.FPS(), headerInfo.FrameSize())
+	source := hi.Source()
+	if source == "" {
+		source = "tc2-agent"
+	}
+
+	ac := &activeConn{source: source, abort: make(chan struct{}), done: make(chan struct{})}
+
+	activeMu.Lock()
+	if active != nil {
+		if source == "tc2-agent" {
+			activeMu.Unlock()
+			log.Infof("Rejecting connection from %s, %s is already connected", source, active.source)
+			conn.Close()
+			return
+		}
+		log.Infof("%s connected, disconnecting current %s connection", source, active.source)
+		close(active.abort)
+		prevDone := active.done
+		activeMu.Unlock()
+		<-prevDone
+		activeMu.Lock()
+	}
+	active = ac
+	activeMu.Unlock()
+
+	log.Printf("connection from %s: %s %s (%dx%d@%dfps) frame size %d", source, hi.Brand(), hi.Model(), hi.ResX(), hi.ResY(), hi.FPS(), hi.FrameSize())
+
+	err = handleConn(conn, reader, hi, ac.abort)
+
+	// connection finished if still the active connection then active becomes nil
+	activeMu.Lock()
+	if active == ac {
+		active = nil
+	}
+	activeMu.Unlock()
+	close(ac.done)
+
+	frameCh <- &FrameData{Disconnected: true}
+	log.Infof("%s connection ended with: %v", source, err)
+	connected.Store(false)
+}
+
+func handleConn(conn net.Conn, reader *bufio.Reader, hi *headers.HeaderInfo, abort <-chan struct{}) error {
+	headerInfo = hi
 
 	clearB := make([]byte, 5)
-	_, err = io.ReadFull(reader, clearB)
-	if err != nil {
+	if _, err := io.ReadFull(reader, clearB); err != nil {
 		return err
 	}
 
-	rawFrame := make([]byte, headerInfo.FrameSize())
-	frame := cptvframe.NewFrame(headerInfo)
+	// Unblock the read loop below if we're told to disconnect in favour of
+	// a takeover connection.
+	watcherDone := make(chan struct{})
+	defer close(watcherDone)
+	go func() {
+		select {
+		case <-abort:
+			conn.Close()
+		case <-watcherDone:
+		}
+	}()
+
+	rawFrame := make([]byte, hi.FrameSize())
+	frame := cptvframe.NewFrame(hi)
 	frames := 0
 	var lastFrame *FrameData
 	connected.Store(true)

@@ -609,7 +609,15 @@ function sendVideoRequest(videoName: string): void {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ video: videoName }),
-  }).catch((error) => {
-    console.error("Error playing test video:", error);
-  });
+  })
+    .then((response) => {
+      if (!response.ok) {
+        console.error("Error playing test video:", response.statusText);
+        alert("Video cannot be played");
+      }
+    })
+    .catch((error) => {
+      console.error("Error playing test video:", error);
+      alert("Video cannot be played");
+    });
 }

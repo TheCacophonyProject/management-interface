@@ -974,48 +974,15 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 	videoName := "/var/spool/cptv/test-recordings/" + req.Video
 	log.Printf("Playing %s", videoName)
 
-	recorderService := "thermal-recorder-py"
-	tc2AgentService := "tc2-agent"
-	if err := manageService("stop", recorderService); err != nil {
-		serverError(&w, err)
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if err := manageService("stop", tc2AgentService); err != nil {
-		serverError(&w, err)
-		return
-	}
-
-	cmd := exec.Command("/home/pi/.venv/classifier/bin/pi_classify", "--seed", "0", "--fps", "9", "--file", videoName)
-	log.Println(strings.Join(cmd.Args, " "))
-
-	stdout, err := cmd.StdoutPipe()
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
+	err = recorder.Call("org.cacophony.thermalrecorder.ParseFile", 0, videoName, 9, -1).Err
 	if err != nil {
-		log.Fatalf("Failed to create stdout pipe: %s", err)
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		log.Fatalf("Failed to create stderr pipe: %s", err)
-	}
-
-	go streamOutput(stdout)
-	go streamOutput(stderr)
-
-	err = cmd.Start()
-	if err != nil {
-		log.Printf("Failed to start command: %s\n", err)
-	} else {
-		err = cmd.Wait()
-		if err != nil {
-			log.Printf("Command finished with error: %s\n", err)
-		}
-	}
-
-	if err := manageService("start", recorderService); err != nil {
-		serverError(&w, err)
-		return
-	}
-	if err := manageService("start", tc2AgentService); err != nil {
-		serverError(&w, err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }
