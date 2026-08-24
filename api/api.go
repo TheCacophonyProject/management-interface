@@ -945,14 +945,24 @@ func (api *ManagementAPI) UploadTestRecording(w http.ResponseWriter, r *http.Req
 		return
 	}
 }
-
-func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) {
-	if !api.playingTestVideo.CompareAndSwap(false, true) {
-		http.Error(w, "a test video is already playing", http.StatusConflict)
+func (api *ManagementAPI) IsPlaying(w http.ResponseWriter, r *http.Request) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer api.playingTestVideo.Store(false)
 
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
+	file := ""
+	err = recorder.Call("org.cacophony.thermalrecorder.ParsingFile", 0).Store(&file)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"parsing": file})
+}
+
+func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		parseFormErrorResponse(&w, err)
 		return
@@ -971,19 +981,48 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	var recorderConfig goconfig.ThermalRecorder
+	if err := api.config.Unmarshal(goconfig.ThermalRecorderKey, &recorderConfig); err != nil {
+		serverError(&w, err)
+		return
+	}
+
+	status, serviceErr := getServiceStatus("thermal-recorder-py")
+	if (serviceErr != nil || !status.Active) && recorderConfig.UseLowPowerMode {
+		manageService("start", "thermal-recorder-py")
+		// need the service to start up will take a while
+		go runPlayCommand(req, 20)
+		return
+	}
+	err = runPlayCommand(req, 0)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func runPlayCommand(req VideoRequest, timeoutSeconds int) error {
 	videoName := "/var/spool/cptv/test-recordings/" + req.Video
 	log.Printf("Playing %s", videoName)
 
 	conn, err := dbus.SystemBus()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return err
 	}
+
 	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
-	err = recorder.Call("org.cacophony.thermalrecorder.ParseFile", 0, videoName, 9, -1).Err
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+
+	deadline := time.Now().Add(time.Duration(timeoutSeconds) * time.Second)
+	for {
+		err = recorder.Call("org.cacophony.thermalrecorder.ParseFile", 0, videoName, 9, -1).Err
+		if err == nil {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			log.Printf("Failed to play run command timed out after %v to connect to thermalrecorder dbus", timeoutSeconds)
+			return err
+		}
+		time.Sleep(time.Second)
 	}
 }
 

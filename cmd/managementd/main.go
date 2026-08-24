@@ -301,6 +301,7 @@ func main() {
 	apiRouter.HandleFunc("/battery/config", apiObj.ClearBatteryConfig).Methods("DELETE")
 	apiRouter.HandleFunc("/test-videos", apiObj.GetTestVideos).Methods("GET")
 	apiRouter.HandleFunc("/play-test-video", apiObj.PlayTestVideo).Methods("POST")
+	apiRouter.HandleFunc("/playing-test-video", apiObj.IsPlaying).Methods("GET")
 	apiRouter.HandleFunc("/upload-test-recording", apiObj.UploadTestRecording).Methods("POST")
 	apiRouter.HandleFunc("/network/interfaces", apiObj.GetNetworkInterfaces).Methods("GET")
 	apiRouter.HandleFunc("/network/wifi", apiObj.ScanWifiNetwork).Methods("GET")

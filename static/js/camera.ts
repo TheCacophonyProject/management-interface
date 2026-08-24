@@ -151,6 +151,7 @@ async function triggerTrap() {
 }
 
 window.onload = function () {
+  waitUntilFinishedPlaying()
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get("timeout") == "off") {
     snapshotLimit = Number.MAX_SAFE_INTEGER;
@@ -237,6 +238,7 @@ function stopSnapshots(message: string) {
   document.getElementById("snapshot-stopped")!.style.display = "";
   document.getElementById("frameCanvas")!.style.display = "none";
   document.getElementById("trackCanvas")!.style.display = "none";
+  setPlayingVideoOverlay(null);
 }
 
 function onConnectionStateChange(connectionState: CameraConnectionState) {}
@@ -507,10 +509,12 @@ export class CameraConnection {
           }
         }
       }
-      snapshotCount++;
+      if(playing != ""){
+        snapshotCount++;
 
-      if (snapshotCount > snapshotLimit) {
-        stopSnapshots("Timeout for camera viewing.");
+        if (snapshotCount > snapshotLimit) {
+          stopSnapshots("Timeout for camera viewing.");
+        }
       }
     });
   }
@@ -601,6 +605,64 @@ function playTestVideo(): void {
   restartCameraViewing();
 }
 
+
+async function isPlaying(): Promise<string> {
+  const response = await fetch("/api/playing-test-video", {
+    method: "GET",
+    headers: {
+      Authorization: "Basic " + btoa("admin:feathers"),
+    },
+  });
+  if (!response.ok) {
+    throw new Error(response.statusText);
+  }
+  const json = await response.json();
+  return json.parsing;
+}
+
+const PLAYING_POLL_TIMEOUT_SECONDS = 60;
+const PLAYING_POLL_MIN_SECONDS = 20;
+
+function setPlayingVideoOverlay(videoName: string | null): void {
+  const overlay = document.getElementById("playing-video-overlay");
+  if (overlay == null) {
+    return;
+  }
+  if (videoName === null) {
+    overlay.style.display = "none";
+  } else {
+    overlay.innerText = videoName;
+    overlay.style.display = "";
+  }
+}
+
+var playing: string;
+
+async function waitUntilFinishedPlaying(): Promise<void> {
+  try {
+    const start = Date.now();
+    const deadline = start + PLAYING_POLL_TIMEOUT_SECONDS * 1000;
+    const minEnd = start + PLAYING_POLL_MIN_SECONDS * 1000;
+    while (Date.now() < deadline) {
+      try {
+        playing = await isPlaying();
+      } catch (error) {
+        console.error("Error checking test video playing status:", error);
+        return;
+      }
+      if (playing== "" && Date.now() >= minEnd) {
+        return;
+      }
+      setPlayingVideoOverlay(playing);
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    console.error("Timed out waiting for test video to finish playing");
+  } finally {
+    setPlayingVideoOverlay(null);
+  }
+}
+
 function sendVideoRequest(videoName: string): void {
   fetch("/api/play-test-video", {
     method: "POST",
@@ -614,7 +676,10 @@ function sendVideoRequest(videoName: string): void {
       if (!response.ok) {
         console.error("Error playing test video:", response.statusText);
         alert("Video cannot be played");
+        return;
       }
+      setPlayingVideoOverlay(videoName);
+      waitUntilFinishedPlaying();
     })
     .catch((error) => {
       console.error("Error playing test video:", error);
