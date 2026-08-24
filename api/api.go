@@ -33,7 +33,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	goapi "github.com/TheCacophonyProject/go-api"
@@ -64,12 +63,11 @@ const (
 )
 
 type ManagementAPI struct {
-	config           *goconfig.Config
-	router           *mux.Router
-	hotspotTimer     *time.Ticker
-	recordingDir     string
-	appVersion       string
-	playingTestVideo atomic.Bool
+	config       *goconfig.Config
+	router       *mux.Router
+	hotspotTimer *time.Ticker
+	recordingDir string
+	appVersion   string
 }
 
 func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *logging.Logger) (*ManagementAPI, error) {
