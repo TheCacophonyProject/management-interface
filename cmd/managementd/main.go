@@ -415,7 +415,7 @@ func handleFrameListener() error {
 		}
 
 		if ac == nil {
-			// Prioritise frames if there are active clients
+			// Prioritise frames if there are no active clients
 			log.Info("Waiting for frames from tc2-agent")
 			deadLineDuration := 5 * time.Second
 			if hasActiveClients() {
@@ -433,7 +433,7 @@ func handleFrameListener() error {
 			unixListener.SetDeadline(time.Now().Add(deadLineDuration))
 		} else {
 			// tc2-agent already streaming; keep listening (without a
-			// deadline) for a possible takeover connection.
+			// deadline) for a possible thermal-recorder-py connection
 			unixListener.SetDeadline(time.Time{})
 		}
 
@@ -458,14 +458,14 @@ func handleFrameListener() error {
 // currently active; any other source is rejected while one is active.
 func handleIncomingConn(conn net.Conn) {
 	reader := bufio.NewReader(conn)
-	hi, err := headers.ReadHeaderInfo(reader)
+	header, err := headers.ReadHeaderInfo(reader)
 	if err != nil {
 		log.Errorf("Failed to read header from new connection: %v", err)
 		conn.Close()
 		return
 	}
 
-	source := hi.Source()
+	source := header.Source()
 	if source == "" {
 		source = "tc2-agent"
 	}
@@ -474,6 +474,7 @@ func handleIncomingConn(conn net.Conn) {
 
 	activeMu.Lock()
 	if active != nil {
+		// thermal-recorder takes preference as this will be a test video
 		if source == "tc2-agent" {
 			activeMu.Unlock()
 			log.Infof("Rejecting connection from %s, %s is already connected", source, active.source)
@@ -490,9 +491,9 @@ func handleIncomingConn(conn net.Conn) {
 	active = ac
 	activeMu.Unlock()
 
-	log.Printf("connection from %s: %s %s (%dx%d@%dfps) frame size %d", source, hi.Brand(), hi.Model(), hi.ResX(), hi.ResY(), hi.FPS(), hi.FrameSize())
+	log.Printf("connection from %s: %s %s (%dx%d@%dfps) frame size %d", source, header.Brand(), header.Model(), header.ResX(), header.ResY(), header.FPS(), header.FrameSize())
 
-	err = handleConn(conn, reader, hi, ac.abort)
+	err = handleConn(conn, reader, header, ac.abort)
 
 	// connection finished if still the active connection then active becomes nil
 	activeMu.Lock()
