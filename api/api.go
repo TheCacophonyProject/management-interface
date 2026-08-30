@@ -685,27 +685,48 @@ func getTrapDbus() (dbus.BusObject, error) {
 	return conn.Object(trapDbusName, trapDbusPath), nil
 }
 
-// RestartTrap restarts the trap that is connected to the device.
-func (api *ManagementAPI) RestartTrap(w http.ResponseWriter, r *http.Request) {
-	log.Println("restarting trap")
+// callTrap makes a call to the trap DBus service, writing the reason for any failure to
+// the response so it can be shown to the user.
+func callTrap(w *http.ResponseWriter, method string) {
 	trapDbus, err := getTrapDbus()
 	if err != nil {
 		log.Printf("failed to connect to DBus: %v", err)
-		serverError(&w, err)
+		serverError(w, err)
 		return
 	}
 
-	if err := trapDbus.Call(trapDbusName+".Restart", 0).Store(); err != nil {
-		log.Printf("failed to restart trap: %v", err)
+	if err := trapDbus.Call(trapDbusName+"."+method, 0).Store(); err != nil {
+		log.Printf("trap %s failed: %v", method, err)
 		var dbusErr dbus.Error
 		if errors.As(err, &dbusErr) && dbusErr.Name == "org.freedesktop.DBus.Error.ServiceUnknown" {
-			badRequest(&w, errors.New("trap service is not running, check that comms is set to trap-control"))
+			badRequest(w, errors.New("trap service is not running, check that comms is set to trap-control"))
 			return
 		}
-		badRequest(&w, fmt.Errorf("failed to restart trap: %v", err))
+		badRequest(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+	(*w).WriteHeader(http.StatusOK)
+}
+
+// RestartTrap restarts the trap that is connected to the device.
+// This is also how the trap is taken out of manual mode.
+func (api *ManagementAPI) RestartTrap(w http.ResponseWriter, r *http.Request) {
+	log.Println("restarting trap")
+	callTrap(&w, "Restart")
+}
+
+// ReleaseTrapSpool releases the spool on the trap.
+// This puts the trap into manual mode, where it stops running its sequence until restarted.
+func (api *ManagementAPI) ReleaseTrapSpool(w http.ResponseWriter, r *http.Request) {
+	log.Println("releasing trap spool")
+	callTrap(&w, "ReleaseSpool")
+}
+
+// ResetTrapSpool resets the spool on the trap.
+// This puts the trap into manual mode, where it stops running its sequence until restarted.
+func (api *ManagementAPI) ResetTrapSpool(w http.ResponseWriter, r *http.Request) {
+	log.Println("resetting trap spool")
+	callTrap(&w, "ResetSpool")
 }
 
 // CheckSaltConnection will try to ping the salt server and return the response

@@ -17,15 +17,34 @@
         </div>
         <hr>
 
-        <p>Restarting the trap will send a request for the trap to restart. If the trap is on program 2 it won't have a UART connection so this won't work.</p>
+        <h4>Manual control</h4>
+        <p>
+            Releasing or resetting the spool puts the trap into <b>manual mode</b>. It stops running
+            its sequence, so it will not trigger on its own until it is restarted. It restarts itself
+            if it is left in manual mode without a request for a while.
+        </p>
+        <div class="row">
+            <div class="col-xs-12 w-100">
+                <button id="release-spool-button" onclick=releaseSpool() class="btn btn-primary">Release Spool</button>
+                <button id="reset-spool-button" onclick=resetSpool() class="btn btn-primary">Reset Spool</button>
+            </div>
+        </div>
 
+        <hr>
+
+        <h4>Restart</h4>
+        <p>
+            Restarting reloads the config and software that has been copied over to the trap, and
+            takes it out of manual mode back to running its sequence.
+        </p>
         <div class="row">
             <div class="col-xs-12 w-100">
                 <button id="restart-trap-button" onclick=restartTrap() class="btn btn-primary">Restart Trap</button>
             </div>
         </div>
+
         <div class="row">
-            <p id="restart-trap-message" class="col-12 mt-3"></p>
+            <p id="trap-message" class="col-12 mt-3"></p>
         </div>
     </div>
 
