@@ -33,6 +33,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	goapi "github.com/TheCacophonyProject/go-api"
@@ -63,11 +64,12 @@ const (
 )
 
 type ManagementAPI struct {
-	config       *goconfig.Config
-	router       *mux.Router
-	hotspotTimer *time.Ticker
-	recordingDir string
-	appVersion   string
+	config           *goconfig.Config
+	router           *mux.Router
+	hotspotTimer     *time.Ticker
+	recordingDir     string
+	appVersion       string
+	playingTestVideo atomic.Bool
 }
 
 func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *logging.Logger) (*ManagementAPI, error) {
@@ -945,6 +947,12 @@ func (api *ManagementAPI) UploadTestRecording(w http.ResponseWriter, r *http.Req
 }
 
 func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) {
+	if !api.playingTestVideo.CompareAndSwap(false, true) {
+		http.Error(w, "a test video is already playing", http.StatusConflict)
+		return
+	}
+	defer api.playingTestVideo.Store(false)
+
 	if err := r.ParseForm(); err != nil {
 		parseFormErrorResponse(&w, err)
 		return
@@ -977,7 +985,7 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	cmd := exec.Command("/home/pi/.venv/classifier/bin/pi_classify", "--fps", "9", "--file", videoName)
+	cmd := exec.Command("/home/pi/.venv/classifier/bin/pi_classify", "--seed", "0", "--fps", "9", "--file", videoName)
 	log.Println(strings.Join(cmd.Args, " "))
 
 	stdout, err := cmd.StdoutPipe()
@@ -994,12 +1002,12 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 
 	err = cmd.Start()
 	if err != nil {
-		log.Fatalf("Failed to start command: %s", err)
-	}
-
-	err = cmd.Wait()
-	if err != nil {
-		log.Fatalf("Command finished with error: %s", err)
+		log.Printf("Failed to start command: %s\n", err)
+	} else {
+		err = cmd.Wait()
+		if err != nil {
+			log.Printf("Command finished with error: %s\n", err)
+		}
 	}
 
 	if err := manageService("start", recorderService); err != nil {

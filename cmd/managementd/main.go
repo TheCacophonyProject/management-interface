@@ -119,6 +119,77 @@ func GetTC2AgentDbus() (dbus.BusObject, error) {
 	return conn.Object("org.cacophony.TC2Agent", "/org/cacophony/TC2Agent"), nil
 }
 
+// listenForClassifications subscribes to thermal-recorder's Tracking (live, in-progress)
+// and TrackingReprocessed (final) D-Bus signals and forwards them as ClassificationEvents
+// through frameCh so they get pushed out to connected websocket clients.
+func listenForClassifications() {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		log.Errorf("classifications: failed to connect to system bus: %v", err)
+		return
+	}
+
+	rule := "type='signal',interface='org.cacophony.thermalrecorder'"
+	if call := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule); call.Err != nil {
+		log.Errorf("classifications: failed to add match rule: %v", call.Err)
+		return
+	}
+
+	c := make(chan *dbus.Signal, 10)
+	conn.Signal(c)
+
+	log.Info("classifications: listening for D-Bus tracking signals")
+
+	for signal := range c {
+		var live bool
+		switch signal.Name {
+		case "org.cacophony.thermalrecorder.Tracking":
+			live = true
+		case "org.cacophony.thermalrecorder.TrackingReprocessed":
+			live = false
+		default:
+			continue
+		}
+
+		if len(signal.Body) != 13 {
+			log.Warnf("classifications: unexpected signal body length %d for %s", len(signal.Body), signal.Name)
+			continue
+		}
+
+		clipId, ok := signal.Body[0].(int32)
+		if !ok {
+			log.Warnf("classifications: unexpected ClipId type %T", signal.Body[0])
+			continue
+		}
+		trackId, ok := signal.Body[1].(int32)
+		if !ok {
+			log.Warnf("classifications: unexpected TrackId type %T", signal.Body[1])
+			continue
+		}
+		what, ok := signal.Body[3].(string)
+		if !ok {
+			log.Warnf("classifications: unexpected What type %T", signal.Body[3])
+			continue
+		}
+		confidence, ok := signal.Body[4].(int32)
+		if !ok {
+			log.Warnf("classifications: unexpected Confidence type %T", signal.Body[4])
+			continue
+		}
+
+		frameCh <- &FrameData{
+			Classification: &ClassificationEvent{
+				ClipId:     clipId,
+				TrackId:    trackId,
+				What:       what,
+				Confidence: confidence,
+				Live:       live,
+				Time:       time.Now(),
+			},
+		}
+	}
+}
+
 // Set up and handle page requests.
 func main() {
 	args := procArgs()
@@ -156,6 +227,7 @@ func main() {
 	})
 
 	go sendFrameToSockets()
+	go listenForClassifications()
 	// UI handlers.
 	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
 	router.HandleFunc("/wifi-networks", managementinterface.WifiNetworkHandler).Methods("GET")
@@ -321,13 +393,11 @@ func handleFrameListener() error {
 			tc2AgentDbus, err := GetTC2AgentDbus()
 			if err != nil {
 				log.Error("Failed to get TC2AgentDbus")
-				return err
 			}
 			var result string
 			err = tc2AgentDbus.Call("org.cacophony.TC2Agent.prioritiseframeserve", 0).Store(&result)
 			if err != nil {
 				log.Errorf("Failed to request frame serve priority from rp2040, %s", result)
-				return err
 			}
 		}
 
@@ -454,7 +524,6 @@ func WebsocketServer(ws *websocket.Conn) {
 						tc2AgentDbus, err := GetTC2AgentDbus()
 						if err != nil {
 							log.Println(err)
-							return
 						}
 						var isOffloading int
 						var percentComplete int
@@ -466,7 +535,6 @@ func WebsocketServer(ws *websocket.Conn) {
 						err = tc2AgentDbus.Call("org.cacophony.TC2Agent.offloadstatus", 0).Store(&isOffloading, &percentComplete, &secondsRemaining, &filesTotal, &filesRemaining, &eventsTotal, &eventsRemaining)
 						if err != nil {
 							log.Println(err)
-							return
 						}
 						if isOffloading == 1 {
 							log.Printf("rp2040 is offloading files")
@@ -474,7 +542,6 @@ func WebsocketServer(ws *websocket.Conn) {
 							err = tc2AgentDbus.Call("org.cacophony.TC2Agent.canceloffload", 0).Store(&result)
 							if err != nil {
 								log.Println(err)
-								return
 							}
 							log.Printf("requested offload cancellation")
 						}
@@ -526,6 +593,22 @@ func sendFrameToSockets() {
 							time.Sleep(100 * time.Millisecond)
 						}
 					}(socket, uuid, frameNum)
+				}
+				socketsLock.RUnlock()
+			} else if lastFrame.Classification != nil {
+				classificationJson, _ := json.Marshal(struct {
+					Type           string              `json:"type"`
+					Classification ClassificationEvent `json:"classification"`
+				}{Type: "Classification", Classification: *lastFrame.Classification})
+				socketsLock.RLock()
+				for uuid, socket := range sockets {
+					go func(socket *WebsocketRegistration, uuid int64) {
+						// If the socket is busy sending a frame, skip this round rather than block.
+						if atomic.CompareAndSwapUint32(&socket.AtomicLock, 0, 1) {
+							_ = websocket.Message.Send(socket.Socket, string(classificationJson))
+							atomic.StoreUint32(&socket.AtomicLock, 0)
+						}
+					}(socket, uuid)
 				}
 				socketsLock.RUnlock()
 			} else {
@@ -592,7 +675,20 @@ func sendFrameToSockets() {
 }
 
 type FrameData struct {
-	Disconnected bool
-	Frame        *cptvframe.Frame
-	Tracks       []map[string]interface{}
+	Disconnected   bool
+	Frame          *cptvframe.Frame
+	Tracks         []map[string]interface{}
+	Classification *ClassificationEvent
+}
+
+// ClassificationEvent is a single tracking/classification update, either a
+// live in-progress guess (Live == true, from the Tracking signal) or a
+// finalized result (Live == false, from the TrackingReprocessed signal).
+type ClassificationEvent struct {
+	ClipId     int32
+	TrackId    int32
+	What       string
+	Confidence int32
+	Live       bool
+	Time       time.Time
 }
