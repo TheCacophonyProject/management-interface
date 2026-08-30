@@ -672,6 +672,42 @@ func (api *ManagementAPI) TriggerTrap(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+const (
+	trapDbusName = "org.cacophony.trap"
+	trapDbusPath = "/org/cacophony/trap"
+)
+
+func getTrapDbus() (dbus.BusObject, error) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		return nil, err
+	}
+	return conn.Object(trapDbusName, trapDbusPath), nil
+}
+
+// RestartTrap restarts the trap that is connected to the device.
+func (api *ManagementAPI) RestartTrap(w http.ResponseWriter, r *http.Request) {
+	log.Println("restarting trap")
+	trapDbus, err := getTrapDbus()
+	if err != nil {
+		log.Printf("failed to connect to DBus: %v", err)
+		serverError(&w, err)
+		return
+	}
+
+	if err := trapDbus.Call(trapDbusName+".Restart", 0).Store(); err != nil {
+		log.Printf("failed to restart trap: %v", err)
+		var dbusErr dbus.Error
+		if errors.As(err, &dbusErr) && dbusErr.Name == "org.freedesktop.DBus.Error.ServiceUnknown" {
+			badRequest(&w, errors.New("trap service is not running, check that comms is set to trap-control"))
+			return
+		}
+		badRequest(&w, fmt.Errorf("failed to restart trap: %v", err))
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 // CheckSaltConnection will try to ping the salt server and return the response
 func (api *ManagementAPI) CheckSaltConnection(w http.ResponseWriter, r *http.Request) {
 	log.Println("pinging salt server")

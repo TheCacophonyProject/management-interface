@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Trap</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+</head>
+
+<body>
+    {{template "navbar"}}
+
+    <div class="container">
+        <div class="container pt-5 pl-0">
+            <h2>Trap<br></h2>
+        </div>
+        <hr>
+
+        <p>Restarting the trap will send a request for the trap to restart. If the trap is on program 2 it won't have a UART connection so this won't work.</p>
+
+        <div class="row">
+            <div class="col-xs-12 w-100">
+                <button id="restart-trap-button" onclick=restartTrap() class="btn btn-primary">Restart Trap</button>
+            </div>
+        </div>
+        <div class="row">
+            <p id="restart-trap-message" class="col-12 mt-3"></p>
+        </div>
+    </div>
+
+    <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+    <script src="/static/js/api-utils.js"></script>
+    <script src="/static/js/trap.js"></script>
+</body>
+
+</html>

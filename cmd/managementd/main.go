@@ -247,6 +247,7 @@ func main() {
 	router.HandleFunc("/audiobait", managementinterface.Audiobait).Methods("GET")
 	router.HandleFunc("/modem", managementinterface.Modem).Methods("GET")
 	router.HandleFunc("/battery", managementinterface.Battery).Methods("GET")
+	router.HandleFunc("/trap", managementinterface.Trap).Methods("GET")
 	router.HandleFunc("/battery-csv", managementinterface.DownloadBatteryCSV).Methods("GET")
 	router.HandleFunc("/temperature-csv", managementinterface.DownloadTemperatureCSV).Methods("GET")
 
@@ -279,6 +280,7 @@ func main() {
 	apiRouter.HandleFunc("/events", apiObj.GetEvents).Methods("GET")
 	apiRouter.HandleFunc("/events", apiObj.DeleteEvents).Methods("DELETE")
 	apiRouter.HandleFunc("/trigger-trap", apiObj.TriggerTrap).Methods("PUT")
+	apiRouter.HandleFunc("/trap/restart", apiObj.RestartTrap).Methods("POST")
 	apiRouter.HandleFunc("/check-salt-connection", apiObj.CheckSaltConnection).Methods("GET")
 	apiRouter.HandleFunc("/salt-update", apiObj.StartSaltUpdate).Methods("POST")
 	apiRouter.HandleFunc("/salt-update", apiObj.GetSaltUpdateState).Methods("GET")
