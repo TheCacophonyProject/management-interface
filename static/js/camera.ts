@@ -151,7 +151,7 @@ async function triggerTrap() {
 }
 
 window.onload = function () {
-  waitUntilFinishedPlaying()
+  checkIfPlaying()
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get("timeout") == "off") {
     snapshotLimit = Number.MAX_SAFE_INTEGER;
@@ -621,7 +621,7 @@ async function isPlaying(): Promise<string> {
 }
 
 const PLAYING_POLL_TIMEOUT_SECONDS = 60;
-const PLAYING_POLL_MIN_SECONDS = 20;
+const PLAYING_POLL_MIN_SECONDS = 40;
 
 function setPlayingVideoOverlay(videoName: string | null): void {
   const overlay = document.getElementById("playing-video-overlay");
@@ -637,9 +637,20 @@ function setPlayingVideoOverlay(videoName: string | null): void {
 }
 
 var playing: string;
-
+async function checkIfPlaying(): Promise<void> {
+  try {
+    playing = await isPlaying();
+  } catch (error) {
+    console.error("Error checking test video playing status:", error);
+    return;
+  }
+  if (playing != ""){
+    waitUntilFinishedPlaying()
+  }
+}
 async function waitUntilFinishedPlaying(): Promise<void> {
   try {
+    setPlayButtonEnabled(false);
     const start = Date.now();
     const deadline = start + PLAYING_POLL_TIMEOUT_SECONDS * 1000;
     const minEnd = start + PLAYING_POLL_MIN_SECONDS * 1000;
@@ -653,17 +664,86 @@ async function waitUntilFinishedPlaying(): Promise<void> {
       if (playing== "" && Date.now() >= minEnd) {
         return;
       }
-      setPlayingVideoOverlay(playing);
+      
+      if(playing != ""){
+        setStatusMessage(null);
+        setPlayingVideoOverlay(playing);
+
+      }
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
     console.error("Timed out waiting for test video to finish playing");
   } finally {
     setPlayingVideoOverlay(null);
+    setPlayButtonEnabled(true);
   }
 }
 
-function sendVideoRequest(videoName: string): void {
+const CLASSIFIER_READY_POLL_TIMEOUT_SECONDS = 30;
+
+interface PlayTestVideoResponse {
+  success: boolean;
+  serviceStarting?: boolean;
+  dbusStarting?: boolean;
+}
+
+function setPlayButtonEnabled(enabled: boolean): void {
+  const button = document.getElementById(
+    "play-test-video"
+  ) as HTMLButtonElement | null;
+  if (button != null) {
+    button.disabled = !enabled;
+  }
+}
+
+function setStatusMessage(text: string | null): void {
+  const message = document.getElementById("status-message");
+  if (message == null) {
+    return;
+  }
+  if (text == null) {
+    message.style.display = "none";
+    message.innerText = "";
+  } else {
+    message.innerText = text;
+    message.style.display = "";
+  }
+}
+
+async function isDbusReady(): Promise<boolean> {
+  const response = await fetch("/api/classifier-ready", {
+    method: "GET",
+    headers: {
+      Authorization: "Basic " + btoa("admin:feathers"),
+    },
+  });
+  if (!response.ok) {
+    throw new Error(response.statusText);
+  }
+  const json = await response.json();
+  return json.dbusReady === true;
+}
+
+async function waitUntilClassifierReady(): Promise<boolean> {
+  setPlayButtonEnabled(false);
+  const deadline = Date.now() + CLASSIFIER_READY_POLL_TIMEOUT_SECONDS * 1000;
+  while (Date.now() < deadline) {
+    try {
+      if (await isDbusReady()) {
+        return true;
+      }
+    } catch (error) {
+      console.error("Error checking classifier ready status:", error);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  alert("Thermal Recorder is still not ready. Please try again shortly.");
+  setPlayButtonEnabled(true);
+  return false;
+}
+
+function sendVideoRequest(videoName: string, waitForReady: boolean = true): void {
   fetch("/api/play-test-video", {
     method: "POST",
     headers: {
@@ -675,11 +755,64 @@ function sendVideoRequest(videoName: string): void {
     .then((response) => {
       if (!response.ok) {
         console.error("Error playing test video:", response.statusText);
-        alert("Video cannot be played");
+        alert("Video cannot be played" + response.statusText);
         return;
       }
-      setPlayingVideoOverlay(videoName);
-      waitUntilFinishedPlaying();
+      return response.json();
+    })
+    .then((json: PlayTestVideoResponse | undefined) => {
+      if (json == null) {
+        return;
+      }
+
+      if (json.serviceStarting) {
+        if (!waitForReady) {
+          setPlayButtonEnabled(true);
+          alert("Video cannot be played");
+          return;
+        }
+        setStatusMessage(
+          "Thermal Recorder is starting up, this may take 30 seconds"
+        );
+        waitUntilClassifierReady().then((ready) => {
+          if (ready) {
+            sendVideoRequest(videoName, false);
+          } else {
+            setStatusMessage(null);
+
+            alert("Video cannot be played");
+          }
+        });
+        return;
+      }
+
+      if (json.dbusStarting) {
+        if (!waitForReady) {
+          setPlayButtonEnabled(true);
+          alert("Video cannot be played");
+          return;
+        }
+        setStatusMessage("Thermal Recorder is starting up");
+        waitUntilClassifierReady().then((ready) => {
+          if (ready) {
+            sendVideoRequest(videoName, false);
+          } else {
+            setStatusMessage(null);
+            alert("Video cannot be played");
+          }
+        });
+        return;
+      }
+
+      if (json.success) {
+        setStatusMessage("Playback pending");
+        setPlayButtonEnabled(false);
+        setPlayingVideoOverlay(videoName);
+        waitUntilFinishedPlaying().finally(() => {
+          setStatusMessage(null);
+          setPlayButtonEnabled(true);
+        });
+      }
     })
     .catch((error) => {
       console.error("Error playing test video:", error);

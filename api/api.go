@@ -960,6 +960,23 @@ func (api *ManagementAPI) IsPlaying(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"parsing": file})
 }
 
+func (api *ManagementAPI) ClassifierIsReady(w http.ResponseWriter, r *http.Request) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
+	ready := false
+	err = recorder.Call("org.cacophony.thermalrecorder.IsReady", 0).Store(&ready)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]bool{"ready": ready, "dbusReady": true})
+}
+
 func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		parseFormErrorResponse(&w, err)
@@ -988,15 +1005,15 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 	status, serviceErr := getServiceStatus("thermal-recorder-py")
 	if (serviceErr != nil || !status.Active) && recorderConfig.UseLowPowerMode {
 		manageService("start", "thermal-recorder-py")
-		// need the service to start up will take a while
-		go runPlayCommand(req, 20)
+		json.NewEncoder(w).Encode(map[string]bool{"success": true, "serviceStarting": true})
 		return
 	}
 	err = runPlayCommand(req, 0)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "dbusStarting": true})
 		return
 	}
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 func runPlayCommand(req VideoRequest, timeoutSeconds int) error {
