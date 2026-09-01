@@ -367,9 +367,7 @@ func main() {
 func handleFrameListenerLoop() {
 	for {
 		err := handleFrameListener()
-		if err != nil {
-			log.Errorf("Error handling frame listener: %v", err)
-		}
+		log.Errorf("Error handling frame listener: %v", err)
 		log.Info("Will retry connection in 5 seconds")
 		time.Sleep(5 * time.Second)
 	}
