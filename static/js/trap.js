@@ -3,6 +3,10 @@
 const trapButtons = [
   "release-spool-button",
   "reset-spool-button",
+  "open-door-1-button",
+  "close-door-1-button",
+  "open-door-2-button",
+  "close-door-2-button",
   "restart-trap-button",
 ];
 
@@ -46,6 +50,27 @@ function resetSpool() {
     "/api/trap/reset-spool",
     "Resetting spool...",
     "Resetting the spool, this takes a few seconds. The trap is now in manual mode, restart it to go back to running its sequence."
+  );
+}
+
+// The trap only reports that a door has finished moving with a DOOR_OPENED/DOOR_CLOSED
+// message, which doesn't come back over this request, so the door is still moving when
+// the button re-enables.
+function openDoor(door) {
+  trapRequest(
+    "/api/trap/door/" + door + "/open",
+    "Opening door " + door + "...",
+    "Opening door " + door +
+      ", this takes about 20 seconds. The trap is now in manual mode, restart it to go back to running its sequence."
+  );
+}
+
+function closeDoor(door) {
+  trapRequest(
+    "/api/trap/door/" + door + "/close",
+    "Closing door " + door + "...",
+    "Door " + door +
+      " closed. The trap is now in manual mode, restart it to go back to running its sequence."
   );
 }
 

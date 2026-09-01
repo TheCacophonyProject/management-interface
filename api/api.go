@@ -687,7 +687,7 @@ func getTrapDbus() (dbus.BusObject, error) {
 
 // callTrap makes a call to the trap DBus service, writing the reason for any failure to
 // the response so it can be shown to the user.
-func callTrap(w *http.ResponseWriter, method string) {
+func callTrap(w *http.ResponseWriter, method string, args ...interface{}) {
 	trapDbus, err := getTrapDbus()
 	if err != nil {
 		log.Printf("failed to connect to DBus: %v", err)
@@ -695,7 +695,7 @@ func callTrap(w *http.ResponseWriter, method string) {
 		return
 	}
 
-	if err := trapDbus.Call(trapDbusName+"."+method, 0).Store(); err != nil {
+	if err := trapDbus.Call(trapDbusName+"."+method, 0, args...).Store(); err != nil {
 		log.Printf("trap %s failed: %v", method, err)
 		var dbusErr dbus.Error
 		if errors.As(err, &dbusErr) && dbusErr.Name == "org.freedesktop.DBus.Error.ServiceUnknown" {
@@ -727,6 +727,39 @@ func (api *ManagementAPI) ReleaseTrapSpool(w http.ResponseWriter, r *http.Reques
 func (api *ManagementAPI) ResetTrapSpool(w http.ResponseWriter, r *http.Request) {
 	log.Println("resetting trap spool")
 	callTrap(&w, "ResetSpool")
+}
+
+// trapDoorNumber reads the door number out of the route. The route only matches 1 and 2,
+// so this can only fail if that pattern is widened without updating the trap.
+func trapDoorNumber(w *http.ResponseWriter, r *http.Request) (int32, bool) {
+	door, err := strconv.Atoi(mux.Vars(r)["door"])
+	if err != nil || (door != 1 && door != 2) {
+		badRequest(w, errors.New("door must be 1 or 2"))
+		return 0, false
+	}
+	return int32(door), true
+}
+
+// OpenTrapDoor opens one of the ratchet doors on the trap, ratcheting it up and holding it.
+// This puts the trap into manual mode, where it stops running its sequence until restarted.
+func (api *ManagementAPI) OpenTrapDoor(w http.ResponseWriter, r *http.Request) {
+	door, ok := trapDoorNumber(&w, r)
+	if !ok {
+		return
+	}
+	log.Printf("opening trap door %d", door)
+	callTrap(&w, "OpenDoor", door)
+}
+
+// CloseTrapDoor closes one of the ratchet doors on the trap, releasing it so it drops.
+// This puts the trap into manual mode, where it stops running its sequence until restarted.
+func (api *ManagementAPI) CloseTrapDoor(w http.ResponseWriter, r *http.Request) {
+	door, ok := trapDoorNumber(&w, r)
+	if !ok {
+		return
+	}
+	log.Printf("closing trap door %d", door)
+	callTrap(&w, "CloseDoor", door)
 }
 
 // CheckSaltConnection will try to ping the salt server and return the response
