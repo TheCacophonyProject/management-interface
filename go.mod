@@ -15,7 +15,7 @@ require (
 	github.com/godbus/dbus v4.1.0+incompatible
 	github.com/gorilla/mux v1.8.0
 	github.com/nathan-osman/go-sunrise v1.0.0 // indirect
-	golang.org/x/net v0.38.0
+	golang.org/x/net v0.55.0
 )
 
 require (
@@ -24,7 +24,7 @@ require (
 	github.com/TheCacophonyProject/thermal-recorder v1.22.1-0.20230627011240-89964c0511f7
 	github.com/TheCacophonyProject/trap-controller v0.0.0-20230227002937-262a1adfaa47
 	github.com/alexflint/go-arg v1.4.3
-	golang.org/x/text v0.26.0
+	golang.org/x/text v0.37.0
 )
 
 require (
@@ -55,8 +55,8 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
-	golang.org/x/mod v0.25.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/mod v0.35.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637 // indirect
 	gopkg.in/yaml.v1 v1.0.0-20140924161607-9f9df34309c0 // indirect
