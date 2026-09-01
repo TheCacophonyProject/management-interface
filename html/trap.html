@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Trap</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+</head>
+
+<body>
+    {{template "navbar"}}
+
+    <div class="container">
+        <div class="container pt-5 pl-0">
+            <h2>Trap<br></h2>
+        </div>
+        <hr>
+
+        <h4>Manual control</h4>
+        <p>
+            
+        </p>
+        <div class="row">
+            <div class="col-xs-12 w-100">
+                <button id="release-spool-button" onclick=releaseSpool() class="btn btn-primary">Release Spool</button>
+                <button id="reset-spool-button" onclick=resetSpool() class="btn btn-primary">Reset Spool</button>
+            </div>
+        </div>
+
+        <hr>
+
+        <h4>Doors</h4>
+        <p>
+           
+        </p>
+        <div class="row">
+            <div class="col-xs-12 w-100">
+                <button id="open-door-1-button" onclick=openDoor(1) class="btn btn-primary">Open Door 1</button>
+                <button id="close-door-1-button" onclick=closeDoor(1) class="btn btn-primary">Close Door 1</button>
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-xs-12 w-100">
+                <button id="open-door-2-button" onclick=openDoor(2) class="btn btn-primary">Open Door 2</button>
+                <button id="close-door-2-button" onclick=closeDoor(2) class="btn btn-primary">Close Door 2</button>
+            </div>
+        </div>
+
+        <hr>
+
+        <h4>Restart</h4>
+        <p>
+           
+        </p>
+        <div class="row">
+            <div class="col-xs-12 w-100">
+                <button id="restart-trap-button" onclick=restartTrap() class="btn btn-primary">Restart Trap</button>
+            </div>
+        </div>
+
+        <div class="row">
+            <p id="trap-message" class="col-12 mt-3"></p>
+        </div>
+    </div>
+
+    <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+    <script src="/static/js/api-utils.js"></script>
+    <script src="/static/js/trap.js"></script>
+</body>
+
+</html>

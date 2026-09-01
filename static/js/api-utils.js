@@ -28,7 +28,9 @@ function apiFormURLEncodedPost(url, data) {
       if (200 <= xhr.status && xhr.status < 300) {
         resolve(xhr.responseText);
       } else {
-        reject(xhr.statusText);
+        // The API handlers write the reason for a failure to the body, so use
+        // that when there is one.
+        reject(xhr.responseText || xhr.statusText);
       }
     };
     xhr.onerror = () => reject(xhr);
