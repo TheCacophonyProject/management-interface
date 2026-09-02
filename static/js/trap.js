@@ -74,6 +74,16 @@ function closeDoor(door) {
   );
 }
 
+// Stop is deliberately left out of trapButtons so it stays pressable while another
+// request is in flight, as stopping a move part way through is the point of it.
+function stopTrap() {
+  trapRequest(
+    "/api/trap/stop",
+    "Stopping...",
+    "Stopped. The trap is now in manual mode, restart it to go back to running its sequence."
+  );
+}
+
 function restartTrap() {
   trapRequest("/api/trap/restart", "Restarting trap...", "Trap restarted.");
 }
