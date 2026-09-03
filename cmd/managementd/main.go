@@ -281,6 +281,7 @@ func main() {
 	apiRouter.HandleFunc("/events", apiObj.DeleteEvents).Methods("DELETE")
 	apiRouter.HandleFunc("/trigger-trap", apiObj.TriggerTrap).Methods("PUT")
 	apiRouter.HandleFunc("/trap/restart", apiObj.RestartTrap).Methods("POST")
+	apiRouter.HandleFunc("/trap/stop", apiObj.StopTrap).Methods("POST")
 	apiRouter.HandleFunc("/trap/release-spool", apiObj.ReleaseTrapSpool).Methods("POST")
 	apiRouter.HandleFunc("/trap/reset-spool", apiObj.ResetTrapSpool).Methods("POST")
 	apiRouter.HandleFunc("/trap/door/{door:[12]}/open", apiObj.OpenTrapDoor).Methods("POST")

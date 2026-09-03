@@ -715,6 +715,14 @@ func (api *ManagementAPI) RestartTrap(w http.ResponseWriter, r *http.Request) {
 	callTrap(&w, "Restart")
 }
 
+// StopTrap stops whatever the trap is doing, interrupting a spool or door that is part
+// way through moving. This puts the trap into manual mode, so it stays stopped until it
+// is restarted.
+func (api *ManagementAPI) StopTrap(w http.ResponseWriter, r *http.Request) {
+	log.Println("stopping trap")
+	callTrap(&w, "Stop")
+}
+
 // ReleaseTrapSpool releases the spool on the trap.
 // This puts the trap into manual mode, where it stops running its sequence until restarted.
 func (api *ManagementAPI) ReleaseTrapSpool(w http.ResponseWriter, r *http.Request) {
