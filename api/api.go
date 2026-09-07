@@ -33,7 +33,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	goapi "github.com/TheCacophonyProject/go-api"
@@ -64,12 +63,11 @@ const (
 )
 
 type ManagementAPI struct {
-	config           *goconfig.Config
-	router           *mux.Router
-	hotspotTimer     *time.Ticker
-	recordingDir     string
-	appVersion       string
-	playingTestVideo atomic.Bool
+	config       *goconfig.Config
+	router       *mux.Router
+	hotspotTimer *time.Ticker
+	recordingDir string
+	appVersion   string
 }
 
 func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *logging.Logger) (*ManagementAPI, error) {
@@ -1043,14 +1041,41 @@ func (api *ManagementAPI) UploadTestRecording(w http.ResponseWriter, r *http.Req
 		return
 	}
 }
-
-func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) {
-	if !api.playingTestVideo.CompareAndSwap(false, true) {
-		http.Error(w, "a test video is already playing", http.StatusConflict)
+func (api *ManagementAPI) IsPlaying(w http.ResponseWriter, r *http.Request) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer api.playingTestVideo.Store(false)
 
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
+	file := ""
+	err = recorder.Call("org.cacophony.thermalrecorder.ParsingFile", 0).Store(&file)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"parsing": file})
+}
+
+func (api *ManagementAPI) ClassifierIsReady(w http.ResponseWriter, r *http.Request) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
+	ready := false
+	err = recorder.Call("org.cacophony.thermalrecorder.IsReady", 0).Store(&ready)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]bool{"ready": ready, "dbusReady": true})
+}
+
+func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		parseFormErrorResponse(&w, err)
 		return
@@ -1069,52 +1094,48 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	var recorderConfig goconfig.ThermalRecorder
+	if err := api.config.Unmarshal(goconfig.ThermalRecorderKey, &recorderConfig); err != nil {
+		serverError(&w, err)
+		return
+	}
+
+	status, serviceErr := getServiceStatus("thermal-recorder-py")
+	if (serviceErr != nil || !status.Active) && recorderConfig.UseLowPowerMode {
+		manageService("start", "thermal-recorder-py")
+		json.NewEncoder(w).Encode(map[string]bool{"success": true, "serviceStarting": true})
+		return
+	}
+	err = runPlayCommand(req, 0)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "dbusStarting": true})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+func runPlayCommand(req VideoRequest, timeoutSeconds int) error {
 	videoName := "/var/spool/cptv/test-recordings/" + req.Video
 	log.Printf("Playing %s", videoName)
 
-	recorderService := "thermal-recorder-py"
-	tc2AgentService := "tc2-agent"
-	if err := manageService("stop", recorderService); err != nil {
-		serverError(&w, err)
-		return
-	}
-	if err := manageService("stop", tc2AgentService); err != nil {
-		serverError(&w, err)
-		return
-	}
-
-	cmd := exec.Command("/home/pi/.venv/classifier/bin/pi_classify", "--seed", "0", "--fps", "9", "--file", videoName)
-	log.Println(strings.Join(cmd.Args, " "))
-
-	stdout, err := cmd.StdoutPipe()
+	conn, err := dbus.SystemBus()
 	if err != nil {
-		log.Fatalf("Failed to create stdout pipe: %s", err)
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		log.Fatalf("Failed to create stderr pipe: %s", err)
+		return err
 	}
 
-	go streamOutput(stdout)
-	go streamOutput(stderr)
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
 
-	err = cmd.Start()
-	if err != nil {
-		log.Printf("Failed to start command: %s\n", err)
-	} else {
-		err = cmd.Wait()
-		if err != nil {
-			log.Printf("Command finished with error: %s\n", err)
+	deadline := time.Now().Add(time.Duration(timeoutSeconds) * time.Second)
+	for {
+		err = recorder.Call("org.cacophony.thermalrecorder.ParseFile", 0, videoName, 9, -1).Err
+		if err == nil {
+			return nil
 		}
-	}
-
-	if err := manageService("start", recorderService); err != nil {
-		serverError(&w, err)
-		return
-	}
-	if err := manageService("start", tc2AgentService); err != nil {
-		serverError(&w, err)
-		return
+		if time.Now().After(deadline) {
+			log.Printf("Failed to play run command timed out after %v to connect to thermalrecorder dbus", timeoutSeconds)
+			return err
+		}
+		time.Sleep(time.Second)
 	}
 }
 

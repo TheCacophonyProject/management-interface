@@ -46,6 +46,7 @@
           </button>
         </div>
       </div>
+      <p id="status-message" style="display: none"></p>
       <div class="row" style="position: relative; aspect-ratio: 160 / 120">
         <canvas
           id="frameCanvas"
@@ -59,6 +60,10 @@
           height="120"
           style="width: 100%; position: absolute; left: 0; top: 0; z-index: 1"
         ></canvas>
+        <div
+          id="playing-video-overlay"
+          style="display: none; position: absolute; left: 8px; top: 8px; z-index: 2; color: white; text-shadow: 0 0 3px black, 0 0 3px black; font: 14px sans-serif; pointer-events: none"
+        ></div>
       </div>
       <div class="row mt-3">
         <h4>Classifications</h4>
