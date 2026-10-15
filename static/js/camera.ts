@@ -653,7 +653,7 @@ async function waitUntilFinishedPlaying(): Promise<void> {
     setPlayButtonEnabled(false);
     const start = Date.now();
     const deadline = start + PLAYING_POLL_TIMEOUT_SECONDS * 1000;
-    const minEnd = start + PLAYING_POLL_MIN_SECONDS * 1000;
+    let minEnd = start + PLAYING_POLL_MIN_SECONDS * 1000;
     while (Date.now() < deadline) {
       try {
         playing = await isPlaying();
@@ -666,6 +666,7 @@ async function waitUntilFinishedPlaying(): Promise<void> {
       }
       
       if(playing != ""){
+        minEnd = 0;
         setStatusMessage(null);
         setPlayingVideoOverlay(playing);
 

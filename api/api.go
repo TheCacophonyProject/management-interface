@@ -901,7 +901,7 @@ func (api *ManagementAPI) GetServiceStatus(w http.ResponseWriter, r *http.Reques
 		parseFormErrorResponse(&w, errors.New("service field was empty"))
 		return
 	}
-	serviceStatus, err := getServiceStatus(service)
+	serviceStatus, err := getServiceStatusAndDuration(service)
 	if err != nil {
 		serverError(&w, err)
 		return
@@ -1100,8 +1100,8 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	status, serviceErr := getServiceStatus("thermal-recorder-py")
-	if (serviceErr != nil || !status.Active) && recorderConfig.UseLowPowerMode {
+	status := getServiceStatus("thermal-recorder-py")
+	if !status.Active && recorderConfig.UseLowPowerMode {
 		manageService("start", "thermal-recorder-py")
 		json.NewEncoder(w).Encode(map[string]bool{"success": true, "serviceStarting": true})
 		return
@@ -1809,8 +1809,17 @@ type serviceStatus struct {
 	Duration int
 }
 
-func getServiceStatus(service string) (*serviceStatus, error) {
+func getServiceStatus(service string) *serviceStatus {
 	status := &serviceStatus{}
+	enabledOut, _ := exec.Command("systemctl", "is-enabled", service).Output()
+	status.Enabled = strings.TrimSpace(string(enabledOut)) == "enabled"
+	activeOut, _ := exec.Command("systemctl", "is-active", service).Output()
+	status.Active = strings.TrimSpace(string(activeOut)) == "active"
+	return status
+}
+
+func getServiceStatusAndDuration(service string) (*serviceStatus, error) {
+	status := getServiceStatus(service)
 	enabledOut, _ := exec.Command("systemctl", "is-enabled", service).Output()
 	status.Enabled = strings.TrimSpace(string(enabledOut)) == "enabled"
 	activeOut, _ := exec.Command("systemctl", "is-active", service).Output()
