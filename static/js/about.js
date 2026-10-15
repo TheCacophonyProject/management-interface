@@ -258,3 +258,32 @@ async function setEnvironment() {
 function downloadTemperatureCsv() {
   window.location.href = "/temperature-csv";
 }
+
+async function eraseFlash() {
+  if (!confirm("Are you sure you want to erase flash? This cannot be undone. Device must stay on for at least 2 minutes.")) {
+    return;
+  }
+  $("#erase-flash-button").attr("disabled", true);
+  $("#erase-flash-button").html("Erasing Flash...");
+  try {
+    const response = await fetch("/api/erase-flash", {
+      method: "POST",
+      headers: {
+        Authorization: "Basic " + btoa("admin:feathers"),
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (response.ok) {
+      alert("Flash erase done.");
+    } else {
+      alert("Error erasing flash");
+      console.error("Error with response:", await response.text());
+    }
+  } catch (error) {
+    alert("Error erasing flash");
+    console.error("Error erasing flash:", error);
+  }
+  $("#erase-flash-button").attr("disabled", false);
+  $("#erase-flash-button").html("Erase Flash");
+}

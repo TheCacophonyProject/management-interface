@@ -1,4 +1,10 @@
-import { FrameInfo, Frame, Region, CameraInfo } from "../../api/types";
+import {
+  FrameInfo,
+  Frame,
+  Region,
+  CameraInfo,
+  ClassificationEvent,
+} from "../../api/types";
 
 async function getAudioMode() {
   return fetch("/api/audiorecording", {
@@ -103,8 +109,25 @@ function restartCameraViewing() {
       window.location.hostname,
       window.location.port,
       processFrame,
-      onConnectionStateChange
+      onConnectionStateChange,
+      addClassificationToList
     );
+  }
+}
+
+const classificationListLimit = 50;
+function addClassificationToList(ce: ClassificationEvent) {
+  const list = document.getElementById("classification-list");
+  if (list == null) {
+    return;
+  }
+  const item = document.createElement("li");
+  const time = new Date(ce.Time).toLocaleTimeString();
+  const status = ce.Live ? "live" : "final";
+  item.innerText = `${ce.What} — ${ce.Confidence}% (${status}) · ${time}`;
+  list.insertBefore(item, list.firstChild);
+  while (list.childElementCount > classificationListLimit) {
+    list.removeChild(list.lastChild as ChildNode);
   }
 }
 
@@ -128,6 +151,7 @@ async function triggerTrap() {
 }
 
 window.onload = function () {
+  checkIfPlaying()
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get("timeout") == "off") {
     snapshotLimit = Number.MAX_SAFE_INTEGER;
@@ -141,7 +165,8 @@ window.onload = function () {
     window.location.hostname,
     window.location.port,
     processFrame,
-    onConnectionStateChange
+    onConnectionStateChange,
+    addClassificationToList
   );
 
   document.getElementById('upload-test-recording-form')!.addEventListener('submit', (event) => {
@@ -213,6 +238,7 @@ function stopSnapshots(message: string) {
   document.getElementById("snapshot-stopped")!.style.display = "";
   document.getElementById("frameCanvas")!.style.display = "none";
   document.getElementById("trackCanvas")!.style.display = "none";
+  setPlayingVideoOverlay(null);
 }
 
 function onConnectionStateChange(connectionState: CameraConnectionState) {}
@@ -361,7 +387,8 @@ export class CameraConnection {
     public onFrame: (frame: Frame) => void,
     public onConnectionStateChange: (
       connectionState: CameraConnectionState
-    ) => void
+    ) => void,
+    public onClassification: (classification: ClassificationEvent) => void
   ) {
     this.audioOnly = false;
     this.closing = false;
@@ -470,13 +497,24 @@ export class CameraConnection {
           } else {
             getAudioStatus();
           }
+        } else {
+          try {
+            const parsed = JSON.parse(event.data);
+            if (parsed.type === "Classification") {
+              this.onClassification(parsed.classification as ClassificationEvent);
+              snapshotCount = 0;  // Don't stop preview when getting classifications
+            }
+          } catch (e) {
+            console.log("got message", event.data);
+          }
         }
-        console.log("got message", event.data);
       }
-      snapshotCount++;
+      if(playing != ""){
+        snapshotCount++;
 
-      if (snapshotCount > snapshotLimit) {
-        stopSnapshots("Timeout for camera viewing.");
+        if (snapshotCount > snapshotLimit) {
+          stopSnapshots("Timeout for camera viewing.");
+        }
       }
     });
   }
@@ -564,9 +602,149 @@ function playTestVideo(): void {
   } else {
     alert("Please select a video option first!");
   }
+  restartCameraViewing();
 }
 
-function sendVideoRequest(videoName: string): void {
+
+async function isPlaying(): Promise<string> {
+  const response = await fetch("/api/playing-test-video", {
+    method: "GET",
+    headers: {
+      Authorization: "Basic " + btoa("admin:feathers"),
+    },
+  });
+  if (!response.ok) {
+    throw new Error(response.statusText);
+  }
+  const json = await response.json();
+  return json.parsing;
+}
+
+const PLAYING_POLL_TIMEOUT_SECONDS = 60;
+const PLAYING_POLL_MIN_SECONDS = 40;
+
+function setPlayingVideoOverlay(videoName: string | null): void {
+  const overlay = document.getElementById("playing-video-overlay");
+  if (overlay == null) {
+    return;
+  }
+  if (videoName === null) {
+    overlay.style.display = "none";
+  } else {
+    overlay.innerText = videoName;
+    overlay.style.display = "";
+  }
+}
+
+var playing: string;
+async function checkIfPlaying(): Promise<void> {
+  try {
+    playing = await isPlaying();
+  } catch (error) {
+    console.error("Error checking test video playing status:", error);
+    return;
+  }
+  if (playing != ""){
+    waitUntilFinishedPlaying()
+  }
+}
+async function waitUntilFinishedPlaying(): Promise<void> {
+  try {
+    setPlayButtonEnabled(false);
+    const start = Date.now();
+    const deadline = start + PLAYING_POLL_TIMEOUT_SECONDS * 1000;
+    let minEnd = start + PLAYING_POLL_MIN_SECONDS * 1000;
+    while (Date.now() < deadline) {
+      try {
+        playing = await isPlaying();
+      } catch (error) {
+        console.error("Error checking test video playing status:", error);
+        return;
+      }
+      if (playing== "" && Date.now() >= minEnd) {
+        return;
+      }
+      
+      if(playing != ""){
+        minEnd = 0;
+        setStatusMessage(null);
+        setPlayingVideoOverlay(playing);
+
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    console.error("Timed out waiting for test video to finish playing");
+  } finally {
+    setPlayingVideoOverlay(null);
+    setPlayButtonEnabled(true);
+  }
+}
+
+const CLASSIFIER_READY_POLL_TIMEOUT_SECONDS = 30;
+
+interface PlayTestVideoResponse {
+  success: boolean;
+  serviceStarting?: boolean;
+  dbusStarting?: boolean;
+}
+
+function setPlayButtonEnabled(enabled: boolean): void {
+  const button = document.getElementById(
+    "play-test-video"
+  ) as HTMLButtonElement | null;
+  if (button != null) {
+    button.disabled = !enabled;
+  }
+}
+
+function setStatusMessage(text: string | null): void {
+  const message = document.getElementById("status-message");
+  if (message == null) {
+    return;
+  }
+  if (text == null) {
+    message.style.display = "none";
+    message.innerText = "";
+  } else {
+    message.innerText = text;
+    message.style.display = "";
+  }
+}
+
+async function isDbusReady(): Promise<boolean> {
+  const response = await fetch("/api/classifier-ready", {
+    method: "GET",
+    headers: {
+      Authorization: "Basic " + btoa("admin:feathers"),
+    },
+  });
+  if (!response.ok) {
+    throw new Error(response.statusText);
+  }
+  const json = await response.json();
+  return json.dbusReady === true;
+}
+
+async function waitUntilClassifierReady(): Promise<boolean> {
+  setPlayButtonEnabled(false);
+  const deadline = Date.now() + CLASSIFIER_READY_POLL_TIMEOUT_SECONDS * 1000;
+  while (Date.now() < deadline) {
+    try {
+      if (await isDbusReady()) {
+        return true;
+      }
+    } catch (error) {
+      console.error("Error checking classifier ready status:", error);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  alert("Thermal Recorder is still not ready. Please try again shortly.");
+  setPlayButtonEnabled(true);
+  return false;
+}
+
+function sendVideoRequest(videoName: string, waitForReady: boolean = true): void {
   fetch("/api/play-test-video", {
     method: "POST",
     headers: {
@@ -574,7 +752,71 @@ function sendVideoRequest(videoName: string): void {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ video: videoName }),
-  }).catch((error) => {
-    console.error("Error playing test video:", error);
-  });
+  })
+    .then((response) => {
+      if (!response.ok) {
+        console.error("Error playing test video:", response.statusText);
+        alert("Video cannot be played" + response.statusText);
+        return;
+      }
+      return response.json();
+    })
+    .then((json: PlayTestVideoResponse | undefined) => {
+      if (json == null) {
+        return;
+      }
+
+      if (json.serviceStarting) {
+        if (!waitForReady) {
+          setPlayButtonEnabled(true);
+          alert("Video cannot be played");
+          return;
+        }
+        setStatusMessage(
+          "Thermal Recorder is starting up, this may take 30 seconds"
+        );
+        waitUntilClassifierReady().then((ready) => {
+          if (ready) {
+            sendVideoRequest(videoName, false);
+          } else {
+            setStatusMessage(null);
+
+            alert("Video cannot be played");
+          }
+        });
+        return;
+      }
+
+      if (json.dbusStarting) {
+        if (!waitForReady) {
+          setPlayButtonEnabled(true);
+          alert("Video cannot be played");
+          return;
+        }
+        setStatusMessage("Thermal Recorder is starting up");
+        waitUntilClassifierReady().then((ready) => {
+          if (ready) {
+            sendVideoRequest(videoName, false);
+          } else {
+            setStatusMessage(null);
+            alert("Video cannot be played");
+          }
+        });
+        return;
+      }
+
+      if (json.success) {
+        setStatusMessage("Playback pending");
+        setPlayButtonEnabled(false);
+        setPlayingVideoOverlay(videoName);
+        waitUntilFinishedPlaying().finally(() => {
+          setStatusMessage(null);
+          setPlayButtonEnabled(true);
+        });
+      }
+    })
+    .catch((error) => {
+      console.error("Error playing test video:", error);
+      alert("Video cannot be played");
+    });
 }

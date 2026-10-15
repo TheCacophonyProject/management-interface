@@ -670,6 +670,104 @@ func (api *ManagementAPI) TriggerTrap(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+const (
+	trapDbusName = "org.cacophony.trap"
+	trapDbusPath = "/org/cacophony/trap"
+)
+
+func getTrapDbus() (dbus.BusObject, error) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		return nil, err
+	}
+	return conn.Object(trapDbusName, trapDbusPath), nil
+}
+
+// callTrap makes a call to the trap DBus service, writing the reason for any failure to
+// the response so it can be shown to the user.
+func callTrap(w *http.ResponseWriter, method string, args ...interface{}) {
+	trapDbus, err := getTrapDbus()
+	if err != nil {
+		log.Printf("failed to connect to DBus: %v", err)
+		serverError(w, err)
+		return
+	}
+
+	if err := trapDbus.Call(trapDbusName+"."+method, 0, args...).Store(); err != nil {
+		log.Printf("trap %s failed: %v", method, err)
+		var dbusErr dbus.Error
+		if errors.As(err, &dbusErr) && dbusErr.Name == "org.freedesktop.DBus.Error.ServiceUnknown" {
+			badRequest(w, errors.New("trap service is not running, check that comms is set to trap-control"))
+			return
+		}
+		badRequest(w, err)
+		return
+	}
+	(*w).WriteHeader(http.StatusOK)
+}
+
+// RestartTrap restarts the trap that is connected to the device.
+// This is also how the trap is taken out of manual mode.
+func (api *ManagementAPI) RestartTrap(w http.ResponseWriter, r *http.Request) {
+	log.Println("restarting trap")
+	callTrap(&w, "Restart")
+}
+
+// StopTrap stops whatever the trap is doing, interrupting a spool or door that is part
+// way through moving. This puts the trap into manual mode, so it stays stopped until it
+// is restarted.
+func (api *ManagementAPI) StopTrap(w http.ResponseWriter, r *http.Request) {
+	log.Println("stopping trap")
+	callTrap(&w, "Stop")
+}
+
+// ReleaseTrapSpool releases the spool on the trap.
+// This puts the trap into manual mode, where it stops running its sequence until restarted.
+func (api *ManagementAPI) ReleaseTrapSpool(w http.ResponseWriter, r *http.Request) {
+	log.Println("releasing trap spool")
+	callTrap(&w, "ReleaseSpool")
+}
+
+// ResetTrapSpool resets the spool on the trap.
+// This puts the trap into manual mode, where it stops running its sequence until restarted.
+func (api *ManagementAPI) ResetTrapSpool(w http.ResponseWriter, r *http.Request) {
+	log.Println("resetting trap spool")
+	callTrap(&w, "ResetSpool")
+}
+
+// trapDoorNumber reads the door number out of the route. The route only matches 1 and 2,
+// so this can only fail if that pattern is widened without updating the trap.
+func trapDoorNumber(w *http.ResponseWriter, r *http.Request) (int32, bool) {
+	door, err := strconv.Atoi(mux.Vars(r)["door"])
+	if err != nil || (door != 1 && door != 2) {
+		badRequest(w, errors.New("door must be 1 or 2"))
+		return 0, false
+	}
+	return int32(door), true
+}
+
+// OpenTrapDoor opens one of the ratchet doors on the trap, ratcheting it up and holding it.
+// This puts the trap into manual mode, where it stops running its sequence until restarted.
+func (api *ManagementAPI) OpenTrapDoor(w http.ResponseWriter, r *http.Request) {
+	door, ok := trapDoorNumber(&w, r)
+	if !ok {
+		return
+	}
+	log.Printf("opening trap door %d", door)
+	callTrap(&w, "OpenDoor", door)
+}
+
+// CloseTrapDoor closes one of the ratchet doors on the trap, releasing it so it drops.
+// This puts the trap into manual mode, where it stops running its sequence until restarted.
+func (api *ManagementAPI) CloseTrapDoor(w http.ResponseWriter, r *http.Request) {
+	door, ok := trapDoorNumber(&w, r)
+	if !ok {
+		return
+	}
+	log.Printf("closing trap door %d", door)
+	callTrap(&w, "CloseDoor", door)
+}
+
 // CheckSaltConnection will try to ping the salt server and return the response
 func (api *ManagementAPI) CheckSaltConnection(w http.ResponseWriter, r *http.Request) {
 	log.Println("pinging salt server")
@@ -803,7 +901,7 @@ func (api *ManagementAPI) GetServiceStatus(w http.ResponseWriter, r *http.Reques
 		parseFormErrorResponse(&w, errors.New("service field was empty"))
 		return
 	}
-	serviceStatus, err := getServiceStatus(service)
+	serviceStatus, err := getServiceStatusAndDuration(service)
 	if err != nil {
 		serverError(&w, err)
 		return
@@ -943,6 +1041,39 @@ func (api *ManagementAPI) UploadTestRecording(w http.ResponseWriter, r *http.Req
 		return
 	}
 }
+func (api *ManagementAPI) IsPlaying(w http.ResponseWriter, r *http.Request) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
+	file := ""
+	err = recorder.Call("org.cacophony.thermalrecorder.ParsingFile", 0).Store(&file)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"parsing": file})
+}
+
+func (api *ManagementAPI) ClassifierIsReady(w http.ResponseWriter, r *http.Request) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
+	ready := false
+	err = recorder.Call("org.cacophony.thermalrecorder.IsReady", 0).Store(&ready)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]bool{"ready": ready, "dbusReady": true})
+}
 
 func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
@@ -963,52 +1094,48 @@ func (api *ManagementAPI) PlayTestVideo(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	var recorderConfig goconfig.ThermalRecorder
+	if err := api.config.Unmarshal(goconfig.ThermalRecorderKey, &recorderConfig); err != nil {
+		serverError(&w, err)
+		return
+	}
+
+	status := getServiceStatus("thermal-recorder-py")
+	if !status.Active && recorderConfig.UseLowPowerMode {
+		manageService("start", "thermal-recorder-py")
+		json.NewEncoder(w).Encode(map[string]bool{"success": true, "serviceStarting": true})
+		return
+	}
+	err = runPlayCommand(req, 0)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "dbusStarting": true})
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+func runPlayCommand(req VideoRequest, timeoutSeconds int) error {
 	videoName := "/var/spool/cptv/test-recordings/" + req.Video
 	log.Printf("Playing %s", videoName)
 
-	recorderService := "thermal-recorder-py"
-	tc2AgentService := "tc2-agent"
-	if err := manageService("stop", recorderService); err != nil {
-		serverError(&w, err)
-		return
-	}
-	if err := manageService("stop", tc2AgentService); err != nil {
-		serverError(&w, err)
-		return
-	}
-
-	cmd := exec.Command("/home/pi/.venv/classifier/bin/pi_classify", "--fps", "9", "--file", videoName)
-	log.Println(strings.Join(cmd.Args, " "))
-
-	stdout, err := cmd.StdoutPipe()
+	conn, err := dbus.SystemBus()
 	if err != nil {
-		log.Fatalf("Failed to create stdout pipe: %s", err)
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		log.Fatalf("Failed to create stderr pipe: %s", err)
+		return err
 	}
 
-	go streamOutput(stdout)
-	go streamOutput(stderr)
+	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
 
-	err = cmd.Start()
-	if err != nil {
-		log.Fatalf("Failed to start command: %s", err)
-	}
-
-	err = cmd.Wait()
-	if err != nil {
-		log.Fatalf("Command finished with error: %s", err)
-	}
-
-	if err := manageService("start", recorderService); err != nil {
-		serverError(&w, err)
-		return
-	}
-	if err := manageService("start", tc2AgentService); err != nil {
-		serverError(&w, err)
-		return
+	deadline := time.Now().Add(time.Duration(timeoutSeconds) * time.Second)
+	for {
+		err = recorder.Call("org.cacophony.thermalrecorder.ParseFile", 0, videoName, 9, -1).Err
+		if err == nil {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			log.Printf("Failed to play run command timed out after %v to connect to thermalrecorder dbus", timeoutSeconds)
+			return err
+		}
+		time.Sleep(time.Second)
 	}
 }
 
@@ -1362,6 +1489,9 @@ func streamOutput(pipe io.ReadCloser) {
 	for scanner.Scan() {
 		log.Println(scanner.Text())
 	}
+	if err := scanner.Err(); err != nil {
+		log.Errorf("Error when printing output: %v", err)
+	}
 }
 
 func (api *ManagementAPI) GetBattery(w http.ResponseWriter, r *http.Request) {
@@ -1679,8 +1809,17 @@ type serviceStatus struct {
 	Duration int
 }
 
-func getServiceStatus(service string) (*serviceStatus, error) {
+func getServiceStatus(service string) *serviceStatus {
 	status := &serviceStatus{}
+	enabledOut, _ := exec.Command("systemctl", "is-enabled", service).Output()
+	status.Enabled = strings.TrimSpace(string(enabledOut)) == "enabled"
+	activeOut, _ := exec.Command("systemctl", "is-active", service).Output()
+	status.Active = strings.TrimSpace(string(activeOut)) == "active"
+	return status
+}
+
+func getServiceStatusAndDuration(service string) (*serviceStatus, error) {
+	status := getServiceStatus(service)
 	enabledOut, _ := exec.Command("systemctl", "is-enabled", service).Output()
 	status.Enabled = strings.TrimSpace(string(enabledOut)) == "enabled"
 	activeOut, _ := exec.Command("systemctl", "is-active", service).Output()
@@ -2065,6 +2204,28 @@ func (api *ManagementAPI) UploadLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *ManagementAPI) EraseFlash(w http.ResponseWriter, r *http.Request) {
+	if err := manageService("stop", "tc2-agent"); err != nil {
+		serverError(&w, err)
+		return
+	}
+	cmd := exec.Command("tc2-hat-rp2040", "--erase-flash")
+	stdout, _ := cmd.StdoutPipe()
+	stderr, _ := cmd.StderrPipe()
+	go streamOutput(stdout)
+	go streamOutput(stderr)
+	if err := cmd.Run(); err != nil {
+		serverError(&w, err)
+		manageService("start", "tc2-agent")
+		return
+	}
+	if err := manageService("start", "tc2-agent"); err != nil {
+		serverError(&w, err)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 

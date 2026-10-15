@@ -492,6 +492,10 @@ func Modem(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "modem.html", nil)
 }
 
+func Trap(w http.ResponseWriter, r *http.Request) {
+	tmpl.ExecuteTemplate(w, "trap.html", nil)
+}
+
 func Battery(w http.ResponseWriter, r *http.Request) {
 	tmpl.ExecuteTemplate(w, "battery.html", nil)
 }

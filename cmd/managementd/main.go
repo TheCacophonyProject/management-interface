@@ -119,6 +119,77 @@ func GetTC2AgentDbus() (dbus.BusObject, error) {
 	return conn.Object("org.cacophony.TC2Agent", "/org/cacophony/TC2Agent"), nil
 }
 
+// listenForClassifications subscribes to thermal-recorder's Tracking (live, in-progress)
+// and TrackingReprocessed (final) D-Bus signals and forwards them as ClassificationEvents
+// through frameCh so they get pushed out to connected websocket clients.
+func listenForClassifications() {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		log.Errorf("classifications: failed to connect to system bus: %v", err)
+		return
+	}
+
+	rule := "type='signal',interface='org.cacophony.thermalrecorder'"
+	if call := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule); call.Err != nil {
+		log.Errorf("classifications: failed to add match rule: %v", call.Err)
+		return
+	}
+
+	c := make(chan *dbus.Signal, 10)
+	conn.Signal(c)
+
+	log.Info("classifications: listening for D-Bus tracking signals")
+
+	for signal := range c {
+		var live bool
+		switch signal.Name {
+		case "org.cacophony.thermalrecorder.Tracking":
+			live = true
+		case "org.cacophony.thermalrecorder.TrackingReprocessed":
+			live = false
+		default:
+			continue
+		}
+
+		if len(signal.Body) != 13 {
+			log.Warnf("classifications: unexpected signal body length %d for %s", len(signal.Body), signal.Name)
+			continue
+		}
+
+		clipId, ok := signal.Body[0].(int32)
+		if !ok {
+			log.Warnf("classifications: unexpected ClipId type %T", signal.Body[0])
+			continue
+		}
+		trackId, ok := signal.Body[1].(int32)
+		if !ok {
+			log.Warnf("classifications: unexpected TrackId type %T", signal.Body[1])
+			continue
+		}
+		what, ok := signal.Body[3].(string)
+		if !ok {
+			log.Warnf("classifications: unexpected What type %T", signal.Body[3])
+			continue
+		}
+		confidence, ok := signal.Body[4].(int32)
+		if !ok {
+			log.Warnf("classifications: unexpected Confidence type %T", signal.Body[4])
+			continue
+		}
+
+		frameCh <- &FrameData{
+			Classification: &ClassificationEvent{
+				ClipId:     clipId,
+				TrackId:    trackId,
+				What:       what,
+				Confidence: confidence,
+				Live:       live,
+				Time:       time.Now(),
+			},
+		}
+	}
+}
+
 // Set up and handle page requests.
 func main() {
 	args := procArgs()
@@ -156,6 +227,7 @@ func main() {
 	})
 
 	go sendFrameToSockets()
+	go listenForClassifications()
 	// UI handlers.
 	router.HandleFunc("/", managementinterface.IndexHandler).Methods("GET")
 	router.HandleFunc("/wifi-networks", managementinterface.WifiNetworkHandler).Methods("GET")
@@ -175,6 +247,7 @@ func main() {
 	router.HandleFunc("/audiobait", managementinterface.Audiobait).Methods("GET")
 	router.HandleFunc("/modem", managementinterface.Modem).Methods("GET")
 	router.HandleFunc("/battery", managementinterface.Battery).Methods("GET")
+	router.HandleFunc("/trap", managementinterface.Trap).Methods("GET")
 	router.HandleFunc("/battery-csv", managementinterface.DownloadBatteryCSV).Methods("GET")
 	router.HandleFunc("/temperature-csv", managementinterface.DownloadTemperatureCSV).Methods("GET")
 
@@ -207,6 +280,12 @@ func main() {
 	apiRouter.HandleFunc("/events", apiObj.GetEvents).Methods("GET")
 	apiRouter.HandleFunc("/events", apiObj.DeleteEvents).Methods("DELETE")
 	apiRouter.HandleFunc("/trigger-trap", apiObj.TriggerTrap).Methods("PUT")
+	apiRouter.HandleFunc("/trap/restart", apiObj.RestartTrap).Methods("POST")
+	apiRouter.HandleFunc("/trap/stop", apiObj.StopTrap).Methods("POST")
+	apiRouter.HandleFunc("/trap/release-spool", apiObj.ReleaseTrapSpool).Methods("POST")
+	apiRouter.HandleFunc("/trap/reset-spool", apiObj.ResetTrapSpool).Methods("POST")
+	apiRouter.HandleFunc("/trap/door/{door:[12]}/open", apiObj.OpenTrapDoor).Methods("POST")
+	apiRouter.HandleFunc("/trap/door/{door:[12]}/close", apiObj.CloseTrapDoor).Methods("POST")
 	apiRouter.HandleFunc("/check-salt-connection", apiObj.CheckSaltConnection).Methods("GET")
 	apiRouter.HandleFunc("/salt-update", apiObj.StartSaltUpdate).Methods("POST")
 	apiRouter.HandleFunc("/salt-update", apiObj.GetSaltUpdateState).Methods("GET")
@@ -229,6 +308,8 @@ func main() {
 	apiRouter.HandleFunc("/battery/config", apiObj.ClearBatteryConfig).Methods("DELETE")
 	apiRouter.HandleFunc("/test-videos", apiObj.GetTestVideos).Methods("GET")
 	apiRouter.HandleFunc("/play-test-video", apiObj.PlayTestVideo).Methods("POST")
+	apiRouter.HandleFunc("/playing-test-video", apiObj.IsPlaying).Methods("GET")
+	apiRouter.HandleFunc("/classifier-ready", apiObj.ClassifierIsReady).Methods("GET")
 	apiRouter.HandleFunc("/upload-test-recording", apiObj.UploadTestRecording).Methods("POST")
 	apiRouter.HandleFunc("/network/interfaces", apiObj.GetNetworkInterfaces).Methods("GET")
 	apiRouter.HandleFunc("/network/wifi", apiObj.ScanWifiNetwork).Methods("GET")
@@ -251,6 +332,7 @@ func main() {
 	apiRouter.HandleFunc("/enable-hotspot", apiObj.EnableHotspot).Methods("POST")
 	apiRouter.HandleFunc("/wifi-status", apiObj.GetConnectionStatus).Methods("GET")
 	apiRouter.HandleFunc("/upload-logs", apiObj.UploadLogs).Methods("PUT")
+	apiRouter.HandleFunc("/erase-flash", apiObj.EraseFlash).Methods("POST")
 
 	apiRouter.HandleFunc("/audiorecording", apiObj.SetAudioRecording).Methods("POST")
 	apiRouter.HandleFunc("/audiorecording", apiObj.GetAudioRecording).Methods("GET")
@@ -277,86 +359,183 @@ func main() {
 		})
 	})
 
-	go func() {
-		for {
-			err := os.Remove(frameSocket)
-			if err != nil && !os.IsNotExist(err) {
-				log.Printf("Couldn't remove  %v %v\n", frameSocket, err)
-				time.Sleep(1000)
-				continue
-			}
-
-			listener, err := net.Listen("unix", frameSocket)
-			if err != nil {
-				log.Println("Couldn't make socket", err)
-				return
-			}
-			log.Print("waiting for frames from tc2-agent")
-
-			listener.(*net.UnixListener).SetDeadline(time.Now().Add(5 * time.Second))
-			conn, err := listener.Accept()
-			if err != nil {
-				if err.(net.Error).Timeout() {
-					log.Printf("socket accept timed out, retrying...")
-
-					if hasActiveClients() {
-						listener.(*net.UnixListener).SetDeadline(time.Now().Add(30 * time.Second))
-						// If there are users connected via web sockets, force the frames to get served.
-						log.Println("Websocket has clients, forcing frame priority")
-						tc2AgentDbus, err := GetTC2AgentDbus()
-						if err != nil {
-							log.Println(err)
-							return
-						}
-						var result string
-						err = tc2AgentDbus.Call("org.cacophony.TC2Agent.prioritiseframeserve", 0).Store(&result)
-						if err != nil {
-							log.Println(err)
-							return
-						}
-					}
-
-					continue
-				}
-				log.Printf("socket accept failed: %v", err)
-				continue
-			}
-
-			// Prevent concurrent connections.
-			listener.Close()
-
-			log.Printf("accepted connection from client")
-			err = handleConn(conn)
-			frameCh <- &FrameData{Disconnected: true}
-			log.Printf("camera connection ended with: %v", err)
-			connected.Store(false)
-
-		}
-	}()
+	// Handle the frame listener in a separate goroutine
+	go handleFrameListenerLoop()
 
 	listenAddr := fmt.Sprintf(":%d", config.Port)
 	log.Printf("listening on %s", listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, router))
 }
 
-func handleConn(conn net.Conn) error {
-	reader := bufio.NewReader(conn)
-	var err error
-	headerInfo, err = headers.ReadHeaderInfo(reader)
-	if err != nil {
+func handleFrameListenerLoop() {
+	for {
+		err := handleFrameListener()
+		log.Errorf("Error handling frame listener: %v", err)
+		log.Info("Will retry connection in 5 seconds")
+		time.Sleep(5 * time.Second)
+	}
+}
+
+// activeConn tracks whichever connection is currently feeding frameCh.
+// A "thermal-recorder-py" connection (test video playback) is allowed to
+// take over from whatever is currently connected; anything else is rejected
+// while a connection is active.
+type activeConn struct {
+	source string
+	abort  chan struct{}
+	done   chan struct{}
+}
+
+var (
+	activeMu sync.Mutex
+	active   *activeConn
+)
+
+func handleFrameListener() error {
+	// Remove old frame socket
+	if err := os.Remove(frameSocket); err != nil && !os.IsNotExist(err) {
+		log.Errorf("Couldn't remove frame socket '%s'", frameSocket)
 		return err
 	}
 
-	log.Printf("connection from %s %s (%dx%d@%dfps) frame size %d", headerInfo.Brand(), headerInfo.Model(), headerInfo.ResX(), headerInfo.ResY(), headerInfo.FPS(), headerInfo.FrameSize())
+	// Make new socket
+	listener, err := net.Listen("unix", frameSocket)
+	if err != nil {
+		log.Errorf("Couldn't make socket '%s'", frameSocket)
+		return err
+	}
+	defer listener.Close()
+	unixListener := listener.(*net.UnixListener)
+
+	for {
+		activeMu.Lock()
+		ac := active
+		activeMu.Unlock()
+
+		if ac != nil && ac.source != "tc2-agent" {
+			// A non-tc2-agent source (e.g. thermal-recorder-py) is
+			// streaming and can't be preempted; stop accepting new
+			// connections until it disconnects.
+			<-ac.done
+			continue
+		}
+
+		if ac == nil {
+			// Prioritise frames if there are no active clients
+			log.Info("Waiting for frames from tc2-agent")
+			deadLineDuration := 5 * time.Second
+			if hasActiveClients() {
+				deadLineDuration = 30 * time.Second
+				tc2AgentDbus, err := GetTC2AgentDbus()
+				if err != nil {
+					log.Error("Failed to get TC2AgentDbus")
+				} else {
+					var result string
+					if err := tc2AgentDbus.Call("org.cacophony.TC2Agent.prioritiseframeserve", 0).Store(&result); err != nil {
+						log.Errorf("Failed to request frame serve priority from rp2040, %s", result)
+					}
+				}
+			}
+			unixListener.SetDeadline(time.Now().Add(deadLineDuration))
+		} else {
+			// tc2-agent already streaming; keep listening (without a
+			// deadline) for a possible thermal-recorder-py connection
+			unixListener.SetDeadline(time.Time{})
+		}
+
+		// Wait for and accept connection
+		conn, err := listener.Accept()
+		if err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				log.Info("Socket accept timed out, retrying...")
+				continue
+			}
+			log.Errorf("Socket accept failed: %v", err)
+			return err
+		}
+
+		go handleIncomingConn(conn)
+	}
+}
+
+// handleIncomingConn reads a new connection's header, decides whether it
+// should become the active frame source, and if so hands it off to
+// handleConn. A "thermal-recorder-py" connection preempts whatever is
+// currently active; any other source is rejected while one is active.
+func handleIncomingConn(conn net.Conn) {
+	reader := bufio.NewReader(conn)
+	header, err := headers.ReadHeaderInfo(reader)
+	if err != nil {
+		log.Errorf("Failed to read header from new connection: %v", err)
+		conn.Close()
+		return
+	}
+
+	source := header.Source()
+	if source == "" {
+		source = "tc2-agent"
+	}
+
+	ac := &activeConn{source: source, abort: make(chan struct{}), done: make(chan struct{})}
+
+	activeMu.Lock()
+	if active != nil {
+		// thermal-recorder takes preference as this will be a test video
+		if source == "tc2-agent" {
+			activeMu.Unlock()
+			log.Infof("Rejecting connection from %s, %s is already connected", source, active.source)
+			conn.Close()
+			return
+		}
+		log.Infof("%s connected, disconnecting current %s connection", source, active.source)
+		close(active.abort)
+		prevDone := active.done
+		activeMu.Unlock()
+		<-prevDone
+		activeMu.Lock()
+	}
+	active = ac
+	activeMu.Unlock()
+
+	log.Printf("connection from %s: %s %s (%dx%d@%dfps) frame size %d", source, header.Brand(), header.Model(), header.ResX(), header.ResY(), header.FPS(), header.FrameSize())
+
+	err = handleConn(conn, reader, header, ac.abort)
+
+	// connection finished if still the active connection then active becomes nil
+	activeMu.Lock()
+	if active == ac {
+		active = nil
+	}
+	activeMu.Unlock()
+	close(ac.done)
+
+	frameCh <- &FrameData{Disconnected: true}
+	log.Infof("%s connection ended with: %v", source, err)
+	connected.Store(false)
+}
+
+func handleConn(conn net.Conn, reader *bufio.Reader, hi *headers.HeaderInfo, abort <-chan struct{}) error {
+	headerInfo = hi
 
 	clearB := make([]byte, 5)
-	_, err = io.ReadFull(reader, clearB)
-	if err != nil {
+	if _, err := io.ReadFull(reader, clearB); err != nil {
 		return err
 	}
 
-	rawFrame := make([]byte, headerInfo.FrameSize())
-	frame := cptvframe.NewFrame(headerInfo)
+	// Unblock the read loop below if we're told to disconnect in favour of
+	// a takeover connection.
+	watcherDone := make(chan struct{})
+	defer close(watcherDone)
+	go func() {
+		select {
+		case <-abort:
+			conn.Close()
+		case <-watcherDone:
+		}
+	}()
+
+	rawFrame := make([]byte, hi.FrameSize())
+	frame := cptvframe.NewFrame(hi)
 	frames := 0
 	var lastFrame *FrameData
 	connected.Store(true)
@@ -440,7 +619,6 @@ func WebsocketServer(ws *websocket.Conn) {
 						tc2AgentDbus, err := GetTC2AgentDbus()
 						if err != nil {
 							log.Println(err)
-							return
 						}
 						var isOffloading int
 						var percentComplete int
@@ -452,7 +630,6 @@ func WebsocketServer(ws *websocket.Conn) {
 						err = tc2AgentDbus.Call("org.cacophony.TC2Agent.offloadstatus", 0).Store(&isOffloading, &percentComplete, &secondsRemaining, &filesTotal, &filesRemaining, &eventsTotal, &eventsRemaining)
 						if err != nil {
 							log.Println(err)
-							return
 						}
 						if isOffloading == 1 {
 							log.Printf("rp2040 is offloading files")
@@ -460,7 +637,6 @@ func WebsocketServer(ws *websocket.Conn) {
 							err = tc2AgentDbus.Call("org.cacophony.TC2Agent.canceloffload", 0).Store(&result)
 							if err != nil {
 								log.Println(err)
-								return
 							}
 							log.Printf("requested offload cancellation")
 						}
@@ -512,6 +688,22 @@ func sendFrameToSockets() {
 							time.Sleep(100 * time.Millisecond)
 						}
 					}(socket, uuid, frameNum)
+				}
+				socketsLock.RUnlock()
+			} else if lastFrame.Classification != nil {
+				classificationJson, _ := json.Marshal(struct {
+					Type           string              `json:"type"`
+					Classification ClassificationEvent `json:"classification"`
+				}{Type: "Classification", Classification: *lastFrame.Classification})
+				socketsLock.RLock()
+				for uuid, socket := range sockets {
+					go func(socket *WebsocketRegistration, uuid int64) {
+						// If the socket is busy sending a frame, skip this round rather than block.
+						if atomic.CompareAndSwapUint32(&socket.AtomicLock, 0, 1) {
+							_ = websocket.Message.Send(socket.Socket, string(classificationJson))
+							atomic.StoreUint32(&socket.AtomicLock, 0)
+						}
+					}(socket, uuid)
 				}
 				socketsLock.RUnlock()
 			} else {
@@ -578,7 +770,20 @@ func sendFrameToSockets() {
 }
 
 type FrameData struct {
-	Disconnected bool
-	Frame        *cptvframe.Frame
-	Tracks       []map[string]interface{}
+	Disconnected   bool
+	Frame          *cptvframe.Frame
+	Tracks         []map[string]interface{}
+	Classification *ClassificationEvent
+}
+
+// ClassificationEvent is a single tracking/classification update, either a
+// live in-progress guess (Live == true, from the Tracking signal) or a
+// finalized result (Live == false, from the TrackingReprocessed signal).
+type ClassificationEvent struct {
+	ClipId     int32
+	TrackId    int32
+	What       string
+	Confidence int32
+	Live       bool
+	Time       time.Time
 }

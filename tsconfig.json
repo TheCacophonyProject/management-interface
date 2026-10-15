@@ -5,9 +5,19 @@
     "moduleResolution": "bundler",
     "allowJs": true,
     "strict": true,
+    "importHelpers": true,
+    "moduleResolution": "bundler",
+    "experimentalDecorators": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "sourceMap": true,
     "rootDir": ".",
     "types": ["jquery"],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    },
     "lib": [
       "esnext",
       "dom",
