@@ -40,11 +40,8 @@ async function loadConfig() {
     document.querySelector("#input-low-power-mode").checked = data.values.thermalRecorder.UseLowPowerMode;
     updateThermalMotionState();
 
-    document.querySelector("#input-do-tracking").checked = data.values.thermalMotion.DoTracking;
     document.querySelector("#input-run-classifier").checked = data.values.thermalMotion.RunClassifier;
-    document.querySelector("#input-tracking-events").checked = data.values.thermalMotion.TrackingEvents;
     document.querySelector("#input-postprocess").checked = data.values.thermalMotion.PostProcess;
-    document.querySelector("#input-postprocess-events").checked = data.values.thermalMotion.PostProcessEvents;
 
     // Set values for comms
     document.querySelector("#input-comms-enable").checked = data.values.comms.Enable;
@@ -126,7 +123,7 @@ function updateThermalMotionState() {
   const lowPower = document.querySelector("#input-low-power-mode").checked;
   document.querySelector("#input-instant-classify").disabled = !lowPower;
   const thermalMotionInputs = document.querySelector("#thermal-recorder-options").querySelectorAll(
-    "#input-do-tracking, #input-run-classifier, #input-tracking-events"
+    "#input-run-classifier"
   );
   thermalMotionInputs.forEach((el) => (el.disabled = lowPower));
 }
@@ -140,11 +137,8 @@ async function saveThermalRecorderConfig(){
 
 async function saveThermalMotionConfig() {
   const data = {
-    "do-tracking": document.querySelector("#input-do-tracking").checked,
     "run-classifier": document.querySelector("#input-run-classifier").checked,
-    "tracking-events": document.querySelector("#input-tracking-events").checked,
     "postprocess": document.querySelector("#input-postprocess").checked,
-    "postprocess-events": document.querySelector("#input-postprocess-events").checked,
   };
 
   await saveConfig("thermal-motion", data);

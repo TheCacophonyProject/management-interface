@@ -59,6 +59,7 @@ export interface ClassificationEvent {
   Confidence: number;
   Live: boolean;
   Time: string;
+  Confident: boolean;
 }
 
 interface CameraStats {

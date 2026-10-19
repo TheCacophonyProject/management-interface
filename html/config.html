@@ -85,11 +85,11 @@
                         <tbody>
                             <tr>
                                 <td>Use low power mode</td>
-                                <td><input type="checkbox" id="input-low-power-mode"></td>
+                                <td><input type="checkbox" id="input-low-power-mode" onchange="updateThermalMotionState()"></td>
                             </tr>
                             <tr>
                                 <td>Instant classify</td>
-                                <td><input type="checkbox" id="input-instant-classify"></td>
+                                <td><input type="checkbox" id="input-instant-classify" onchange="updateThermalMotionState()"></td>
                             </tr>
                         </tbody>
                     </table>
@@ -110,24 +110,12 @@
                     <table class="table" id="thermal-recorder-options">
                         <tbody>
                             <tr>
-                                <td>Do tracking on PI</td>
-                                <td><input type="checkbox" id="input-do-tracking"></td>
-                            </tr>
-                            <tr>
-                                <td>Run classifier</td>
+                                <td>Track and Classify</td>
                                 <td><input type="checkbox" id="input-run-classifier"></td>
-                            </tr>
-                            <tr>
-                                <td>Tracking events</td>
-                                <td><input type="checkbox" id="input-tracking-events"></td>
                             </tr>
                             <tr>
                                 <td>Post Process</td>
                                 <td><input type="checkbox" id="input-postprocess"></td>
-                            </tr>
-                             <tr>
-                                <td>Post Process Events</td>
-                                <td><input type="checkbox" id="input-postprocess-events"></td>
                             </tr>
                         </tbody>
                     </table>
