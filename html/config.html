@@ -115,10 +115,12 @@
                             </tr>
                             <tr>
                                 <td>Post Process</td>
-                                <td><input type="checkbox" id="input-postprocess"></td>
+                                <td><input type="checkbox" id="input-postprocess" onchange="updateClassifierState()"></td>
                             </tr>
                         </tbody>
                     </table>
+                    <p id="postprocess-classifier-message" class="text-muted" style="display: none;">Track and Classify is always enabled in Postprocess mode</p>
+                    <p id="postprocess-comms-message" class="text-muted" style="display: none;">Postprocessing is always enabled for selected trap comms</p>
                 </div>
             </div>
         </div>

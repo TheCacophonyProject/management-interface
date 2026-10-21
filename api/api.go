@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"net/url"
@@ -31,6 +32,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -401,6 +403,47 @@ func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// Comms types that need thermal-motion to run the classifier and postprocess tracks.
+var postProcessingComms = []string{"at-esl"}
+
+// ensurePostProcessingForComms enables run-classifier and postprocess in the
+// thermal-motion section when comms-out is set to a type that requires them.
+func (api *ManagementAPI) ensurePostProcessingForComms(newConfig map[string]any) {
+	comms, ok := newConfig[goconfig.CommsKey].(map[string]any)
+	if !ok {
+		return
+	}
+	commsOut, ok := comms["comms-out"].(string)
+	if !ok || !slices.Contains(postProcessingComms, commsOut) {
+		return
+	}
+
+	// Setting a section replaces it, so start from the existing thermal-motion config.
+	thermalMotion, ok := newConfig[goconfig.ThermalMotionKey].(map[string]any)
+	if !ok {
+		thermalMotion = map[string]any{}
+		if existing, ok := api.config.Get(goconfig.ThermalMotionKey).(map[string]any); ok {
+			maps.Copy(thermalMotion, existing)
+		}
+	}
+	thermalMotion["run-classifier"] = true
+	thermalMotion["postprocess"] = true
+	newConfig[goconfig.ThermalMotionKey] = thermalMotion
+	log.Infof("comms-out is %s, enabling run-classifier and postprocess in thermal-motion", commsOut)
+}
+
+// ensureClassifierForPostProcess enables run-classifier in the thermal-motion
+// section when postprocess is enabled, as postprocessing needs classified tracks.
+func ensureClassifierForPostProcess(newConfig map[string]any) {
+	thermalMotion, ok := newConfig[goconfig.ThermalMotionKey].(map[string]any)
+	if !ok {
+		return
+	}
+	if postProcess, ok := thermalMotion["postprocess"].(bool); ok && postProcess {
+		thermalMotion["run-classifier"] = true
+	}
+}
+
 // SetConfig is a way of writing new config to the device.
 func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 	log.Info("API request: SetConfig")
@@ -423,6 +466,9 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	api.ensurePostProcessingForComms(newConfig)
+	ensureClassifierForPostProcess(newConfig)
 
 	log.Debugf("set config: %+v", newConfig)
 	if err := api.config.SetMultipleSections(newConfig); err != nil {
@@ -459,8 +505,9 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 	values = configValuesCC
 
 	valuesAndDefaults := map[string]interface{}{
-		"values":   values,
-		"defaults": defaultValues,
+		"values":              values,
+		"defaults":            defaultValues,
+		"postProcessingComms": postProcessingComms,
 	}
 
 	jsonString, err := json.Marshal(valuesAndDefaults)

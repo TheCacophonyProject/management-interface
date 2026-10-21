@@ -57,6 +57,7 @@ async function loadConfig() {
     document.querySelector("#input-comms-protect-species").value = JSON.stringify(data.values.comms.ProtectSpecies);
     document.querySelector("#input-comms-protect-duration").value = formatDuration(data.values.comms.ProtectDuration);
     document.querySelector("#input-comms-protect-duration").placeholder = formatDuration(data.defaults.comms.ProtectDuration);
+    updatePostProcessingState(data.values.comms.CommsOut, data.postProcessingComms || []);
 
     // Set values for trap config
     const trapConfig = (data.values.trap && data.values.trap.Config) || {};
@@ -122,10 +123,27 @@ async function saveModemConfig() {
 function updateThermalMotionState() {
   const lowPower = document.querySelector("#input-low-power-mode").checked;
   document.querySelector("#input-instant-classify").disabled = !lowPower;
-  const thermalMotionInputs = document.querySelector("#thermal-recorder-options").querySelectorAll(
-    "#input-run-classifier"
-  );
-  thermalMotionInputs.forEach((el) => (el.disabled = lowPower));
+}
+
+let commsForcesPostProcessing = false;
+
+// postProcessingComms comes from /api/config: comms types that always run the classifier and postprocess.
+function updatePostProcessingState(commsOut, postProcessingComms) {
+  commsForcesPostProcessing = postProcessingComms.includes(commsOut);
+  document.querySelector("#input-postprocess").disabled = commsForcesPostProcessing;
+  document.querySelector("#postprocess-comms-message").style.display = commsForcesPostProcessing ? "" : "none";
+  updateClassifierState();
+}
+
+// Postprocessing needs classified tracks, so Track and Classify is always on in postprocess mode.
+function updateClassifierState() {
+  const postProcess = document.querySelector("#input-postprocess").checked;
+  const runClassifier = document.querySelector("#input-run-classifier");
+  if (postProcess) {
+    runClassifier.checked = true;
+  }
+  runClassifier.disabled = postProcess || commsForcesPostProcessing;
+  document.querySelector("#postprocess-classifier-message").style.display = postProcess ? "" : "none";
 }
 
 async function saveThermalRecorderConfig(){
