@@ -85,14 +85,15 @@
                         <tbody>
                             <tr>
                                 <td>Use low power mode</td>
-                                <td><input type="checkbox" id="input-low-power-mode" onchange="updateThermalMotionState()"></td>
+                                <td><input type="checkbox" id="input-low-power-mode"></td>
                             </tr>
                             <tr>
                                 <td>Instant classify</td>
-                                <td><input type="checkbox" id="input-instant-classify" onchange="updateThermalMotionState()"></td>
+                                <td><input type="checkbox" id="input-instant-classify" onchange="updateLowPowerState()"></td>
                             </tr>
                         </tbody>
                     </table>
+                    <p id="instant-classify-message" class="text-muted" style="display: none;">Instant classify requires low power mode</p>
                 </div>
             </div>
         </div> 

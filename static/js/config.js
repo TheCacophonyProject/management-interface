@@ -38,7 +38,7 @@ async function loadConfig() {
     // Set values for thermal motion
     document.querySelector("#input-instant-classify").checked = data.values.thermalRecorder.InstantClassify;
     document.querySelector("#input-low-power-mode").checked = data.values.thermalRecorder.UseLowPowerMode;
-    updateThermalMotionState();
+    updateLowPowerState();
 
     document.querySelector("#input-run-classifier").checked = data.values.thermalMotion.RunClassifier;
     document.querySelector("#input-postprocess").checked = data.values.thermalMotion.PostProcess;
@@ -120,9 +120,15 @@ async function saveModemConfig() {
   await saveConfig("modemd", data);
 }
 
-function updateThermalMotionState() {
-  const lowPower = document.querySelector("#input-low-power-mode").checked;
-  document.querySelector("#input-instant-classify").disabled = !lowPower;
+// Instant classify requires low power mode, so low power mode is always on while instant classify is.
+function updateLowPowerState() {
+  const instantClassify = document.querySelector("#input-instant-classify").checked;
+  const lowPower = document.querySelector("#input-low-power-mode");
+  if (instantClassify) {
+    lowPower.checked = true;
+  }
+  lowPower.disabled = instantClassify;
+  document.querySelector("#instant-classify-message").style.display = instantClassify ? "" : "none";
 }
 
 let commsForcesPostProcessing = false;

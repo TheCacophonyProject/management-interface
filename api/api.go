@@ -444,6 +444,19 @@ func ensureClassifierForPostProcess(newConfig map[string]any) {
 	}
 }
 
+// ensureLowPowerForInstantClassify enables use-low-power-mode in the
+// thermal-recorder section when instant-classify is enabled, as instant
+// classify requires low power mode.
+func ensureLowPowerForInstantClassify(newConfig map[string]any) {
+	thermalRecorder, ok := newConfig[goconfig.ThermalRecorderKey].(map[string]any)
+	if !ok {
+		return
+	}
+	if instantClassify, ok := thermalRecorder["instant-classify"].(bool); ok && instantClassify {
+		thermalRecorder["use-low-power-mode"] = true
+	}
+}
+
 // SetConfig is a way of writing new config to the device.
 func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 	log.Info("API request: SetConfig")
@@ -469,6 +482,7 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 
 	api.ensurePostProcessingForComms(newConfig)
 	ensureClassifierForPostProcess(newConfig)
+	ensureLowPowerForInstantClassify(newConfig)
 
 	log.Debugf("set config: %+v", newConfig)
 	if err := api.config.SetMultipleSections(newConfig); err != nil {
