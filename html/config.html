@@ -75,44 +75,59 @@
         <div class="container pt-1 pl-0">
             <button id="save-button" type="button" onclick="saveModemConfig()" class="btn btn-primary">Save Modem Config</button>
         </div>
-
         <div class="container pt-5 pl-0">
-            <h3>Thermal Motion<br></h3>
+            <h3>Thermal Recorder<br></h3>
         </div>
-
         <div class="row">
             <div class="col-xs-8">
                 <div class="table-responsive">
                     <table class="table">
                         <tbody>
                             <tr>
-                                <td>Do tracking on PI</td>
-                                <td><input type="checkbox" id="input-do-tracking"></td>
+                                <td>Use low power mode</td>
+                                <td><input type="checkbox" id="input-low-power-mode"></td>
                             </tr>
                             <tr>
-                                <td>Run classifier</td>
-                                <td><input type="checkbox" id="input-run-classifier"></td>
-                            </tr>
-                            <tr>
-                                <td>Tracking events</td>
-                                <td><input type="checkbox" id="input-tracking-events"></td>
-                            </tr>
-                            <tr>
-                                <td>Post Process</td>
-                                <td><input type="checkbox" id="input-postprocess"></td>
-                            </tr>
-                             <tr>
-                                <td>Post Process Events</td>
-                                <td><input type="checkbox" id="input-postprocess-events"></td>
+                                <td>Instant classify</td>
+                                <td><input type="checkbox" id="input-instant-classify" onchange="updateLowPowerState()"></td>
                             </tr>
                         </tbody>
                     </table>
+                    <p id="instant-classify-message" class="text-muted" style="display: none;">Instant classify requires low power mode</p>
+                </div>
+            </div>
+        </div> 
+        
+        <div class="container pt-1 pl-0">
+            <button id="save-button" type="button" onclick="saveThermalRecorderConfig()" class="btn btn-primary">Save Thermal Recorder Config</button>
+        </div>
+
+        <div class="container pt-5 pl-0">
+            <h3>Thermal Motion<br></h3>
+        </div>
+        <div class="row">
+            <div class="col-xs-8">
+                <div class="table-responsive">
+                    <table class="table" id="thermal-recorder-options">
+                        <tbody>
+                            <tr>
+                                <td>Track and Classify</td>
+                                <td><input type="checkbox" id="input-run-classifier"></td>
+                            </tr>
+                            <tr>
+                                <td>Post Process</td>
+                                <td><input type="checkbox" id="input-postprocess" onchange="updateClassifierState()"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p id="postprocess-classifier-message" class="text-muted" style="display: none;">Track and Classify is always enabled in Postprocess mode</p>
+                    <p id="postprocess-comms-message" class="text-muted" style="display: none;">Postprocessing is always enabled for selected trap comms</p>
                 </div>
             </div>
         </div>
         
         <div class="container pt-1 pl-0">
-            <button id="save-button" type="button" onclick="saveThermalMotionConfig()" class="btn btn-primary">Save ThermalMotion Config</button>
+            <button id="save-button" type="button" onclick="saveThermalMotionConfig()" class="btn btn-primary">Save Thermal Motion Config</button>
         </div>
 
         <div class="container pt-5 pl-0">

@@ -151,7 +151,7 @@ func listenForClassifications() {
 			continue
 		}
 
-		if len(signal.Body) != 13 {
+		if len(signal.Body) != 14 {
 			log.Warnf("classifications: unexpected signal body length %d for %s", len(signal.Body), signal.Name)
 			continue
 		}
@@ -176,6 +176,11 @@ func listenForClassifications() {
 			log.Warnf("classifications: unexpected Confidence type %T", signal.Body[4])
 			continue
 		}
+		confident, ok := signal.Body[13].(bool)
+		if !ok {
+			log.Warnf("classifications: unexpected Confdent type %T", signal.Body[13])
+			continue
+		}
 
 		frameCh <- &FrameData{
 			Classification: &ClassificationEvent{
@@ -185,6 +190,7 @@ func listenForClassifications() {
 				Confidence: confidence,
 				Live:       live,
 				Time:       time.Now(),
+				Confident:  confident,
 			},
 		}
 	}
@@ -786,4 +792,5 @@ type ClassificationEvent struct {
 	Confidence int32
 	Live       bool
 	Time       time.Time
+	Confident  bool
 }

@@ -84,6 +84,7 @@ interface CameraStats {
   skippedFramesClient: number;
 }
 
+
 interface CameraState {
   socket: WebSocket | null;
   UUID: number;
@@ -91,7 +92,6 @@ interface CameraState {
   prevFrameNum: number;
   heartbeatInterval: number;
 }
-
 const colours = ["#ff0000", "#00ff00", "#ffff00", "#80ffff"];
 let snapshotCount = 0;
 let snapshotLimit = 200;
@@ -116,19 +116,45 @@ function restartCameraViewing() {
 }
 
 const classificationListLimit = 50;
+// Last reported classification per track of the current clip, used to skip repeats.
+let lastClassificationsClipId: number | null = null;
+const lastClassifications = new Map<number, { What: string; Confidence: number; Live: boolean }>();
 function addClassificationToList(ce: ClassificationEvent) {
   const list = document.getElementById("classification-list");
   if (list == null) {
     return;
   }
+  if (ce.ClipId !== lastClassificationsClipId) {
+    lastClassifications.clear();
+    lastClassificationsClipId = ce.ClipId;
+  }
+  const last = lastClassifications.get(ce.TrackId);
+  if (
+    last &&
+    last.What === ce.What &&
+    last.Confidence === ce.Confidence &&
+    last.Live === ce.Live
+  ) {
+    return;
+  }
+  lastClassifications.set(ce.TrackId, {
+    What: ce.What,
+    Confidence: ce.Confidence,
+    Live: ce.Live,
+  });
   const item = document.createElement("li");
   const time = new Date(ce.Time).toLocaleTimeString();
   const status = ce.Live ? "live" : "final";
-  item.innerText = `${ce.What} — ${ce.Confidence}% (${status}) · ${time}`;
+  if (ce.Confidence == 0){
+    item.innerText = `${ce.TrackId}: Tracking Started (${status}) · ${time}`;
+  }else{
+    item.innerText = `${ce.TrackId}: ${ce.What} — ${ce.Confidence}% ( ${(ce.Confident)} ) (${status}) · ${time}`;
+  }
   list.insertBefore(item, list.firstChild);
   while (list.childElementCount > classificationListLimit) {
     list.removeChild(list.lastChild as ChildNode);
   }
+  list.scrollTop = 0;
 }
 
 async function triggerTrap() {
@@ -204,7 +230,6 @@ window.onload = function () {
   });
   updateTestVideos();
 };
-
 async function takeTestRecording() {
   document.getElementById("take-snapshot-recording")!.innerText =
     "Making a test recording";
@@ -622,6 +647,7 @@ async function isPlaying(): Promise<string> {
 
 const PLAYING_POLL_TIMEOUT_SECONDS = 60;
 const PLAYING_POLL_MIN_SECONDS = 40;
+const PLAYING_POLL_MAX_CONSECUTIVE_ERRORS = 30;
 
 function setPlayingVideoOverlay(videoName: string | null): void {
   const overlay = document.getElementById("playing-video-overlay");
@@ -654,12 +680,26 @@ async function waitUntilFinishedPlaying(): Promise<void> {
     const start = Date.now();
     const deadline = start + PLAYING_POLL_TIMEOUT_SECONDS * 1000;
     let minEnd = start + PLAYING_POLL_MIN_SECONDS * 1000;
+    let hasSucceeded = false;
+    let consecutiveErrors = 0;
     while (Date.now() < deadline) {
       try {
         playing = await isPlaying();
+        hasSucceeded = true;
+        consecutiveErrors = 0;
       } catch (error) {
-        console.error("Error checking test video playing status:", error);
-        return;
+        consecutiveErrors++;
+        // Once the endpoint has responded, tolerate transient errors.
+        if (!hasSucceeded || consecutiveErrors >= PLAYING_POLL_MAX_CONSECUTIVE_ERRORS) {
+          console.error("Error checking test video playing status:", error);
+          return;
+        }
+        console.warn(
+          `Error checking test video playing status (${consecutiveErrors}/${PLAYING_POLL_MAX_CONSECUTIVE_ERRORS}):`,
+          error
+        );
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        continue;
       }
       if (playing== "" && Date.now() >= minEnd) {
         return;

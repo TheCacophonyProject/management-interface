@@ -36,11 +36,12 @@ async function loadConfig() {
     document.querySelector("#input-connection-timeout").value = formatDuration(data.values.modemd.ConnectionTimeout);
 
     // Set values for thermal motion
-    document.querySelector("#input-do-tracking").checked = data.values.thermalMotion.DoTracking;
+    document.querySelector("#input-instant-classify").checked = data.values.thermalRecorder.InstantClassify;
+    document.querySelector("#input-low-power-mode").checked = data.values.thermalRecorder.UseLowPowerMode;
+    updateLowPowerState();
+
     document.querySelector("#input-run-classifier").checked = data.values.thermalMotion.RunClassifier;
-    document.querySelector("#input-tracking-events").checked = data.values.thermalMotion.TrackingEvents;
     document.querySelector("#input-postprocess").checked = data.values.thermalMotion.PostProcess;
-    document.querySelector("#input-postprocess-events").checked = data.values.thermalMotion.PostProcessEvents;
 
     // Set values for comms
     document.querySelector("#input-comms-enable").checked = data.values.comms.Enable;
@@ -56,6 +57,7 @@ async function loadConfig() {
     document.querySelector("#input-comms-protect-species").value = JSON.stringify(data.values.comms.ProtectSpecies);
     document.querySelector("#input-comms-protect-duration").value = formatDuration(data.values.comms.ProtectDuration);
     document.querySelector("#input-comms-protect-duration").placeholder = formatDuration(data.defaults.comms.ProtectDuration);
+    updatePostProcessingState(data.values.comms.CommsOut, data.postProcessingComms || []);
 
     // Set values for trap config
     const trapConfig = (data.values.trap && data.values.trap.Config) || {};
@@ -118,13 +120,49 @@ async function saveModemConfig() {
   await saveConfig("modemd", data);
 }
 
+// Instant classify requires low power mode, so low power mode is always on while instant classify is.
+function updateLowPowerState() {
+  const instantClassify = document.querySelector("#input-instant-classify").checked;
+  const lowPower = document.querySelector("#input-low-power-mode");
+  if (instantClassify) {
+    lowPower.checked = true;
+  }
+  lowPower.disabled = instantClassify;
+  document.querySelector("#instant-classify-message").style.display = instantClassify ? "" : "none";
+}
+
+let commsForcesPostProcessing = false;
+
+// postProcessingComms comes from /api/config: comms types that always run the classifier and postprocess.
+function updatePostProcessingState(commsOut, postProcessingComms) {
+  commsForcesPostProcessing = postProcessingComms.includes(commsOut);
+  document.querySelector("#input-postprocess").disabled = commsForcesPostProcessing;
+  document.querySelector("#postprocess-comms-message").style.display = commsForcesPostProcessing ? "" : "none";
+  updateClassifierState();
+}
+
+// Postprocessing needs classified tracks, so Track and Classify is always on in postprocess mode.
+function updateClassifierState() {
+  const postProcess = document.querySelector("#input-postprocess").checked;
+  const runClassifier = document.querySelector("#input-run-classifier");
+  if (postProcess) {
+    runClassifier.checked = true;
+  }
+  runClassifier.disabled = postProcess || commsForcesPostProcessing;
+  document.querySelector("#postprocess-classifier-message").style.display = postProcess ? "" : "none";
+}
+
+async function saveThermalRecorderConfig(){
+  const data = {    "instant-classify": document.querySelector("#input-instant-classify").checked,
+    "use-low-power-mode":document.querySelector("#input-low-power-mode").checked
+  }
+  await saveConfig("thermal-recorder",data);  
+}
+
 async function saveThermalMotionConfig() {
   const data = {
-    "do-tracking": document.querySelector("#input-do-tracking").checked,
     "run-classifier": document.querySelector("#input-run-classifier").checked,
-    "tracking-events": document.querySelector("#input-tracking-events").checked,
     "postprocess": document.querySelector("#input-postprocess").checked,
-    "postprocess-events": document.querySelector("#input-postprocess-events").checked,
   };
 
   await saveConfig("thermal-motion", data);
