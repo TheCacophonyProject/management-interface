@@ -130,7 +130,6 @@ const trapConfigNumbers = [
   ["motion_message_gap", "#input-trap-motion-message-gap"],
   ["post_reset_cooldown_seconds", "#input-trap-post-reset-cooldown"],
   ["manual_mode_timeout_minutes", "#input-trap-manual-mode-timeout"],
-  ["program", "#input-trap-program"],
   ["cage_entry_timeout_minutes", "#input-trap-cage-entry-timeout"],
   ["cage_hold_hours", "#input-trap-cage-hold-hours"],
   ["cage_exit_wait_hours", "#input-trap-cage-exit-wait-hours"],
@@ -149,6 +148,37 @@ const trapConfigSelects = [
   ["switch_2_disable", "#input-trap-switch-2-disable", "IGNORE"],
   ["switch_logic", "#input-trap-switch-logic", "OR"],
 ];
+
+// The spool-py programs (src/codeNN.py) users can pick, by number. The trap runs program 1
+// if none is set. The other programs are for development.
+const trapPrograms = [
+  [1, "Non-AI Mode"],
+  [2, "Digital Trigger Mode"],
+  [3, "AI Mode"],
+  [8, "Cycle Testing Mode"],
+];
+
+// setProgramOptions fills the program select and selects the saved program. A saved number
+// that isn't in trapPrograms (e.g. a development program) still gets an option, so saving
+// doesn't change it.
+function setProgramOptions(program) {
+  const select = document.querySelector("#input-trap-program");
+  const options = [["", "Default (Non-AI Mode)"]];
+  for (const [n, name] of trapPrograms) {
+    options.push([String(n), name]);
+  }
+  if (program !== undefined && program !== null && !trapPrograms.some(([n]) => n === program)) {
+    options.push([String(program), `Program ${program} (development)`]);
+  }
+  select.innerHTML = "";
+  for (const [value, text] of options) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = text;
+    select.appendChild(option);
+  }
+  select.value = program === undefined || program === null ? "" : String(program);
+}
 
 async function loadTrapPageConfig() {
   try {
@@ -184,6 +214,7 @@ async function loadTrapPageConfig() {
     for (const [key, selector, fallback] of trapConfigSelects) {
       document.querySelector(selector).value = trapConfig[key] || fallback;
     }
+    setProgramOptions(trapConfig.program);
   } catch (error) {
     console.error("Error loading config:", error);
     alert("Error loading config");
@@ -230,6 +261,8 @@ async function saveTrapConfig() {
   for (const [key, selector] of trapConfigSelects) {
     trapConfig[key] = document.querySelector(selector).value;
   }
+  const program = document.querySelector("#input-trap-program").value;
+  if (program !== "") trapConfig.program = parseInt(program);
 
   if (await saveConfig("trap", { config: trapConfig })) {
     await loadTrapPageConfig();
