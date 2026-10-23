@@ -768,6 +768,33 @@ func (api *ManagementAPI) CloseTrapDoor(w http.ResponseWriter, r *http.Request) 
 	callTrap(&w, "CloseDoor", door)
 }
 
+// cageCommandMethods maps the command in a /trap/cage/{command} route to the trap DBus
+// method that sends it.
+var cageCommandMethods = map[string]string{
+	"hold":    "CageHold",
+	"release": "CageRelease",
+	"kill":    "CageKill",
+	"wait":    "CageWait",
+	"escaped": "CageEscaped",
+	"killed":  "CageKilled",
+}
+
+// CageCommand sends a command for the animal held in the cage on a trap that has one.
+// hold, release and kill are for while the animal is shut in the cage, and wait, escaped
+// and killed are for once it has been released or let through to the kill mechanism.
+// Unlike the other trap requests these don't put the trap into manual mode. The trap
+// refuses a command that doesn't apply at the time, and the reason is returned.
+func (api *ManagementAPI) CageCommand(w http.ResponseWriter, r *http.Request) {
+	command := mux.Vars(r)["command"]
+	method, ok := cageCommandMethods[command]
+	if !ok {
+		badRequest(&w, fmt.Errorf("unknown cage command %q", command))
+		return
+	}
+	log.Printf("sending cage command %s", command)
+	callTrap(&w, method)
+}
+
 // CheckSaltConnection will try to ping the salt server and return the response
 func (api *ManagementAPI) CheckSaltConnection(w http.ResponseWriter, r *http.Request) {
 	log.Println("pinging salt server")

@@ -8,6 +8,12 @@ const trapButtons = [
   "open-door-2-button",
   "close-door-2-button",
   "restart-trap-button",
+  "cage-hold-button",
+  "cage-release-button",
+  "cage-kill-button",
+  "cage-wait-button",
+  "cage-escaped-button",
+  "cage-killed-button",
 ];
 
 // Send a request to the trap. Only one request is sent at a time, as they all go to the
@@ -86,4 +92,24 @@ function stopTrap() {
 
 function restartTrap() {
   trapRequest("/api/trap/restart", "Restarting trap...", "Trap restarted.");
+}
+
+// Messages for each cage command: [while sending, once the trap has accepted it].
+const cageCommandMessages = {
+  hold: ["Holding animal...", "Holding the animal for another cage_hold_hours."],
+  release: ["Releasing animal...", "Opening door 1 to release the animal, this takes about 20 seconds."],
+  kill: ["Opening door to kill mechanism...", "Opening door 2 to the kill mechanism, this takes about 20 seconds."],
+  wait: ["Waiting longer...", "Waiting another cage_exit_wait_hours for the animal to leave the cage."],
+  escaped: ["Marking as escaped...", "Marked as escaped. The trap will re-arm the cage and reset the spool."],
+  killed: ["Marking as killed...", "Marked as killed. The trap will re-arm the cage and reset the spool."],
+};
+
+// Commands for an animal in the cage. The trap refuses one that doesn't apply at the
+// time, such as Wait Longer while it is still holding the animal, and says why.
+function cageCommand(command) {
+  if (command === "kill" && !confirm("Open the door to the kill mechanism?")) {
+    return;
+  }
+  const [working, done] = cageCommandMessages[command];
+  trapRequest("/api/trap/cage/" + command, working, done);
 }

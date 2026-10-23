@@ -61,6 +61,30 @@
 
         <hr>
 
+        <h4>Cage</h4>
+        <p>
+            For a trap with a holding cage (cage_enabled). Once an animal is shut in the cage, choose what to do with it. If nothing is chosen it is released after cage_hold_hours. These don't put the trap into manual mode, but the buttons above do, and that ends the cage sequence.
+        </p>
+        <div class="row">
+            <div class="col-xs-12 w-100">
+                <button id="cage-hold-button" onclick="cageCommand('hold')" class="btn btn-primary">Hold</button>
+                <button id="cage-release-button" onclick="cageCommand('release')" class="btn btn-primary">Release</button>
+                <button id="cage-kill-button" onclick="cageCommand('kill')" class="btn btn-danger">Kill</button>
+            </div>
+        </div>
+        <p class="mt-3">
+            Once the animal has been released or let through to the kill mechanism, the trap waits up to cage_exit_wait_hours for it to leave the cage.
+        </p>
+        <div class="row">
+            <div class="col-xs-12 w-100">
+                <button id="cage-wait-button" onclick="cageCommand('wait')" class="btn btn-primary">Wait Longer</button>
+                <button id="cage-escaped-button" onclick="cageCommand('escaped')" class="btn btn-primary">Escaped</button>
+                <button id="cage-killed-button" onclick="cageCommand('killed')" class="btn btn-primary">Killed</button>
+            </div>
+        </div>
+
+        <hr>
+
         <h4>Restart</h4>
         <p>
            
