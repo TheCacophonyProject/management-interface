@@ -113,3 +113,125 @@ function cageCommand(command) {
   const [working, done] = cageCommandMessages[command];
   trapRequest("/api/trap/cage/" + command, working, done);
 }
+
+window.onload = async function () {
+  await loadTrapPageConfig();
+};
+
+// Number fields in the trap config: [config key, input id].
+const trapConfigNumbers = [
+  ["apir_d_threshold", "#input-trap-apir-d-threshold"],
+  ["apir_dt_threshold", "#input-trap-apir-dt-threshold"],
+  ["max_current", "#input-trap-max-current"],
+  ["spool_reset_delay_minutes", "#input-trap-spool-reset-delay"],
+  ["latitude", "#input-trap-latitude"],
+  ["longitude", "#input-trap-longitude"],
+  ["test_loop_interval", "#input-trap-test-loop-interval"],
+  ["motion_message_gap", "#input-trap-motion-message-gap"],
+  ["post_reset_cooldown_seconds", "#input-trap-post-reset-cooldown"],
+  ["manual_mode_timeout_minutes", "#input-trap-manual-mode-timeout"],
+  ["program", "#input-trap-program"],
+  ["cage_entry_timeout_minutes", "#input-trap-cage-entry-timeout"],
+  ["cage_hold_hours", "#input-trap-cage-hold-hours"],
+  ["cage_exit_wait_hours", "#input-trap-cage-exit-wait-hours"],
+];
+
+// Checkbox fields in the trap config: [config key, input id].
+const trapConfigChecks = [
+  ["observation_mode", "#input-trap-observation-mode"],
+  ["spool_reed_check", "#input-trap-spool-reed-check"],
+  ["cage_enabled", "#input-trap-cage-enabled"],
+];
+
+// Select fields in the trap config: [config key, input id, default].
+const trapConfigSelects = [
+  ["switch_1_disable", "#input-trap-switch-1-disable", "IGNORE"],
+  ["switch_2_disable", "#input-trap-switch-2-disable", "IGNORE"],
+  ["switch_logic", "#input-trap-switch-logic", "OR"],
+];
+
+async function loadTrapPageConfig() {
+  try {
+    const data = await fetchConfig();
+    const comms = data.values.comms;
+
+    // The trap is only talked to when comms is enabled and set to trap-control. tc2-hat-comms
+    // also runs trap control for "uart", for sidekick compatibility.
+    const warning = document.querySelector("#comms-warning");
+    if (!comms.Enable || !["trap-control", "uart"].includes(comms.CommsOut)) {
+      warning.innerHTML =
+        'Comms needs to be enabled and set to trap-control for the camera to talk to the trap. Change this on the <a href="/config">config</a> page.';
+    } else {
+      warning.innerText = "";
+    }
+
+    document.querySelector("#input-comms-trap-default").checked = comms.TrapEnabledByDefault;
+    document.querySelector("#input-comms-trap-species").value = JSON.stringify(comms.TrapSpecies);
+    document.querySelector("#input-comms-trap-duration").value = formatDuration(comms.TrapDuration);
+    document.querySelector("#input-comms-trap-duration").placeholder = formatDuration(data.defaults.comms.TrapDuration);
+    document.querySelector("#input-comms-protect-species").value = JSON.stringify(comms.ProtectSpecies);
+    document.querySelector("#input-comms-protect-duration").value = formatDuration(comms.ProtectDuration);
+    document.querySelector("#input-comms-protect-duration").placeholder = formatDuration(data.defaults.comms.ProtectDuration);
+
+    const trapConfig = (data.values.trap && data.values.trap.Config) || {};
+    for (const [key, selector] of trapConfigNumbers) {
+      document.querySelector(selector).value = "";
+      setNumberInput(selector, trapConfig[key]);
+    }
+    for (const [key, selector] of trapConfigChecks) {
+      document.querySelector(selector).checked = trapConfig[key] || false;
+    }
+    for (const [key, selector, fallback] of trapConfigSelects) {
+      document.querySelector(selector).value = trapConfig[key] || fallback;
+    }
+  } catch (error) {
+    console.error("Error loading config:", error);
+    alert("Error loading config");
+  }
+}
+
+// saveTrapSettings saves only the trap's part of the comms config, the rest of the comms
+// config is left as it is.
+async function saveTrapSettings() {
+  let trapSpecies, protectSpecies;
+  try {
+    trapSpecies = JSON.parse(document.querySelector("#input-comms-trap-species").value) || undefined;
+    protectSpecies = JSON.parse(document.querySelector("#input-comms-protect-species").value) || undefined;
+  } catch (error) {
+    console.error("Error parsing JSON:", error);
+    alert("Error parsing JSON for trap or protect species");
+    return;
+  }
+
+  const data = {
+    "trap-enabled-by-default": document.querySelector("#input-comms-trap-default").checked,
+    "trap-species": trapSpecies,
+    "trap-duration": document.querySelector("#input-comms-trap-duration").value || undefined,
+    "protect-species": protectSpecies,
+    "protect-duration": document.querySelector("#input-comms-protect-duration").value || undefined,
+  };
+
+  if (await saveConfig("comms", data)) {
+    await loadTrapPageConfig();
+  }
+}
+
+// saveTrapConfig saves the whole trap config. Empty number fields are left out so the trap
+// uses its default for them.
+async function saveTrapConfig() {
+  const trapConfig = {};
+  for (const [key, selector] of trapConfigNumbers) {
+    const val = document.querySelector(selector).value;
+    if (val !== "") trapConfig[key] = parseFloat(val);
+  }
+  for (const [key, selector] of trapConfigChecks) {
+    trapConfig[key] = document.querySelector(selector).checked;
+  }
+  for (const [key, selector] of trapConfigSelects) {
+    trapConfig[key] = document.querySelector(selector).value;
+  }
+
+  if (await saveConfig("trap", { config: trapConfig })) {
+    await loadTrapPageConfig();
+  }
+}

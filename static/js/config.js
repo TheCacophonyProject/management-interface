@@ -6,17 +6,7 @@ window.onload = async function () {
 
 async function loadConfig() {
   try {
-    const response = await fetch("/api/config", {
-      headers: {
-        Authorization: "Basic " + btoa("admin:feathers"),
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to load config");
-    }
-
-    const data = await response.json();
+    const data = await fetchConfig();
     console.log(data);
 
     // Set placeholders and values for windows
@@ -57,46 +47,10 @@ async function loadConfig() {
     document.querySelector("#input-comms-protect-duration").value = formatDuration(data.values.comms.ProtectDuration);
     document.querySelector("#input-comms-protect-duration").placeholder = formatDuration(data.defaults.comms.ProtectDuration);
 
-    // Set values for trap config
-    const trapConfig = (data.values.trap && data.values.trap.Config) || {};
-    setNumberInput("#input-trap-apir-d-threshold", trapConfig.apir_d_threshold);
-    setNumberInput("#input-trap-apir-dt-threshold", trapConfig.apir_dt_threshold);
-    setNumberInput("#input-trap-max-current", trapConfig.max_current);
-    setNumberInput("#input-trap-spool-reset-delay", trapConfig.spool_reset_delay_minutes);
-    setNumberInput("#input-trap-latitude", trapConfig.latitude);
-    setNumberInput("#input-trap-longitude", trapConfig.longitude);
-    setNumberInput("#input-trap-test-loop-interval", trapConfig.test_loop_interval);
-    document.querySelector("#input-trap-switch-1-disable").value = trapConfig.switch_1_disable || "IGNORE";
-    document.querySelector("#input-trap-switch-2-disable").value = trapConfig.switch_2_disable || "IGNORE";
-    document.querySelector("#input-trap-switch-logic").value = trapConfig.switch_logic || "OR";
-    document.querySelector("#input-trap-observation-mode").checked = trapConfig.observation_mode || false;
-    setNumberInput("#input-trap-motion-message-gap", trapConfig.motion_message_gap);
-    setNumberInput("#input-trap-post-reset-cooldown", trapConfig.post_reset_cooldown_seconds);
-    document.querySelector("#input-trap-spool-reed-check").checked = trapConfig.spool_reed_check || false;
-    setNumberInput("#input-trap-program", trapConfig.program);
-
   } catch (error) {
     console.error("Error loading config:", error);
     alert("Error loading config");
   }
-}
-
-function setNumberInput(selector, value) {
-  if (value !== undefined && value !== null) {
-    document.querySelector(selector).value = value;
-  }
-}
-
-function formatDuration(nanoseconds) {
-  if (!nanoseconds) {
-    return "";
-  }
-  const seconds = Math.floor(nanoseconds / 1_000_000_000);
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const remainingSeconds = seconds % 60;
-
-  return `${hours > 0 ? `${hours}h` : ""}${minutes > 0 ? `${minutes}m` : ""}${remainingSeconds}s`;
 }
 
 async function saveWindowsConfig() {
@@ -105,7 +59,9 @@ async function saveWindowsConfig() {
     "stop-recording": document.querySelector("#input-stop-recording").value || undefined,
   };
 
-  await saveConfig("windows", data);
+  if (await saveConfig("windows", data)) {
+    await loadConfig();
+  }
 }
 
 async function saveModemConfig() {
@@ -115,7 +71,9 @@ async function saveModemConfig() {
     "connection-timeout": document.querySelector("#input-connection-timeout").value || undefined,
   };
 
-  await saveConfig("modemd", data);
+  if (await saveConfig("modemd", data)) {
+    await loadConfig();
+  }
 }
 
 async function saveThermalMotionConfig() {
@@ -127,7 +85,9 @@ async function saveThermalMotionConfig() {
     "postprocess-events": document.querySelector("#input-postprocess-events").checked,
   };
 
-  await saveConfig("thermal-motion", data);
+  if (await saveConfig("thermal-motion", data)) {
+    await loadConfig();
+  }
 }
 
 async function saveCommsConfig() {
@@ -156,58 +116,7 @@ async function saveCommsConfig() {
     "protect-duration": document.querySelector("#input-comms-protect-duration").value || undefined,
   };
 
-  await saveConfig("comms", data);
-}
-
-async function saveTrapConfig() {
-  const trapConfig = {};
-
-  function addNumber(key, selector) {
-    const val = document.querySelector(selector).value;
-    if (val !== "") trapConfig[key] = parseFloat(val);
-  }
-
-  addNumber("apir_d_threshold", "#input-trap-apir-d-threshold");
-  addNumber("apir_dt_threshold", "#input-trap-apir-dt-threshold");
-  addNumber("max_current", "#input-trap-max-current");
-  addNumber("spool_reset_delay_minutes", "#input-trap-spool-reset-delay");
-  addNumber("latitude", "#input-trap-latitude");
-  addNumber("longitude", "#input-trap-longitude");
-  addNumber("test_loop_interval", "#input-trap-test-loop-interval");
-  trapConfig["switch_1_disable"] = document.querySelector("#input-trap-switch-1-disable").value;
-  trapConfig["switch_2_disable"] = document.querySelector("#input-trap-switch-2-disable").value;
-  trapConfig["switch_logic"] = document.querySelector("#input-trap-switch-logic").value;
-  trapConfig["observation_mode"] = document.querySelector("#input-trap-observation-mode").checked;
-  addNumber("motion_message_gap", "#input-trap-motion-message-gap");
-  addNumber("post_reset_cooldown_seconds", "#input-trap-post-reset-cooldown");
-  trapConfig["spool_reed_check"] = document.querySelector("#input-trap-spool-reed-check").checked;
-  addNumber("program", "#input-trap-program");
-
-  await saveConfig("trap", { "config": trapConfig });
-}
-
-async function saveConfig(section, data) {
-  const formData = new FormData();
-  formData.append("section", section);
-  formData.append("config", JSON.stringify(data));
-
-  try {
-    const response = await fetch("/api/config", {
-      method: "POST",
-      headers: {
-        Authorization: "Basic " + btoa("admin:feathers"),
-      },
-      body: formData,
-    });
-
-    if (response.ok) {
-      alert(`${section} config saved`);
-      await loadConfig();
-    } else {
-      throw new Error("Failed to save config");
-    }
-  } catch (error) {
-    console.error("Error saving config:", error);
-    alert("Error saving config");
+  if (await saveConfig("comms", data)) {
+    await loadConfig();
   }
 }
