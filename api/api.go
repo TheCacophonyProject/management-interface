@@ -424,6 +424,11 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if err := api.checkTrapProgram(newConfig); err != nil {
+		badRequest(&w, err)
+		return
+	}
+
 	log.Debugf("set config: %+v", newConfig)
 	if err := api.config.SetMultipleSections(newConfig); err != nil {
 		log.Printf("Error with SetFromMap: %s", err)
@@ -431,6 +436,33 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// aiModeTrapProgram is the spool-py program where the camera enables the trap when it sees a
+// target species. The camera can only do that in high power mode, where the Raspberry Pi is
+// on and doing the recording.
+const aiModeTrapProgram = 3
+
+// checkTrapProgram refuses new config that sets the trap to AI Mode while the camera is in
+// low power mode.
+func (api *ManagementAPI) checkTrapProgram(newConfig map[string]any) error {
+	trap, _ := newConfig[goconfig.TrapKey].(map[string]any)
+	trapConfig, _ := trap["config"].(map[string]any)
+	if program, _ := trapConfig["program"].(float64); program != aiModeTrapProgram {
+		return nil
+	}
+
+	if err := api.config.Reload(); err != nil {
+		return err
+	}
+	recorder := goconfig.DefaultThermalRecorder()
+	if err := api.config.Unmarshal(goconfig.ThermalRecorderKey, &recorder); err != nil {
+		return err
+	}
+	if recorder.UseLowPowerMode {
+		return errors.New("the trap can't be set to AI Mode while the camera is in low power mode")
+	}
+	return nil
 }
 
 // GetConfig will return the config settings and the defaults

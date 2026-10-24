@@ -252,6 +252,10 @@ const trapConfigSelects = [
   ["switch_logic", "#input-trap-switch-logic", "OR"],
 ];
 
+// The program where the camera enables the trap when it sees a target species. The camera
+// can only do that in high power mode, where the Raspberry Pi is on and doing the recording.
+const aiModeProgram = 3;
+
 // The spool-py programs (src/codeNN.py) users can pick, by number. The trap runs program 1
 // if none is set. The other programs are for development.
 const trapPrograms = [
@@ -263,8 +267,8 @@ const trapPrograms = [
 
 // setProgramOptions fills the program select and selects the saved program. A saved number
 // that isn't in trapPrograms (e.g. a development program) still gets an option, so saving
-// doesn't change it.
-function setProgramOptions(program) {
+// doesn't change it. In low power mode AI Mode can't be picked.
+function setProgramOptions(program, lowPowerMode) {
   const select = document.querySelector("#input-trap-program");
   const options = [["", "Default (Non-AI Mode)"]];
   for (const [n, name] of trapPrograms) {
@@ -278,9 +282,18 @@ function setProgramOptions(program) {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = text;
+    if (lowPowerMode && value === String(aiModeProgram)) {
+      option.disabled = true;
+      option.textContent += " (needs high power mode)";
+    }
     select.appendChild(option);
   }
   select.value = program === undefined || program === null ? "" : String(program);
+
+  const warning = document.querySelector("#program-warning");
+  warning.innerText = lowPowerMode && program === aiModeProgram
+    ? "The camera is in low power mode, so it can't enable the trap in AI Mode. Pick another program, or put the camera in high power mode."
+    : "";
 }
 
 async function loadTrapPageConfig() {
@@ -317,7 +330,7 @@ async function loadTrapPageConfig() {
     for (const [key, selector, fallback] of trapConfigSelects) {
       document.querySelector(selector).value = trapConfig[key] || fallback;
     }
-    setProgramOptions(trapConfig.program);
+    setProgramOptions(trapConfig.program, data.values.thermalRecorder?.UseLowPowerMode || false);
   } catch (error) {
     console.error("Error loading config:", error);
     alert("Error loading config");
