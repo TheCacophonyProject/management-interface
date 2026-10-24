@@ -287,6 +287,7 @@ func main() {
 	apiRouter.HandleFunc("/trap/door/{door:[12]}/open", apiObj.OpenTrapDoor).Methods("POST")
 	apiRouter.HandleFunc("/trap/door/{door:[12]}/close", apiObj.CloseTrapDoor).Methods("POST")
 	apiRouter.HandleFunc("/trap/cage/{command:hold|release|kill|wait|escaped|killed}", apiObj.CageCommand).Methods("POST")
+	apiRouter.HandleFunc("/trap/history", apiObj.GetTrapHistory).Methods("GET")
 	apiRouter.HandleFunc("/check-salt-connection", apiObj.CheckSaltConnection).Methods("GET")
 	apiRouter.HandleFunc("/salt-update", apiObj.StartSaltUpdate).Methods("POST")
 	apiRouter.HandleFunc("/salt-update", apiObj.GetSaltUpdateState).Methods("GET")

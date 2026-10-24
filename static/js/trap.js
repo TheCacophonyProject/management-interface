@@ -115,8 +115,111 @@ function cageCommand(command) {
 }
 
 window.onload = async function () {
-  await loadTrapPageConfig();
+  await Promise.all([loadTrapPageConfig(), loadTrapHistory()]);
 };
+
+// What the messages mean, for the history. Messages not listed show their type.
+const trapMessageNames = {
+  // Sent by the camera.
+  PING: "Ping",
+  ENABLE: "Enable",
+  DISABLE: "Disable",
+  RESTART: "Restart",
+  STOP: "Stop",
+  RELEASE_SPOOL: "Release spool",
+  RESET_SPOOL: "Reset spool",
+  OPEN_DOOR_1: "Open door 1",
+  OPEN_DOOR_2: "Open door 2",
+  CLOSE_DOOR_1: "Close door 1",
+  CLOSE_DOOR_2: "Close door 2",
+  CAGE_HOLD: "Cage: hold",
+  CAGE_RELEASE: "Cage: release",
+  CAGE_KILL: "Cage: kill",
+  CAGE_WAIT: "Cage: wait longer",
+  CAGE_ESCAPED: "Cage: animal escaped",
+  CAGE_KILLED: "Cage: animal killed",
+  READ_TIME: "Read time",
+  WRITE_TIME: "Set time",
+  LS: "Check files",
+  WRITE: "Upload file chunk",
+  DECOMPRESS: "Unpack file",
+  DELETE: "Delete file",
+  DELETE_TMP: "Delete temporary files",
+  COMMIT: "Save uploaded files",
+  // Responses from the trap.
+  ACK: "Accepted",
+  NACK: "Refused",
+  BAD_KEY: "Not supported",
+  READ_TIME_R: "Time",
+  // Sent by the trap on its own.
+  RUNNING: "Started program",
+  ENABLED: "Enabled",
+  DISABLED: "Disabled",
+  MOTION: "Motion",
+  MAX_MOTION: "Too much motion",
+  TRIGGERED: "Triggered",
+  SPOOL_RESET: "Spool reset",
+  ERROR_CODE: "Error",
+  EXCEPTION: "Software error",
+  DOOR_OPENED: "Door opened",
+  DOOR_CLOSED: "Door closed",
+  MANUAL_MODE: "Manual mode",
+  STOPPED: "Stopped",
+  MANUAL_MODE_TIMEOUT: "Manual mode timed out",
+  MANUAL_ERROR: "Manual mode error",
+  CAGE_NO_ENTRY: "Cage: nothing entered",
+  CAGE_CAPTURED: "Cage: animal captured",
+  CAGE_HOLDING: "Cage: holding longer",
+  CAGE_RELEASING: "Cage: releasing",
+  CAGE_KILLING: "Cage: opening to kill mechanism",
+  CAGE_WAITING: "Cage: waiting longer",
+  CAGE_FINISHED: "Cage: finished",
+};
+
+const trapHistoryDirs = {
+  sent: "Sent",
+  received: "Received",
+  failed: "No response",
+  lost: "Lost",
+};
+
+async function loadTrapHistory() {
+  const message = document.querySelector("#trap-history-message");
+  const tbody = document.querySelector("#trap-history");
+  try {
+    const response = await fetch("/api/trap/history", {
+      headers: {
+        Authorization: "Basic " + btoa("admin:feathers"),
+      },
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const entries = await response.json();
+    tbody.innerHTML = "";
+    for (const entry of entries) {
+      const row = document.createElement("tr");
+      const name = trapMessageNames[entry.type];
+      const time = new Date(entry.time);
+      for (const text of [
+        // A lost entry from a line in the history file that couldn't be read has no time.
+        time.getFullYear() > 1 ? time.toLocaleString() : "Unknown",
+        trapHistoryDirs[entry.dir] || "Received",
+        entry.id || "",
+        entry.dir === "lost" ? "Line lost" : name ? `${name} (${entry.type})` : entry.type,
+        entry.payload || "",
+      ]) {
+        const cell = document.createElement("td");
+        cell.textContent = text;
+        row.appendChild(cell);
+      }
+      tbody.appendChild(row);
+    }
+    message.innerText = entries.length === 0 ? "No messages from the trap yet." : "";
+  } catch (e) {
+    message.innerText = "Failed to load history: " + e;
+  }
+}
 
 // Number fields in the trap config: [config key, input id].
 const trapConfigNumbers = [

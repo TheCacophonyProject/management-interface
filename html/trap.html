@@ -101,6 +101,33 @@
 
         <hr>
 
+        <h4>History</h4>
+        <p>
+            Messages sent to and received from the trap, newest first. A response has the same ID as the message it answers. "Lost" is a line that was garbled on the way from the trap, or an entry in the saved history that couldn't be read. File uploads only show the chunks that failed, and while the trap isn't answering only the first unanswered ping is shown. The camera keeps the last 2000 to 3000.
+        </p>
+        <div class="row">
+            <div class="col-xs-12 w-100">
+                <button id="trap-history-button" onclick=loadTrapHistory() class="btn btn-primary">Refresh</button>
+            </div>
+        </div>
+        <p id="trap-history-message" class="mt-3"></p>
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th></th>
+                        <th>ID</th>
+                        <th>Message</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="trap-history"></tbody>
+            </table>
+        </div>
+
+        <hr>
+
         <h4>Trap Settings</h4>
         <p>
             These are part of the comms config, and are also on the config page. Species are JSON, for example {"possum": 60}.
