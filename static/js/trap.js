@@ -159,6 +159,7 @@ const trapMessageNames = {
   MAX_MOTION: "Too much motion",
   TRIGGERED: "Triggered",
   SPOOL_RESET: "Spool reset",
+  SPOOL_RESET_FAILED: "Spool reset failed",
   ERROR_CODE: "Error",
   EXCEPTION: "Software error",
   DOOR_OPENED: "Door opened",
