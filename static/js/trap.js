@@ -322,6 +322,7 @@ const trapMessageNames = {
   TRIGGERED: "Triggered",
   SPOOL_RESET: "Spool reset",
   SPOOL_RESET_FAILED: "Spool reset failed",
+  RTC_BATTERY_FLAT: "RTC battery flat",
   ERROR_CODE: "Error",
   EXCEPTION: "Software error",
   DOOR_OPENED: "Door opened",
