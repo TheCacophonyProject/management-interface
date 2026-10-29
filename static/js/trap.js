@@ -21,7 +21,8 @@ const trapButtons = [
 // has finished moving the spool.
 async function trapRequest(url, working, done) {
   const message = document.getElementById("trap-message");
-  setTrapButtonsDisabled(true);
+  trapRequestRunning = true;
+  updateTrapButtons();
   message.className = "col-12 mt-3";
   message.innerText = working;
   try {
@@ -33,12 +34,34 @@ async function trapRequest(url, working, done) {
     message.className = "col-12 mt-3 text-danger";
     message.innerText = "Request failed: " + e;
   } finally {
-    setTrapButtonsDisabled(false);
+    trapRequestRunning = false;
+    updateTrapButtons();
+    loadTrapHistory();
   }
 }
 
-function setTrapButtonsDisabled(disabled) {
+let trapRequestRunning = false;
+
+// The cage phase each cage button can be used in. The trap refuses them at other times.
+const cageButtonPhases = {
+  "cage-hold-button": "HOLDING",
+  "cage-release-button": "HOLDING",
+  "cage-kill-button": "HOLDING",
+  "cage-wait-button": "EXITING",
+  "cage-escaped-button": "EXITING",
+  "cage-killed-button": "EXITING",
+};
+
+// updateTrapButtons disables the buttons while a request is being sent, and the cage
+// buttons that don't apply to what the cage is doing. Without a status from the trap (such
+// as older trap software) the cage buttons are left for the trap to refuse.
+function updateTrapButtons() {
+  const status = trapStatus && trapStatus.status;
   for (const id of trapButtons) {
+    let disabled = trapRequestRunning;
+    if (id in cageButtonPhases && status) {
+      disabled = disabled || status.CagePhase !== cageButtonPhases[id];
+    }
     document.getElementById(id).disabled = disabled;
   }
 }
@@ -115,8 +138,144 @@ function cageCommand(command) {
 }
 
 window.onload = async function () {
+  streamTrapStatus();
   await Promise.all([loadTrapPageConfig(), loadTrapHistory()]);
 };
+
+const trapStatusRetry = 2000;
+
+// The trap's states (State in its status).
+const trapStates = {
+  RESETTING: "Resetting the spool",
+  RESET_FAILED: "Spool reset failed, waiting to be reset or restarted",
+  ARMED: "Armed",
+  TRIGGERED: "Triggered",
+  CAGE: "Running the cage sequence",
+  MANUAL: "Manual mode",
+};
+
+// The cage phases (CagePhase in the status), for a trap with a cage.
+const cagePhases = {
+  IDLE: "Empty",
+  WAITING_FOR_ENTRY: "Waiting for the animal to go in",
+  MOVING: "Moving a door",
+  HOLDING: "Holding an animal",
+  EXITING: "Door open, waiting for the animal to leave",
+  MANUAL: "Stopped, the trap is in manual mode",
+};
+
+// trapStatusRows turns the trap's status into [label, value] rows.
+function trapStatusRows(status) {
+  const rows = [];
+  rows.push(["State", trapStates[status.State] || status.State || "Unknown (this program doesn't run the trap sequence)"]);
+  if (status.Enabled !== undefined) {
+    rows.push(["Enabled", status.Enabled ? "Yes" : "No: " + (status.DisabledReason || "")]);
+  }
+  if (status.Request) {
+    rows.push(["Running", trapMessageNames[status.Request] || status.Request]);
+  }
+  if (status.CagePhase) {
+    rows.push(["Cage", cagePhases[status.CagePhase] || status.CagePhase]);
+  }
+  if (status.CameraEnabled !== undefined) {
+    rows.push(["Camera", status.CameraEnabled ? "Enabling the trap" : "Not enabling the trap"]);
+  }
+  return rows;
+}
+
+// The last status from the trap, and when it came, or null if there isn't one.
+let trapStatus = null;
+// Why there isn't a status, shown instead of one.
+let trapStatusProblem = "Connecting...";
+
+// streamTrapStatus reads the trap's status from the camera as server-sent events: the
+// current status, then each change as the trap reports it. EventSource can't send the
+// Authorization header, so the stream is read with fetch. It reconnects if it drops.
+async function streamTrapStatus() {
+  for (;;) {
+    try {
+      const response = await fetch("/api/trap/status/events", {
+        headers: {
+          Authorization: "Basic " + btoa("admin:feathers"),
+        },
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) {
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        let end;
+        while ((end = buffer.indexOf("\n\n")) >= 0) {
+          handleTrapStatusEvent(buffer.slice(0, end));
+          buffer = buffer.slice(end + 2);
+        }
+      }
+      throw new Error("the connection closed");
+    } catch (e) {
+      console.log(e);
+      trapStatus = null;
+      trapStatusProblem = "Lost the connection to the camera, reconnecting...";
+      renderTrapStatus();
+    }
+    await new Promise((resolve) => setTimeout(resolve, trapStatusRetry));
+  }
+}
+
+// handleTrapStatusEvent handles one event from the status stream. Comment lines, which
+// keep the connection alive, are ignored.
+function handleTrapStatusEvent(text) {
+  let name = "message";
+  const data = [];
+  for (const line of text.split("\n")) {
+    if (line.startsWith("event: ")) {
+      name = line.slice("event: ".length);
+    } else if (line.startsWith("data: ")) {
+      data.push(line.slice("data: ".length));
+    }
+  }
+  if (name === "status") {
+    trapStatus = { status: JSON.parse(data.join("\n")), receivedAt: Date.now() };
+    // Whatever changed the status is in the history too.
+    loadTrapHistory();
+  } else if (name === "unavailable") {
+    trapStatus = null;
+    trapStatusProblem = "Couldn't get the trap's status: " + data.join("\n");
+  } else {
+    return;
+  }
+  renderTrapStatus();
+}
+
+// renderTrapStatus shows the last status.
+function renderTrapStatus() {
+  const message = document.querySelector("#trap-status-message");
+  const tbody = document.querySelector("#trap-status");
+  tbody.innerHTML = "";
+  updateTrapButtons();
+  if (!trapStatus) {
+    message.className = "text-danger";
+    message.innerText = trapStatusProblem;
+    return;
+  }
+  for (const [label, value] of trapStatusRows(trapStatus.status)) {
+    const row = document.createElement("tr");
+    for (const text of [label, value]) {
+      const cell = document.createElement("td");
+      cell.textContent = text;
+      row.appendChild(cell);
+    }
+    tbody.appendChild(row);
+  }
+  message.className = "text-success";
+  message.innerText = "Live, last changed at " + new Date(trapStatus.receivedAt).toLocaleTimeString();
+}
 
 // What the messages mean, for the history. Messages not listed show their type.
 const trapMessageNames = {
@@ -140,6 +299,7 @@ const trapMessageNames = {
   CAGE_KILLED: "Cage: animal killed",
   READ_TIME: "Read time",
   WRITE_TIME: "Set time",
+  STATUS: "Get status",
   LS: "Check files",
   WRITE: "Upload file chunk",
   DECOMPRESS: "Unpack file",
@@ -151,6 +311,8 @@ const trapMessageNames = {
   NACK: "Refused",
   BAD_KEY: "Not supported",
   READ_TIME_R: "Time",
+  STATUS_R: "Status",
+  STATUS_CHANGED: "Status changed",
   // Sent by the trap on its own.
   RUNNING: "Started program",
   ENABLED: "Enabled",
@@ -184,6 +346,8 @@ const trapHistoryDirs = {
   lost: "Lost",
 };
 
+let lastTrapHistory = null;
+
 async function loadTrapHistory() {
   const message = document.querySelector("#trap-history-message");
   const tbody = document.querySelector("#trap-history");
@@ -196,7 +360,12 @@ async function loadTrapHistory() {
     if (!response.ok) {
       throw new Error(await response.text());
     }
-    const entries = await response.json();
+    const text = await response.text();
+    if (text === lastTrapHistory) {
+      return;
+    }
+    lastTrapHistory = text;
+    const entries = JSON.parse(text);
     tbody.innerHTML = "";
     for (const entry of entries) {
       const row = document.createElement("tr");

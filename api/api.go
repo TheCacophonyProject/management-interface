@@ -68,6 +68,10 @@ type ManagementAPI struct {
 	hotspotTimer *time.Ticker
 	recordingDir string
 	appVersion   string
+
+	// KeepAwake keeps the camera and its hotspot on. Every API request does this, and a
+	// stream that stays open, such as the trap status, calls it every so often.
+	KeepAwake func()
 }
 
 func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *logging.Logger) (*ManagementAPI, error) {
@@ -718,24 +722,52 @@ func getTrapDbus() (dbus.BusObject, error) {
 // callTrap makes a call to the trap DBus service, writing the reason for any failure to
 // the response so it can be shown to the user.
 func callTrap(w *http.ResponseWriter, method string, args ...interface{}) {
+	if storeTrapCall(w, method, nil, args...) {
+		(*w).WriteHeader(http.StatusOK)
+	}
+}
+
+// storeTrapCall makes a call to the trap DBus service, storing what it returns in out.
+// It returns false after writing the reason for a failure to the response.
+func storeTrapCall(w *http.ResponseWriter, method string, out []any, args ...any) bool {
 	trapDbus, err := getTrapDbus()
 	if err != nil {
 		log.Printf("failed to connect to DBus: %v", err)
 		serverError(w, err)
-		return
+		return false
 	}
 
-	if err := trapDbus.Call(trapDbusName+"."+method, 0, args...).Store(); err != nil {
+	if err := trapDbus.Call(trapDbusName+"."+method, 0, args...).Store(out...); err != nil {
 		log.Printf("trap %s failed: %v", method, err)
-		var dbusErr dbus.Error
-		if errors.As(err, &dbusErr) && dbusErr.Name == "org.freedesktop.DBus.Error.ServiceUnknown" {
-			badRequest(w, errors.New("trap service is not running, check that comms is set to trap-control"))
-			return
-		}
-		badRequest(w, err)
+		badRequest(w, trapCallError(err))
+		return false
+	}
+	return true
+}
+
+// errTrapServiceNotRunning is why a trap call fails when tc2-hat-comms hasn't started the
+// trap service. It only starts it once the trap has answered.
+var errTrapServiceNotRunning = errors.New("trap service is not running, check that comms is set to trap-control and the trap is connected")
+
+// trapCallError gives the reason a call to the trap DBus service failed, for the user.
+func trapCallError(err error) error {
+	var dbusErr dbus.Error
+	if errors.As(err, &dbusErr) && dbusErr.Name == "org.freedesktop.DBus.Error.ServiceUnknown" {
+		return errTrapServiceNotRunning
+	}
+	return err
+}
+
+// GetTrapStatus returns what the trap is doing, as the JSON the trap reports: State, and
+// depending on the state Enabled, DisabledReason, Request, CagePhase and CameraEnabled
+// (see status_reply in spool-py).
+func (api *ManagementAPI) GetTrapStatus(w http.ResponseWriter, r *http.Request) {
+	var status string
+	if !storeTrapCall(&w, "Status", []any{&status}) {
 		return
 	}
-	(*w).WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	io.WriteString(w, status)
 }
 
 // RestartTrap restarts the trap that is connected to the device.
