@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os/exec"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
+	goconfig "github.com/TheCacophonyProject/go-config"
 	"github.com/godbus/dbus"
 )
 
@@ -67,7 +71,12 @@ func (h *trapStatusHub) publish(event trapStatusEvent) {
 	}
 }
 
-// currentTrapStatus asks the trap for its status.
+// trapCommsCheckInterval is how often it checks on tc2-hat-comms while the trap service
+// isn't running, so the page hears if comms stops or gets started again.
+const trapCommsCheckInterval = 5 * time.Second
+
+// currentTrapStatus asks the trap for its status. tc2-hat-comms starts the trap service as
+// it starts connecting to the trap, and gives the connection stage until it has connected.
 func currentTrapStatus() trapStatusEvent {
 	trapDbus, err := getTrapDbus()
 	if err != nil {
@@ -75,9 +84,37 @@ func currentTrapStatus() trapStatusEvent {
 	}
 	var status string
 	if err := trapDbus.Call(trapDbusName+".Status", 0).Store(&status); err != nil {
-		return trapStatusEvent{"unavailable", trapCallError(err).Error()}
+		if errors.Is(trapCallError(err), errTrapServiceNotRunning) {
+			return trapCommsStatus()
+		}
+		return trapStatusEvent{"unavailable", err.Error()}
 	}
 	return trapStatusEvent{"status", status}
+}
+
+// trapCommsStatus says why the trap service isn't running. If comms is set up to talk to
+// a trap and tc2-hat-comms is starting (or restarting, such as after a config change) it
+// is the "STARTING" connection stage, otherwise why it isn't.
+func trapCommsStatus() trapStatusEvent {
+	config, err := goconfig.New(goconfig.DefaultConfigDir)
+	if err != nil {
+		return trapStatusEvent{"unavailable", fmt.Sprintf("failed to read the config: %v", err)}
+	}
+	comms := goconfig.DefaultComms()
+	if err := config.Unmarshal(goconfig.CommsKey, &comms); err != nil {
+		return trapStatusEvent{"unavailable", fmt.Sprintf("failed to read the comms config: %v", err)}
+	}
+	// tc2-hat-comms also runs trap control for "uart", for sidekick compatibility.
+	if !comms.Enable || !slices.Contains([]string{"trap-control", "uart"}, comms.CommsOut) {
+		return trapStatusEvent{"unavailable", "comms isn't set to trap-control, so the camera isn't talking to a trap"}
+	}
+	out, _ := exec.Command("systemctl", "is-active", "tc2-hat-comms").Output()
+	switch state := strings.TrimSpace(string(out)); state {
+	case "failed", "inactive":
+		return trapStatusEvent{"unavailable", "trap comms (tc2-hat-comms) isn't running, it is " + state}
+	default:
+		return trapStatusEvent{"status", `{"Connection": "STARTING"}`}
+	}
 }
 
 // ListenForTrapStatus passes the trap's StatusChanged signals on to the open status
@@ -114,22 +151,53 @@ func listenForTrapStatus() error {
 	signals := make(chan *dbus.Signal, 10)
 	conn.Signal(signals)
 
-	for signal := range signals {
-		switch signal.Name {
-		case trapDbusName + ".StatusChanged":
-			if status, ok := signalString(signal, 0); ok {
-				trapStatuses.publish(trapStatusEvent{"status", status})
+	// While the trap service isn't running, comms is checked on every so often, and any
+	// change in why is passed on.
+	var serviceRunning bool
+	if err := conn.BusObject().Call("org.freedesktop.DBus.NameHasOwner", 0, trapDbusName).Store(&serviceRunning); err != nil {
+		return err
+	}
+	var lastCommsStatus trapStatusEvent
+	checkComms := func() {
+		if status := trapCommsStatus(); status != lastCommsStatus {
+			lastCommsStatus = status
+			trapStatuses.publish(status)
+		}
+	}
+	commsCheck := time.NewTicker(trapCommsCheckInterval)
+	defer commsCheck.Stop()
+
+	for {
+		select {
+		case signal, ok := <-signals:
+			if !ok {
+				return errors.New("lost the connection to DBus")
 			}
-		case "org.freedesktop.DBus.NameOwnerChanged":
-			// The body is the name, its old owner and its new owner, "" when it has gone.
-			if newOwner, ok := signalString(signal, 2); ok && newOwner == "" {
-				trapStatuses.publish(trapStatusEvent{"unavailable", errTrapServiceNotRunning.Error()})
-			} else if ok {
-				trapStatuses.publish(currentTrapStatus())
+			switch signal.Name {
+			case trapDbusName + ".StatusChanged":
+				if status, ok := signalString(signal, 0); ok {
+					trapStatuses.publish(trapStatusEvent{"status", status})
+				}
+			case "org.freedesktop.DBus.NameOwnerChanged":
+				// The body is the name, its old owner and its new owner, "" when it has gone.
+				newOwner, ok := signalString(signal, 2)
+				if !ok {
+					continue
+				}
+				serviceRunning = newOwner != ""
+				if serviceRunning {
+					trapStatuses.publish(currentTrapStatus())
+				} else {
+					lastCommsStatus = trapStatusEvent{}
+					checkComms()
+				}
+			}
+		case <-commsCheck.C:
+			if !serviceRunning {
+				checkComms()
 			}
 		}
 	}
-	return errors.New("lost the connection to DBus")
 }
 
 func signalString(signal *dbus.Signal, i int) (string, bool) {

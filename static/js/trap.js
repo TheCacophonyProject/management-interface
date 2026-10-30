@@ -58,13 +58,15 @@ const cageKillButtons = ["cage-kill-button", "cage-killed-button"];
 // How many doors the trap's cage has (cage_doors in the trap config), 0 without a cage.
 let cageDoors = 0;
 
-// updateTrapButtons disables the buttons while a request is being sent, and the cage
-// buttons that don't apply to what the cage is doing. Without a status from the trap (such
-// as older trap software) the cage buttons are left for the trap to refuse.
+// updateTrapButtons disables the buttons while a request is being sent or the camera is
+// still connecting to the trap, and the cage buttons that don't apply to what the cage is
+// doing. Without a status from the trap (such as older trap software) the cage buttons are
+// left for the trap to refuse.
 function updateTrapButtons() {
   const status = trapStatus && trapStatus.status;
+  const connecting = Boolean(status && status.Connection);
   for (const id of trapButtons) {
-    let disabled = trapRequestRunning;
+    let disabled = trapRequestRunning || connecting;
     if (id in cageButtonPhases && status) {
       disabled = disabled || status.CagePhase !== cageButtonPhases[id];
     }
@@ -176,8 +178,25 @@ const cagePhases = {
   MANUAL: "Stopped, the trap is in manual mode",
 };
 
+// What the camera is doing to connect to the trap (Connection in the status), before the
+// trap's own status can be shown. STARTING is while tc2-hat-comms is starting up, such as
+// after a config change.
+const trapConnectionStages = {
+  STARTING: "Starting trap comms",
+  INITIALIZING: "Starting trap comms",
+  PINGING: "Connecting to the trap (waiting for it to answer)",
+  CHECKING_SOFTWARE: "Checking the trap's software is up to date",
+  UPDATING_SOFTWARE: "Updating the trap's software",
+  CHECKING_CONFIG: "Checking the trap's config is up to date",
+  UPDATING_CONFIG: "Updating the trap's config",
+  RESTARTING: "Restarting the trap",
+};
+
 // trapStatusRows turns the trap's status into [label, value] rows.
 function trapStatusRows(status) {
+  if (status.Connection) {
+    return [["State", trapConnectionStages[status.Connection] || status.Connection]];
+  }
   const rows = [];
   rows.push(["State", trapStates[status.State] || status.State || "Unknown (this program doesn't run the trap sequence)"]);
   if (status.Enabled !== undefined) {

@@ -746,8 +746,8 @@ func storeTrapCall(w *http.ResponseWriter, method string, out []any, args ...any
 }
 
 // errTrapServiceNotRunning is why a trap call fails when tc2-hat-comms hasn't started the
-// trap service. It only starts it once the trap has answered.
-var errTrapServiceNotRunning = errors.New("trap service is not running, check that comms is set to trap-control and the trap is connected")
+// trap service, such as while it is starting or when comms isn't set to trap-control.
+var errTrapServiceNotRunning = errors.New("trap service is not running, check that comms is set to trap-control")
 
 // trapCallError gives the reason a call to the trap DBus service failed, for the user.
 func trapCallError(err error) error {
