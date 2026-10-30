@@ -52,6 +52,12 @@ const cageButtonPhases = {
   "cage-killed-button": "EXITING",
 };
 
+// The cage buttons that need the kill door, hidden for a cage with only the spool door.
+const cageKillButtons = ["cage-kill-button", "cage-killed-button"];
+
+// How many doors the trap's cage has (cage_doors in the trap config), 0 without a cage.
+let cageDoors = 0;
+
 // updateTrapButtons disables the buttons while a request is being sent, and the cage
 // buttons that don't apply to what the cage is doing. Without a status from the trap (such
 // as older trap software) the cage buttons are left for the trap to refuse.
@@ -63,6 +69,12 @@ function updateTrapButtons() {
       disabled = disabled || status.CagePhase !== cageButtonPhases[id];
     }
     document.getElementById(id).disabled = disabled;
+  }
+  // The cage buttons are only shown for a trap with a cage, and the kill ones only for a
+  // cage with the kill door.
+  document.getElementById("cage-section").style.display = cageDoors === 0 ? "none" : "";
+  for (const id of cageKillButtons) {
+    document.getElementById(id).style.display = cageDoors < 2 ? "none" : "";
   }
 }
 
@@ -413,7 +425,6 @@ const trapConfigNumbers = [
 const trapConfigChecks = [
   ["observation_mode", "#input-trap-observation-mode"],
   ["spool_reed_check", "#input-trap-spool-reed-check"],
-  ["cage_enabled", "#input-trap-cage-enabled"],
 ];
 
 // Select fields in the trap config: [config key, input id, default].
@@ -502,6 +513,9 @@ async function loadTrapPageConfig() {
       document.querySelector(selector).value = trapConfig[key] || fallback;
     }
     setProgramOptions(trapConfig.program, data.values.thermalRecorder?.UseLowPowerMode || false);
+    cageDoors = trapConfig.cage_doors || 0;
+    document.querySelector("#input-trap-cage-doors").value = String(cageDoors);
+    updateTrapButtons();
   } catch (error) {
     console.error("Error loading config:", error);
     alert("Error loading config");
@@ -550,6 +564,7 @@ async function saveTrapConfig() {
   }
   const program = document.querySelector("#input-trap-program").value;
   if (program !== "") trapConfig.program = parseInt(program);
+  trapConfig.cage_doors = parseInt(document.querySelector("#input-trap-cage-doors").value);
 
   if (await saveConfig("trap", { config: trapConfig })) {
     await loadTrapPageConfig();

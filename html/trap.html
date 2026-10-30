@@ -76,11 +76,12 @@
             </div>
         </div>
 
+        <div id="cage-section" style="display: none">
         <hr>
 
         <h4>Cage</h4>
         <p>
-            For a trap with a holding cage (cage_enabled). Once an animal is shut in the cage, choose what to do with it. If nothing is chosen it is released after cage_hold_hours. These don't put the trap into manual mode, but the buttons above do, and that ends the cage sequence.
+            Shown when the trap config below has a cage. Once an animal is shut in the cage, choose what to do with it. If nothing is chosen it is released after cage_hold_hours. These don't put the trap into manual mode, but the buttons above do, and that ends the cage sequence. Kill and Killed are hidden for a cage with 1 door.
         </p>
         <div class="row">
             <div class="col-xs-12 w-100">
@@ -98,6 +99,7 @@
                 <button id="cage-escaped-button" onclick="cageCommand('escaped')" class="btn btn-primary">Escaped</button>
                 <button id="cage-killed-button" onclick="cageCommand('killed')" class="btn btn-primary">Killed</button>
             </div>
+        </div>
         </div>
 
         <hr>
@@ -281,8 +283,15 @@
                                 </td>
                             </tr>
                             <tr>
-                                <td>Cage Enabled</td>
-                                <td><input type="checkbox" id="input-trap-cage-enabled"></td>
+                                <td>Cage</td>
+                                <td>
+                                    <select id="input-trap-cage-doors">
+                                        <option value="0">No cage</option>
+                                        <option value="1">1 door: release only</option>
+                                        <option value="2">2 doors: release and kill</option>
+                                    </select>
+                                    <div><small>A cage with 1 door only has the door to the spool, so a held animal can only be released.</small></div>
+                                </td>
                             </tr>
                             <tr>
                                 <td>Cage Entry Timeout (minutes)</td>
