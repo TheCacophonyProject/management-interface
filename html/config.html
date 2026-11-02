@@ -75,44 +75,42 @@
         <div class="container pt-1 pl-0">
             <button id="save-button" type="button" onclick="saveModemConfig()" class="btn btn-primary">Save Modem Config</button>
         </div>
-
         <div class="container pt-5 pl-0">
-            <h3>Thermal Motion<br></h3>
+            <h3>Thermal Recorder<br></h3>
         </div>
-
         <div class="row">
             <div class="col-xs-8">
                 <div class="table-responsive">
                     <table class="table">
                         <tbody>
                             <tr>
-                                <td>Do tracking on PI</td>
-                                <td><input type="checkbox" id="input-do-tracking"></td>
-                            </tr>
-                            <tr>
-                                <td>Run classifier</td>
-                                <td><input type="checkbox" id="input-run-classifier"></td>
-                            </tr>
-                            <tr>
-                                <td>Tracking events</td>
-                                <td><input type="checkbox" id="input-tracking-events"></td>
-                            </tr>
-                            <tr>
-                                <td>Post Process</td>
-                                <td><input type="checkbox" id="input-postprocess"></td>
-                            </tr>
-                             <tr>
-                                <td>Post Process Events</td>
-                                <td><input type="checkbox" id="input-postprocess-events"></td>
+                                <td>Power Mode</td>
+                                <td>
+                                    <select class="form-select" id="input-power-mode">
+                                        <option value="low">Low Power</option>
+                                        <option value="medium">Medium Power</option>
+                                        <option value="high">High Power</option>
+                                    </select>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
+                    <p id="power-mode-comms-message" class="text-muted" style="display: none;">Trap Comms requires Medium or High power modes</p>
                 </div>
             </div>
-        </div>
+        </div> 
         
         <div class="container pt-1 pl-0">
-            <button id="save-button" type="button" onclick="saveThermalMotionConfig()" class="btn btn-primary">Save ThermalMotion Config</button>
+            <button id="save-button" type="button" onclick="saveThermalRecorderConfig()" class="btn btn-primary">Save Thermal Recorder Config</button>
+        </div>
+
+        <div class="container pt-5 pl-0">
+            <h3>Thermal Motion<br></h3>
+        </div>
+        <div class="row">
+            <div class="col-xs-8">
+                <p id="thermal-motion-message" class="text-muted" style="display: none;"></p>
+            </div>
         </div>
 
         <div class="container pt-5 pl-0">
@@ -126,7 +124,7 @@
                         <tbody>
                             <tr>
                                 <td>Enable</td>
-                                <td><input type="checkbox" id="input-comms-enable"></td>
+                                <td><input type="checkbox" id="input-comms-enable" onchange="updatePowerModeState()"></td>
                             </tr>
                             <tr></tr>
                                 <td>Trap Default State</td>
@@ -161,7 +159,7 @@
                                 <td>Comms Type</td>
                                 <td>
                                     <div id="comms-type">
-                                        <select class="form-select" id="input-comms-type-select">
+                                        <select class="form-select" id="input-comms-type-select" onchange="updatePowerModeState()">
                                             <option selected>Select Comms type</option>
                                             <option>simple</option>
                                             <option>uart</option>

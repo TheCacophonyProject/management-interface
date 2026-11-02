@@ -36,11 +36,7 @@ async function loadConfig() {
     document.querySelector("#input-connection-timeout").value = formatDuration(data.values.modemd.ConnectionTimeout);
 
     // Set values for thermal motion
-    document.querySelector("#input-do-tracking").checked = data.values.thermalMotion.DoTracking;
-    document.querySelector("#input-run-classifier").checked = data.values.thermalMotion.RunClassifier;
-    document.querySelector("#input-tracking-events").checked = data.values.thermalMotion.TrackingEvents;
-    document.querySelector("#input-postprocess").checked = data.values.thermalMotion.PostProcess;
-    document.querySelector("#input-postprocess-events").checked = data.values.thermalMotion.PostProcessEvents;
+    document.querySelector("#input-power-mode").value = getPowerMode(data.values.thermalRecorder);
 
     // Set values for comms
     document.querySelector("#input-comms-enable").checked = data.values.comms.Enable;
@@ -56,6 +52,9 @@ async function loadConfig() {
     document.querySelector("#input-comms-protect-species").value = JSON.stringify(data.values.comms.ProtectSpecies);
     document.querySelector("#input-comms-protect-duration").value = formatDuration(data.values.comms.ProtectDuration);
     document.querySelector("#input-comms-protect-duration").placeholder = formatDuration(data.defaults.comms.ProtectDuration);
+    updateThermalMotionMessage(data.values.comms, data.postProcessingComms || []);
+    lowPowerComms = data.lowPowerComms || [];
+    updatePowerModeState();
 
     // Set values for trap config
     const trapConfig = (data.values.trap && data.values.trap.Config) || {};
@@ -118,16 +117,54 @@ async function saveModemConfig() {
   await saveConfig("modemd", data);
 }
 
-async function saveThermalMotionConfig() {
-  const data = {
-    "do-tracking": document.querySelector("#input-do-tracking").checked,
-    "run-classifier": document.querySelector("#input-run-classifier").checked,
-    "tracking-events": document.querySelector("#input-tracking-events").checked,
-    "postprocess": document.querySelector("#input-postprocess").checked,
-    "postprocess-events": document.querySelector("#input-postprocess-events").checked,
-  };
+// Power modes map onto the thermal recorder's low power and instant classify settings.
+const powerModes = {
+  low: { "use-low-power-mode": true, "instant-classify": false },
+  medium: { "use-low-power-mode": true, "instant-classify": true },
+  high: { "use-low-power-mode": false, "instant-classify": false },
+};
 
-  await saveConfig("thermal-motion", data);
+function getPowerMode(thermalRecorder) {
+  if (!thermalRecorder.UseLowPowerMode) {
+    return "high";
+  }
+  return thermalRecorder.InstantClassify ? "medium" : "low";
+}
+
+// Thermal motion isn't set directly, explain what the comms config has enabled.
+function updateThermalMotionMessage(comms, postProcessingComms) {
+  const message = document.querySelector("#thermal-motion-message");
+  if (!comms.Enable) {
+    message.style.display = "none";
+    return;
+  }
+  if (postProcessingComms.includes(comms.CommsOut)) {
+    message.textContent = `Tracking, classification and post processing is enabled because of Comms Type ${comms.CommsOut}`;
+  } else {
+    message.textContent = "Tracking and classification is enabled because trap comms is enabled";
+  }
+  message.style.display = "";
+}
+
+// lowPowerComms comes from /api/config: comms types that work in low power mode.
+let lowPowerComms = [];
+
+// Other trap comms types don't work in low power mode, so switch to medium power and stop low power being selected.
+function updatePowerModeState() {
+  const commsEnabled = document.querySelector("#input-comms-enable").checked;
+  const commsOut = document.querySelector("#input-comms-type-select").value;
+  const lowPowerBlocked = commsEnabled && !lowPowerComms.includes(commsOut);
+  const powerMode = document.querySelector("#input-power-mode");
+  if (lowPowerBlocked && powerMode.value === "low") {
+    powerMode.value = "medium";
+  }
+  powerMode.querySelector('option[value="low"]').disabled = lowPowerBlocked;
+  document.querySelector("#power-mode-comms-message").style.display = lowPowerBlocked ? "" : "none";
+}
+
+async function saveThermalRecorderConfig(){
+  const data = powerModes[document.querySelector("#input-power-mode").value];
+  await saveConfig("thermal-recorder",data);  
 }
 
 async function saveCommsConfig() {

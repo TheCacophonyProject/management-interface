@@ -26,7 +26,7 @@ class AudioState {
   }
   startPolling() {
     this.clearInterval();
-    this.intervalId = setInterval(getAudioStatus, 1000);
+    this.intervalId = window.setInterval(getAudioStatus, 1000);
   }
 }
 const audioState = new AudioState(null, null);

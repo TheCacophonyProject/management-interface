@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "esnext",
     "module": "esnext",
+    "moduleResolution": "bundler",
     "allowJs": true,
     "strict": true,
     "importHelpers": true,
@@ -29,6 +30,6 @@
     "./api/*.ts"
   ],
   "exclude": [
-    "node_modules",
+    "node_modules"
   ]
 }

@@ -31,6 +31,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -401,6 +402,112 @@ func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// Comms types that need thermal-motion to run the classifier and postprocess tracks.
+var postProcessingComms = []string{"at-esl"}
+
+// Comms types that work in low power mode, any other comms type needs medium or high power.
+var lowPowerComms = []string{"at-esl"}
+
+// ensureThermalMotionForComms enables run-classifier in the thermal-motion
+// section when comms is enabled, with postprocess only enabled when comms-out is
+// set to a type that requires it. When comms is disabled both are turned off.
+func (api *ManagementAPI) ensureThermalMotionForComms(newConfig map[string]any) {
+	comms, ok := newConfig[goconfig.CommsKey].(map[string]any)
+	if !ok {
+		return
+	}
+	enable, _ := comms["enable"].(bool)
+	commsOut, _ := comms["comms-out"].(string)
+	postProcess := slices.Contains(postProcessingComms, commsOut)
+
+	// Only the keys set here are changed, the rest of the section is kept.
+	thermalMotion, ok := newConfig[goconfig.ThermalMotionKey].(map[string]any)
+	if !ok {
+		thermalMotion = map[string]any{}
+	}
+	if !enable {
+		thermalMotion["run-classifier"] = false
+		thermalMotion["postprocess"] = false
+		log.Info("comms is disabled, disabling run-classifier and postprocess in thermal-motion")
+	} else if postProcess {
+		thermalMotion["run-classifier"] = true
+		thermalMotion["postprocess"] = true
+		log.Infof("comms-out is %s, enabling run-classifier and postprocess in thermal-motion", commsOut)
+	} else {
+		thermalMotion["run-classifier"] = true
+		thermalMotion["postprocess"] = false
+		log.Infof("comms-out is %s, enabling run-classifier and disabling postprocess in thermal-motion", commsOut)
+	}
+	newConfig[goconfig.ThermalMotionKey] = thermalMotion
+}
+
+// ensureClassifierForPostProcess enables run-classifier in the thermal-motion
+// section when postprocess is enabled, as postprocessing needs classified tracks.
+func ensureClassifierForPostProcess(newConfig map[string]any) {
+	thermalMotion, ok := newConfig[goconfig.ThermalMotionKey].(map[string]any)
+	if !ok {
+		return
+	}
+	if postProcess, ok := thermalMotion["postprocess"].(bool); ok && postProcess {
+		thermalMotion["run-classifier"] = true
+	}
+}
+
+// ensureLowPowerForInstantClassify enables use-low-power-mode in the
+// thermal-recorder section when instant-classify is enabled, as instant
+// classify requires low power mode.
+func ensureLowPowerForInstantClassify(newConfig map[string]any) {
+	thermalRecorder, ok := newConfig[goconfig.ThermalRecorderKey].(map[string]any)
+	if !ok {
+		return
+	}
+	if instantClassify, ok := thermalRecorder["instant-classify"].(bool); ok && instantClassify {
+		thermalRecorder["use-low-power-mode"] = true
+	}
+}
+
+// ensurePowerModeForComms switches the thermal recorder from low power to medium
+// power when comms is enabled, as trap comms only works in medium or high power
+// unless the comms type is in lowPowerComms.
+func (api *ManagementAPI) ensurePowerModeForComms(newConfig map[string]any) {
+	comms, ok := newConfig[goconfig.CommsKey].(map[string]any)
+	if !ok {
+		return
+	}
+	if enable, ok := comms["enable"].(bool); !ok || !enable {
+		return
+	}
+	if commsOut, _ := comms["comms-out"].(string); slices.Contains(lowPowerComms, commsOut) {
+		return
+	}
+
+	// Use the requested power mode, falling back to the existing config for
+	// anything not in the request. Only the keys set here are changed.
+	var existing goconfig.ThermalRecorder
+	if err := api.config.Unmarshal(goconfig.ThermalRecorderKey, &existing); err != nil {
+		log.Errorf("Error reading thermal-recorder config: %v", err)
+		return
+	}
+	thermalRecorder, ok := newConfig[goconfig.ThermalRecorderKey].(map[string]any)
+	if !ok {
+		thermalRecorder = map[string]any{}
+	}
+	lowPower, ok := thermalRecorder["use-low-power-mode"].(bool)
+	if !ok {
+		lowPower = existing.UseLowPowerMode
+	}
+	instantClassify, ok := thermalRecorder["instant-classify"].(bool)
+	if !ok {
+		instantClassify = existing.InstantClassify
+	}
+	if !lowPower || instantClassify {
+		return
+	}
+	thermalRecorder["instant-classify"] = true
+	newConfig[goconfig.ThermalRecorderKey] = thermalRecorder
+	log.Info("comms is enabled, switching thermal-recorder from low power to medium power mode")
+}
+
 // SetConfig is a way of writing new config to the device.
 func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 	log.Info("API request: SetConfig")
@@ -423,6 +530,11 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	api.ensureThermalMotionForComms(newConfig)
+	ensureClassifierForPostProcess(newConfig)
+	ensureLowPowerForInstantClassify(newConfig)
+	api.ensurePowerModeForComms(newConfig)
 
 	log.Debugf("set config: %+v", newConfig)
 	if err := api.config.SetMultipleSections(newConfig); err != nil {
@@ -459,8 +571,10 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 	values = configValuesCC
 
 	valuesAndDefaults := map[string]interface{}{
-		"values":   values,
-		"defaults": defaultValues,
+		"values":              values,
+		"defaults":            defaultValues,
+		"postProcessingComms": postProcessingComms,
+		"lowPowerComms":       lowPowerComms,
 	}
 
 	jsonString, err := json.Marshal(valuesAndDefaults)
