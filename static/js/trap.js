@@ -465,13 +465,102 @@ const trapPrograms = [
   [3, "AI Mode"],
   [8, "Cycle Testing Mode"],
 ];
+const defaultTrapProgram = 1;
+
+// The programs in trapPrograms that run the trap sequence, triggering from the PIRs, and of
+// those the ones that talk to the camera over UART (program 2 is only enabled by a pin).
+const pirPrograms = [1, 2, 3];
+const uartPrograms = [1, 3];
+
+// When each settings row is shown, given the program and cage picked on the page. For a
+// program that isn't in trapPrograms (a development one) every row is shown.
+const trapSettingRows = {
+  "row-trap-cage-doors": (t) => t.pir,
+  "row-comms-trap-default": (t) => t.ai,
+  "row-comms-trap-species": (t) => t.ai,
+  "row-comms-trap-duration": (t) => t.ai,
+  "row-comms-protect-species": (t) => t.ai,
+  "row-comms-protect-duration": (t) => t.ai,
+  // With a cage the cage sequence decides when the spool is reset, not the delay.
+  "row-trap-spool-reset-delay": (t) => t.pir && t.cageDoors === 0,
+  "row-trap-cage-entry-timeout": (t) => t.pir && t.cageDoors > 0,
+  "row-trap-cage-hold-hours": (t) => t.pir && t.cageDoors > 0,
+  "row-trap-cage-exit-wait-hours": (t) => t.pir && t.cageDoors > 0,
+  // Only the programs that check the night only switch use the location.
+  "row-trap-latitude": (t) => t.uart,
+  "row-trap-longitude": (t) => t.uart,
+  "row-trap-observation-mode": (t) => t.pir,
+  "row-trap-apir-d-threshold": (t) => t.pir,
+  "row-trap-apir-dt-threshold": (t) => t.pir,
+  // The cage's reed switches are SW1 for door 1 and SW2 for door 2, so a switch the cage
+  // uses can't also disable the trap.
+  "row-trap-switch-1-disable": (t) => t.pir && t.cageDoors < 1,
+  "row-trap-switch-2-disable": (t) => t.pir && t.cageDoors < 2,
+  "row-trap-switch-logic": (t) => t.pir && t.cageDoors === 0,
+  "row-trap-motion-message-gap": (t) => t.uart,
+  "row-trap-post-reset-cooldown": (t) => t.pir,
+  "row-trap-manual-mode-timeout": (t) => t.uart,
+  // Only program 9, a development program, loops on an interval.
+  "row-trap-test-loop-interval": () => false,
+};
+
+// Species labels from the classifier, for the species lists: [label, name shown].
+const knownSpecies = [
+  ["possum", "Possum"],
+  ["rodent", "Rodent (rat, mouse)"],
+  ["mustelid", "Mustelid (stoat, ferret, weasel)"],
+  ["cat", "Cat"],
+  ["hedgehog", "Hedgehog"],
+  ["leporidae", "Rabbit or hare"],
+  ["wallaby", "Wallaby"],
+  ["deer", "Deer"],
+  ["dog", "Dog"],
+  ["sheep", "Sheep"],
+  ["bird", "Bird"],
+  ["kiwi", "Kiwi"],
+  ["penguin", "Penguin"],
+  ["human", "Human"],
+];
+const otherSpecies = "other";
+
+// Whether the camera is in low power mode, where AI Mode can't be used.
+let lowPowerMode = false;
+
+// The comms and trap config as loaded, as JSON, so saving only writes the parts that changed.
+let loadedTrapSettings = { comms: "", trap: "" };
+
+// pickedTrapProgram returns the program picked on the page, or the default if none is.
+function pickedTrapProgram() {
+  const value = document.querySelector("#input-trap-program").value;
+  return value === "" ? defaultTrapProgram : parseInt(value);
+}
+
+// updateTrapSettingRows shows only the settings rows that apply to the program and cage
+// picked on the page, and warns about AI Mode in low power mode.
+function updateTrapSettingRows() {
+  const program = pickedTrapProgram();
+  const known = trapPrograms.some(([n]) => n === program);
+  const trap = {
+    pir: pirPrograms.includes(program),
+    uart: uartPrograms.includes(program),
+    ai: program === aiModeProgram,
+    cageDoors: parseInt(document.querySelector("#input-trap-cage-doors").value),
+  };
+  for (const [id, shown] of Object.entries(trapSettingRows)) {
+    document.getElementById(id).style.display = !known || shown(trap) ? "" : "none";
+  }
+
+  document.querySelector("#program-warning").innerText = lowPowerMode && program === aiModeProgram
+    ? "The camera is in low power mode, so it can't enable the trap in AI Mode. Pick another program, or put the camera in high power mode."
+    : "";
+}
 
 // setProgramOptions fills the program select and selects the saved program. A saved number
 // that isn't in trapPrograms (e.g. a development program) still gets an option, so saving
 // doesn't change it. In low power mode AI Mode can't be picked.
-function setProgramOptions(program, lowPowerMode) {
+function setProgramOptions(program) {
   const select = document.querySelector("#input-trap-program");
-  const options = [["", "Default (Non-AI Mode)"]];
+  const options = [["", `Default (${trapPrograms.find(([n]) => n === defaultTrapProgram)[1]})`]];
   for (const [n, name] of trapPrograms) {
     options.push([String(n), name]);
   }
@@ -490,11 +579,155 @@ function setProgramOptions(program, lowPowerMode) {
     select.appendChild(option);
   }
   select.value = program === undefined || program === null ? "" : String(program);
+}
 
-  const warning = document.querySelector("#program-warning");
-  warning.innerText = lowPowerMode && program === aiModeProgram
-    ? "The camera is in low power mode, so it can't enable the trap in AI Mode. Pick another program, or put the camera in high power mode."
-    : "";
+// setSpeciesList fills a species list ("trap" or "protect") from the comms config.
+function setSpeciesList(kind, species) {
+  document.getElementById(`${kind}-species-list`).innerHTML = "";
+  for (const [label, confidence] of Object.entries(species || {})) {
+    addSpeciesRow(kind, label, confidence);
+  }
+}
+
+// addSpeciesRow adds a species and its confidence to a species list. Without a label it
+// picks the first known species that isn't in the list yet. A label that isn't in
+// knownSpecies gets an option of its own, and "Other" lets one be typed in.
+function addSpeciesRow(kind, label, confidence) {
+  const list = document.getElementById(`${kind}-species-list`);
+  if (label === undefined) {
+    const used = readSpeciesRows(kind).map((row) => row.label);
+    label = (knownSpecies.find(([l]) => !used.includes(l)) || [otherSpecies])[0];
+  }
+
+  const row = document.createElement("div");
+  // On a narrow screen the species gets a line of its own, above the confidence.
+  row.className = "d-flex flex-wrap align-items-center mb-1";
+  const select = document.createElement("select");
+  select.className = "form-control form-control-sm mr-2 mb-1";
+  select.style.flex = "1 1 9em";
+  const options = [...knownSpecies];
+  if (label !== otherSpecies && !knownSpecies.some(([l]) => l === label)) {
+    options.push([label, label]);
+  }
+  options.push([otherSpecies, "Other..."]);
+  for (const [value, text] of options) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = text;
+    select.appendChild(option);
+  }
+  select.value = label;
+
+  const other = document.createElement("input");
+  other.type = "text";
+  other.className = "form-control form-control-sm mr-2 mb-1";
+  other.placeholder = "Classifier label";
+  other.style.flex = "1 1 9em";
+  other.style.display = label === otherSpecies ? "" : "none";
+  select.onchange = () => {
+    other.style.display = select.value === otherSpecies ? "" : "none";
+  };
+
+  // The confidence, with a % after it.
+  const confGroup = document.createElement("div");
+  confGroup.className = "input-group input-group-sm mr-2 mb-1";
+  confGroup.style.width = "6em";
+  confGroup.style.flex = "none";
+  const conf = document.createElement("input");
+  conf.type = "number";
+  conf.min = "0";
+  conf.max = "100";
+  conf.step = "1";
+  conf.className = "form-control";
+  conf.title = "Confidence";
+  conf.value = confidence === undefined ? "" : String(confidence);
+  const percent = document.createElement("div");
+  percent.className = "input-group-append";
+  percent.innerHTML = '<span class="input-group-text">%</span>';
+  confGroup.append(conf, percent);
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "btn btn-sm btn-outline-danger mb-1";
+  remove.title = "Remove";
+  remove.textContent = "\u2715";
+  remove.onclick = () => row.remove();
+
+  row.speciesInputs = { select, other, conf };
+  row.append(select, other, confGroup, remove);
+  list.appendChild(row);
+}
+
+// readSpeciesRows returns what is in a species list, as [{label, confidence}], with the
+// confidence as typed in.
+function readSpeciesRows(kind) {
+  return [...document.getElementById(`${kind}-species-list`).children].map((row) => {
+    const { select, other, conf } = row.speciesInputs;
+    const label = select.value === otherSpecies ? other.value.trim().toLowerCase() : select.value;
+    return { label, confidence: conf.value };
+  });
+}
+
+// readSpecies returns a species list as the comms config has it, {label: confidence}, or
+// throws an error saying what is wrong with it.
+function readSpecies(kind) {
+  const species = {};
+  for (const { label, confidence } of readSpeciesRows(kind)) {
+    if (label === "") {
+      throw new Error(`Type in the classifier label for the "Other" species to ${kind}.`);
+    }
+    if (label in species) {
+      throw new Error(`${label} is in the species to ${kind} more than once.`);
+    }
+    const n = Number(confidence);
+    if (confidence === "" || !Number.isInteger(n) || n < 0 || n > 100) {
+      throw new Error(`Enter a confidence from 0 to 100 for ${label} in the species to ${kind}.`);
+    }
+    species[label] = n;
+  }
+  return species;
+}
+
+// The durations are shown in minutes and saved as a Go duration string.
+function durationMinutes(nanoseconds) {
+  return nanoseconds ? String(nanoseconds / 60e9) : "";
+}
+
+function minutesDuration(selector) {
+  const minutes = document.querySelector(selector).value;
+  return minutes === "" ? undefined : `${minutes}m`;
+}
+
+// commsSettings returns the trap's part of the comms config as set on the page. Empty
+// durations are left out, so they keep their saved value.
+function commsSettings() {
+  return {
+    "trap-enabled-by-default": document.querySelector("#input-comms-trap-default").checked,
+    "trap-species": readSpecies("trap"),
+    "trap-duration": minutesDuration("#input-comms-trap-duration"),
+    "protect-species": readSpecies("protect"),
+    "protect-duration": minutesDuration("#input-comms-protect-duration"),
+  };
+}
+
+// trapConfigSettings returns the whole trap config as set on the page. Empty number fields
+// are left out so the trap uses its default for them. Hidden fields are kept as they are.
+function trapConfigSettings() {
+  const trapConfig = {};
+  for (const [key, selector] of trapConfigNumbers) {
+    const val = document.querySelector(selector).value;
+    if (val !== "") trapConfig[key] = parseFloat(val);
+  }
+  for (const [key, selector] of trapConfigChecks) {
+    trapConfig[key] = document.querySelector(selector).checked;
+  }
+  for (const [key, selector] of trapConfigSelects) {
+    trapConfig[key] = document.querySelector(selector).value;
+  }
+  const program = document.querySelector("#input-trap-program").value;
+  if (program !== "") trapConfig.program = parseInt(program);
+  trapConfig.cage_doors = parseInt(document.querySelector("#input-trap-cage-doors").value);
+  return trapConfig;
 }
 
 async function loadTrapPageConfig() {
@@ -513,12 +746,12 @@ async function loadTrapPageConfig() {
     }
 
     document.querySelector("#input-comms-trap-default").checked = comms.TrapEnabledByDefault;
-    document.querySelector("#input-comms-trap-species").value = JSON.stringify(comms.TrapSpecies);
-    document.querySelector("#input-comms-trap-duration").value = formatDuration(comms.TrapDuration);
-    document.querySelector("#input-comms-trap-duration").placeholder = formatDuration(data.defaults.comms.TrapDuration);
-    document.querySelector("#input-comms-protect-species").value = JSON.stringify(comms.ProtectSpecies);
-    document.querySelector("#input-comms-protect-duration").value = formatDuration(comms.ProtectDuration);
-    document.querySelector("#input-comms-protect-duration").placeholder = formatDuration(data.defaults.comms.ProtectDuration);
+    setSpeciesList("trap", comms.TrapSpecies);
+    document.querySelector("#input-comms-trap-duration").value = durationMinutes(comms.TrapDuration);
+    document.querySelector("#input-comms-trap-duration").placeholder = durationMinutes(data.defaults.comms.TrapDuration);
+    setSpeciesList("protect", comms.ProtectSpecies);
+    document.querySelector("#input-comms-protect-duration").value = durationMinutes(comms.ProtectDuration);
+    document.querySelector("#input-comms-protect-duration").placeholder = durationMinutes(data.defaults.comms.ProtectDuration);
 
     const trapConfig = (data.values.trap && data.values.trap.Config) || {};
     for (const [key, selector] of trapConfigNumbers) {
@@ -531,61 +764,51 @@ async function loadTrapPageConfig() {
     for (const [key, selector, fallback] of trapConfigSelects) {
       document.querySelector(selector).value = trapConfig[key] || fallback;
     }
-    setProgramOptions(trapConfig.program, data.values.thermalRecorder?.UseLowPowerMode || false);
+    lowPowerMode = data.values.thermalRecorder?.UseLowPowerMode || false;
+    setProgramOptions(trapConfig.program);
     cageDoors = trapConfig.cage_doors || 0;
     document.querySelector("#input-trap-cage-doors").value = String(cageDoors);
+    updateTrapSettingRows();
     updateTrapButtons();
+
+    loadedTrapSettings = { comms: "", trap: JSON.stringify(trapConfigSettings()) };
+    try {
+      loadedTrapSettings.comms = JSON.stringify(commsSettings());
+    } catch {
+      // A saved species list the page can't read back counts as changed.
+    }
   } catch (error) {
     console.error("Error loading config:", error);
     alert("Error loading config");
   }
 }
 
-// saveTrapSettings saves only the trap's part of the comms config, the rest of the comms
-// config is left as it is.
+// saveTrapSettings saves the trap's part of the comms config and the trap config, each only
+// if it has changed. The rest of the comms config is left as it is.
 async function saveTrapSettings() {
-  let trapSpecies, protectSpecies;
+  let comms;
   try {
-    trapSpecies = JSON.parse(document.querySelector("#input-comms-trap-species").value) || undefined;
-    protectSpecies = JSON.parse(document.querySelector("#input-comms-protect-species").value) || undefined;
+    comms = commsSettings();
   } catch (error) {
-    console.error("Error parsing JSON:", error);
-    alert("Error parsing JSON for trap or protect species");
+    alert(error.message);
+    return;
+  }
+  const trap = trapConfigSettings();
+  const commsChanged = JSON.stringify(comms) !== loadedTrapSettings.comms;
+  const trapChanged = JSON.stringify(trap) !== loadedTrapSettings.trap;
+  if (!commsChanged && !trapChanged) {
+    alert("Nothing to save, the trap settings haven't changed.");
     return;
   }
 
-  const data = {
-    "trap-enabled-by-default": document.querySelector("#input-comms-trap-default").checked,
-    "trap-species": trapSpecies,
-    "trap-duration": document.querySelector("#input-comms-trap-duration").value || undefined,
-    "protect-species": protectSpecies,
-    "protect-duration": document.querySelector("#input-comms-protect-duration").value || undefined,
-  };
-
-  if (await saveConfig("comms", data)) {
-    await loadTrapPageConfig();
+  let saved = true;
+  if (trapChanged) {
+    saved = (await saveConfig("trap", { config: trap })) && saved;
   }
-}
-
-// saveTrapConfig saves the whole trap config. Empty number fields are left out so the trap
-// uses its default for them.
-async function saveTrapConfig() {
-  const trapConfig = {};
-  for (const [key, selector] of trapConfigNumbers) {
-    const val = document.querySelector(selector).value;
-    if (val !== "") trapConfig[key] = parseFloat(val);
+  if (commsChanged) {
+    saved = (await saveConfig("comms", comms)) && saved;
   }
-  for (const [key, selector] of trapConfigChecks) {
-    trapConfig[key] = document.querySelector(selector).checked;
-  }
-  for (const [key, selector] of trapConfigSelects) {
-    trapConfig[key] = document.querySelector(selector).value;
-  }
-  const program = document.querySelector("#input-trap-program").value;
-  if (program !== "") trapConfig.program = parseInt(program);
-  trapConfig.cage_doors = parseInt(document.querySelector("#input-trap-cage-doors").value);
-
-  if (await saveConfig("trap", { config: trapConfig })) {
+  if (saved) {
     await loadTrapPageConfig();
   }
 }
