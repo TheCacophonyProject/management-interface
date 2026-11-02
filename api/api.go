@@ -405,6 +405,9 @@ func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 // Comms types that need thermal-motion to run the classifier and postprocess tracks.
 var postProcessingComms = []string{"at-esl"}
 
+// Comms types that work in low power mode, any other comms type needs medium or high power.
+var lowPowerComms = []string{"at-esl"}
+
 // ensureThermalMotionForComms enables run-classifier in the thermal-motion
 // section when comms is enabled, with postprocess only enabled when comms-out is
 // set to a type that requires it. When comms is disabled both are turned off.
@@ -464,13 +467,17 @@ func ensureLowPowerForInstantClassify(newConfig map[string]any) {
 }
 
 // ensurePowerModeForComms switches the thermal recorder from low power to medium
-// power when comms is enabled, as trap comms only works in medium or high power.
+// power when comms is enabled, as trap comms only works in medium or high power
+// unless the comms type is in lowPowerComms.
 func (api *ManagementAPI) ensurePowerModeForComms(newConfig map[string]any) {
 	comms, ok := newConfig[goconfig.CommsKey].(map[string]any)
 	if !ok {
 		return
 	}
 	if enable, ok := comms["enable"].(bool); !ok || !enable {
+		return
+	}
+	if commsOut, _ := comms["comms-out"].(string); slices.Contains(lowPowerComms, commsOut) {
 		return
 	}
 
@@ -567,6 +574,7 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 		"values":              values,
 		"defaults":            defaultValues,
 		"postProcessingComms": postProcessingComms,
+		"lowPowerComms":       lowPowerComms,
 	}
 
 	jsonString, err := json.Marshal(valuesAndDefaults)

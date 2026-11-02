@@ -53,6 +53,7 @@ async function loadConfig() {
     document.querySelector("#input-comms-protect-duration").value = formatDuration(data.values.comms.ProtectDuration);
     document.querySelector("#input-comms-protect-duration").placeholder = formatDuration(data.defaults.comms.ProtectDuration);
     updateThermalMotionMessage(data.values.comms, data.postProcessingComms || []);
+    lowPowerComms = data.lowPowerComms || [];
     updatePowerModeState();
 
     // Set values for trap config
@@ -145,15 +146,20 @@ function updateThermalMotionMessage(comms, postProcessingComms) {
   message.style.display = "";
 }
 
-// Trap comms doesn't work in low power mode, so switch to medium power and stop low power being selected.
+// lowPowerComms comes from /api/config: comms types that work in low power mode.
+let lowPowerComms = [];
+
+// Other trap comms types don't work in low power mode, so switch to medium power and stop low power being selected.
 function updatePowerModeState() {
   const commsEnabled = document.querySelector("#input-comms-enable").checked;
+  const commsOut = document.querySelector("#input-comms-type-select").value;
+  const lowPowerBlocked = commsEnabled && !lowPowerComms.includes(commsOut);
   const powerMode = document.querySelector("#input-power-mode");
-  if (commsEnabled && powerMode.value === "low") {
+  if (lowPowerBlocked && powerMode.value === "low") {
     powerMode.value = "medium";
   }
-  powerMode.querySelector('option[value="low"]').disabled = commsEnabled;
-  document.querySelector("#power-mode-comms-message").style.display = commsEnabled ? "" : "none";
+  powerMode.querySelector('option[value="low"]').disabled = lowPowerBlocked;
+  document.querySelector("#power-mode-comms-message").style.display = lowPowerBlocked ? "" : "none";
 }
 
 async function saveThermalRecorderConfig(){
