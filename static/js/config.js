@@ -138,7 +138,7 @@ function updateThermalMotionMessage(comms, postProcessingComms) {
     return;
   }
   if (postProcessingComms.includes(comms.CommsOut)) {
-    message.textContent = `Tracking, classification and post processing is enabled because of trap comms ${comms.CommsOut}`;
+    message.textContent = `Tracking, classification and post processing is enabled because of Comms Type ${comms.CommsOut}`;
   } else {
     message.textContent = "Tracking and classification is enabled because trap comms is enabled";
   }

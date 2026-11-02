@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"net"
 	"net/http"
 	"net/url"
@@ -418,13 +417,10 @@ func (api *ManagementAPI) ensureThermalMotionForComms(newConfig map[string]any) 
 	commsOut, _ := comms["comms-out"].(string)
 	postProcess := slices.Contains(postProcessingComms, commsOut)
 
-	// Setting a section replaces it, so start from the existing thermal-motion config.
+	// Only the keys set here are changed, the rest of the section is kept.
 	thermalMotion, ok := newConfig[goconfig.ThermalMotionKey].(map[string]any)
 	if !ok {
 		thermalMotion = map[string]any{}
-		if existing, ok := api.config.Get(goconfig.ThermalMotionKey).(map[string]any); ok {
-			maps.Copy(thermalMotion, existing)
-		}
 	}
 	if !enable {
 		thermalMotion["run-classifier"] = false
@@ -478,16 +474,25 @@ func (api *ManagementAPI) ensurePowerModeForComms(newConfig map[string]any) {
 		return
 	}
 
-	// Setting a section replaces it, so start from the existing thermal-recorder config.
+	// Use the requested power mode, falling back to the existing config for
+	// anything not in the request. Only the keys set here are changed.
+	var existing goconfig.ThermalRecorder
+	if err := api.config.Unmarshal(goconfig.ThermalRecorderKey, &existing); err != nil {
+		log.Errorf("Error reading thermal-recorder config: %v", err)
+		return
+	}
 	thermalRecorder, ok := newConfig[goconfig.ThermalRecorderKey].(map[string]any)
 	if !ok {
 		thermalRecorder = map[string]any{}
-		if existing, ok := api.config.Get(goconfig.ThermalRecorderKey).(map[string]any); ok {
-			maps.Copy(thermalRecorder, existing)
-		}
 	}
-	lowPower, _ := thermalRecorder["use-low-power-mode"].(bool)
-	instantClassify, _ := thermalRecorder["instant-classify"].(bool)
+	lowPower, ok := thermalRecorder["use-low-power-mode"].(bool)
+	if !ok {
+		lowPower = existing.UseLowPowerMode
+	}
+	instantClassify, ok := thermalRecorder["instant-classify"].(bool)
+	if !ok {
+		instantClassify = existing.InstantClassify
+	}
 	if !lowPower || instantClassify {
 		return
 	}
@@ -519,30 +524,16 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sections := slices.Sorted(maps.Keys(newConfig))
-
 	api.ensureThermalMotionForComms(newConfig)
 	ensureClassifierForPostProcess(newConfig)
 	ensureLowPowerForInstantClassify(newConfig)
 	api.ensurePowerModeForComms(newConfig)
 
-	// Sections added by the rules above are written after the requested ones.
-	for _, key := range slices.Sorted(maps.Keys(newConfig)) {
-		if !slices.Contains(sections, key) {
-			sections = append(sections, key)
-		}
-	}
-
 	log.Debugf("set config: %+v", newConfig)
-	// SetMultipleSections can lose sections when setting more than one, as each
-	// set re-reads the config file before anything is written, so write each
-	// section on its own.
-	for _, key := range sections {
-		if err := api.config.Set(key, newConfig[key]); err != nil {
-			log.Printf("Error setting %s config: %s", key, err)
-			badRequest(&w, err)
-			return
-		}
+	if err := api.config.SetMultipleSections(newConfig); err != nil {
+		log.Printf("Error with SetFromMap: %s", err)
+		badRequest(&w, err)
+		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
