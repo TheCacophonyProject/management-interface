@@ -406,17 +406,17 @@ func (api *ManagementAPI) Reboot(w http.ResponseWriter, r *http.Request) {
 // Comms types that need thermal-motion to run the classifier and postprocess tracks.
 var postProcessingComms = []string{"at-esl"}
 
-// ensurePostProcessingForComms enables run-classifier and postprocess in the
-// thermal-motion section when comms-out is set to a type that requires them.
-func (api *ManagementAPI) ensurePostProcessingForComms(newConfig map[string]any) {
+// ensureThermalMotionForComms enables run-classifier in the thermal-motion
+// section when comms is enabled, with postprocess only enabled when comms-out is
+// set to a type that requires it. When comms is disabled both are turned off.
+func (api *ManagementAPI) ensureThermalMotionForComms(newConfig map[string]any) {
 	comms, ok := newConfig[goconfig.CommsKey].(map[string]any)
 	if !ok {
 		return
 	}
-	commsOut, ok := comms["comms-out"].(string)
-	if !ok || !slices.Contains(postProcessingComms, commsOut) {
-		return
-	}
+	enable, _ := comms["enable"].(bool)
+	commsOut, _ := comms["comms-out"].(string)
+	postProcess := slices.Contains(postProcessingComms, commsOut)
 
 	// Setting a section replaces it, so start from the existing thermal-motion config.
 	thermalMotion, ok := newConfig[goconfig.ThermalMotionKey].(map[string]any)
@@ -426,10 +426,20 @@ func (api *ManagementAPI) ensurePostProcessingForComms(newConfig map[string]any)
 			maps.Copy(thermalMotion, existing)
 		}
 	}
-	thermalMotion["run-classifier"] = true
-	thermalMotion["postprocess"] = true
+	if !enable {
+		thermalMotion["run-classifier"] = false
+		thermalMotion["postprocess"] = false
+		log.Info("comms is disabled, disabling run-classifier and postprocess in thermal-motion")
+	} else if postProcess {
+		thermalMotion["run-classifier"] = true
+		thermalMotion["postprocess"] = true
+		log.Infof("comms-out is %s, enabling run-classifier and postprocess in thermal-motion", commsOut)
+	} else {
+		thermalMotion["run-classifier"] = true
+		thermalMotion["postprocess"] = false
+		log.Infof("comms-out is %s, enabling run-classifier and disabling postprocess in thermal-motion", commsOut)
+	}
 	newConfig[goconfig.ThermalMotionKey] = thermalMotion
-	log.Infof("comms-out is %s, enabling run-classifier and postprocess in thermal-motion", commsOut)
 }
 
 // ensureClassifierForPostProcess enables run-classifier in the thermal-motion
@@ -457,6 +467,35 @@ func ensureLowPowerForInstantClassify(newConfig map[string]any) {
 	}
 }
 
+// ensurePowerModeForComms switches the thermal recorder from low power to medium
+// power when comms is enabled, as trap comms only works in medium or high power.
+func (api *ManagementAPI) ensurePowerModeForComms(newConfig map[string]any) {
+	comms, ok := newConfig[goconfig.CommsKey].(map[string]any)
+	if !ok {
+		return
+	}
+	if enable, ok := comms["enable"].(bool); !ok || !enable {
+		return
+	}
+
+	// Setting a section replaces it, so start from the existing thermal-recorder config.
+	thermalRecorder, ok := newConfig[goconfig.ThermalRecorderKey].(map[string]any)
+	if !ok {
+		thermalRecorder = map[string]any{}
+		if existing, ok := api.config.Get(goconfig.ThermalRecorderKey).(map[string]any); ok {
+			maps.Copy(thermalRecorder, existing)
+		}
+	}
+	lowPower, _ := thermalRecorder["use-low-power-mode"].(bool)
+	instantClassify, _ := thermalRecorder["instant-classify"].(bool)
+	if !lowPower || instantClassify {
+		return
+	}
+	thermalRecorder["instant-classify"] = true
+	newConfig[goconfig.ThermalRecorderKey] = thermalRecorder
+	log.Info("comms is enabled, switching thermal-recorder from low power to medium power mode")
+}
+
 // SetConfig is a way of writing new config to the device.
 func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 	log.Info("API request: SetConfig")
@@ -480,15 +519,30 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	api.ensurePostProcessingForComms(newConfig)
+	sections := slices.Sorted(maps.Keys(newConfig))
+
+	api.ensureThermalMotionForComms(newConfig)
 	ensureClassifierForPostProcess(newConfig)
 	ensureLowPowerForInstantClassify(newConfig)
+	api.ensurePowerModeForComms(newConfig)
+
+	// Sections added by the rules above are written after the requested ones.
+	for _, key := range slices.Sorted(maps.Keys(newConfig)) {
+		if !slices.Contains(sections, key) {
+			sections = append(sections, key)
+		}
+	}
 
 	log.Debugf("set config: %+v", newConfig)
-	if err := api.config.SetMultipleSections(newConfig); err != nil {
-		log.Printf("Error with SetFromMap: %s", err)
-		badRequest(&w, err)
-		return
+	// SetMultipleSections can lose sections when setting more than one, as each
+	// set re-reads the config file before anything is written, so write each
+	// section on its own.
+	for _, key := range sections {
+		if err := api.config.Set(key, newConfig[key]); err != nil {
+			log.Printf("Error setting %s config: %s", key, err)
+			badRequest(&w, err)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusOK)
 }

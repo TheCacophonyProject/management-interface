@@ -36,12 +36,7 @@ async function loadConfig() {
     document.querySelector("#input-connection-timeout").value = formatDuration(data.values.modemd.ConnectionTimeout);
 
     // Set values for thermal motion
-    document.querySelector("#input-instant-classify").checked = data.values.thermalRecorder.InstantClassify;
-    document.querySelector("#input-low-power-mode").checked = data.values.thermalRecorder.UseLowPowerMode;
-    updateLowPowerState();
-
-    document.querySelector("#input-run-classifier").checked = data.values.thermalMotion.RunClassifier;
-    document.querySelector("#input-postprocess").checked = data.values.thermalMotion.PostProcess;
+    document.querySelector("#input-power-mode").value = getPowerMode(data.values.thermalRecorder);
 
     // Set values for comms
     document.querySelector("#input-comms-enable").checked = data.values.comms.Enable;
@@ -57,7 +52,8 @@ async function loadConfig() {
     document.querySelector("#input-comms-protect-species").value = JSON.stringify(data.values.comms.ProtectSpecies);
     document.querySelector("#input-comms-protect-duration").value = formatDuration(data.values.comms.ProtectDuration);
     document.querySelector("#input-comms-protect-duration").placeholder = formatDuration(data.defaults.comms.ProtectDuration);
-    updatePostProcessingState(data.values.comms.CommsOut, data.postProcessingComms || []);
+    updateThermalMotionMessage(data.values.comms, data.postProcessingComms || []);
+    updatePowerModeState();
 
     // Set values for trap config
     const trapConfig = (data.values.trap && data.values.trap.Config) || {};
@@ -120,52 +116,49 @@ async function saveModemConfig() {
   await saveConfig("modemd", data);
 }
 
-// Instant classify requires low power mode, so low power mode is always on while instant classify is.
-function updateLowPowerState() {
-  const instantClassify = document.querySelector("#input-instant-classify").checked;
-  const lowPower = document.querySelector("#input-low-power-mode");
-  if (instantClassify) {
-    lowPower.checked = true;
+// Power modes map onto the thermal recorder's low power and instant classify settings.
+const powerModes = {
+  low: { "use-low-power-mode": true, "instant-classify": false },
+  medium: { "use-low-power-mode": true, "instant-classify": true },
+  high: { "use-low-power-mode": false, "instant-classify": false },
+};
+
+function getPowerMode(thermalRecorder) {
+  if (!thermalRecorder.UseLowPowerMode) {
+    return "high";
   }
-  lowPower.disabled = instantClassify;
-  document.querySelector("#instant-classify-message").style.display = instantClassify ? "" : "none";
+  return thermalRecorder.InstantClassify ? "medium" : "low";
 }
 
-let commsForcesPostProcessing = false;
-
-// postProcessingComms comes from /api/config: comms types that always run the classifier and postprocess.
-function updatePostProcessingState(commsOut, postProcessingComms) {
-  commsForcesPostProcessing = postProcessingComms.includes(commsOut);
-  document.querySelector("#input-postprocess").disabled = commsForcesPostProcessing;
-  document.querySelector("#postprocess-comms-message").style.display = commsForcesPostProcessing ? "" : "none";
-  updateClassifierState();
+// Thermal motion isn't set directly, explain what the comms config has enabled.
+function updateThermalMotionMessage(comms, postProcessingComms) {
+  const message = document.querySelector("#thermal-motion-message");
+  if (!comms.Enable) {
+    message.style.display = "none";
+    return;
+  }
+  if (postProcessingComms.includes(comms.CommsOut)) {
+    message.textContent = `Tracking, classification and post processing is enabled because of trap comms ${comms.CommsOut}`;
+  } else {
+    message.textContent = "Tracking and classification is enabled because trap comms is enabled";
+  }
+  message.style.display = "";
 }
 
-// Postprocessing needs classified tracks, so Track and Classify is always on in postprocess mode.
-function updateClassifierState() {
-  const postProcess = document.querySelector("#input-postprocess").checked;
-  const runClassifier = document.querySelector("#input-run-classifier");
-  if (postProcess) {
-    runClassifier.checked = true;
+// Trap comms doesn't work in low power mode, so switch to medium power and stop low power being selected.
+function updatePowerModeState() {
+  const commsEnabled = document.querySelector("#input-comms-enable").checked;
+  const powerMode = document.querySelector("#input-power-mode");
+  if (commsEnabled && powerMode.value === "low") {
+    powerMode.value = "medium";
   }
-  runClassifier.disabled = postProcess || commsForcesPostProcessing;
-  document.querySelector("#postprocess-classifier-message").style.display = postProcess ? "" : "none";
+  powerMode.querySelector('option[value="low"]').disabled = commsEnabled;
+  document.querySelector("#power-mode-comms-message").style.display = commsEnabled ? "" : "none";
 }
 
 async function saveThermalRecorderConfig(){
-  const data = {    "instant-classify": document.querySelector("#input-instant-classify").checked,
-    "use-low-power-mode":document.querySelector("#input-low-power-mode").checked
-  }
+  const data = powerModes[document.querySelector("#input-power-mode").value];
   await saveConfig("thermal-recorder",data);  
-}
-
-async function saveThermalMotionConfig() {
-  const data = {
-    "run-classifier": document.querySelector("#input-run-classifier").checked,
-    "postprocess": document.querySelector("#input-postprocess").checked,
-  };
-
-  await saveConfig("thermal-motion", data);
 }
 
 async function saveCommsConfig() {
