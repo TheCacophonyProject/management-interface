@@ -81,6 +81,12 @@ func hasActiveClients() bool {
 // This should be called when there is an API request, as that indicates that a user is using the camera.
 // We throttle this to once every minute to avoid unnecessary calls.
 // Because of the use of mutex we run this is a goroutine to avoid blocking the main thread.
+// keepAwake keeps the hotspot and the camera on for a while, as someone is using the API.
+func keepAwake() {
+	netmanagerclient.KeepHotspotOnFor(60 * 5)
+	maybeTriggerStayOnFor()
+}
+
 func maybeTriggerStayOnFor() {
 	go func() {
 		stayOnForMu.Lock()
@@ -286,6 +292,10 @@ func main() {
 	apiRouter.HandleFunc("/trap/reset-spool", apiObj.ResetTrapSpool).Methods("POST")
 	apiRouter.HandleFunc("/trap/door/{door:[12]}/open", apiObj.OpenTrapDoor).Methods("POST")
 	apiRouter.HandleFunc("/trap/door/{door:[12]}/close", apiObj.CloseTrapDoor).Methods("POST")
+	apiRouter.HandleFunc("/trap/cage/{command:hold|release|kill|wait|escaped|killed}", apiObj.CageCommand).Methods("POST")
+	apiRouter.HandleFunc("/trap/history", apiObj.GetTrapHistory).Methods("GET")
+	apiRouter.HandleFunc("/trap/status", apiObj.GetTrapStatus).Methods("GET")
+	apiRouter.HandleFunc("/trap/status/events", apiObj.TrapStatusEvents).Methods("GET")
 	apiRouter.HandleFunc("/check-salt-connection", apiObj.CheckSaltConnection).Methods("GET")
 	apiRouter.HandleFunc("/salt-update", apiObj.StartSaltUpdate).Methods("POST")
 	apiRouter.HandleFunc("/salt-update", apiObj.GetSaltUpdateState).Methods("GET")
@@ -351,13 +361,14 @@ func main() {
 
 	apiRouter.Use(basicAuth)
 
+	apiObj.KeepAwake = keepAwake
 	apiRouter.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			netmanagerclient.KeepHotspotOnFor(60 * 5)
-			maybeTriggerStayOnFor()
+			keepAwake()
 			next.ServeHTTP(w, r)
 		})
 	})
+	go api.ListenForTrapStatus()
 
 	// Handle the frame listener in a separate goroutine
 	go handleFrameListenerLoop()

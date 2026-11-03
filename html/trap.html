@@ -17,6 +17,23 @@
         </div>
         <hr>
 
+        <h4>Status</h4>
+        <p>
+            What the trap is doing. It updates as soon as the trap reports a change.
+        </p>
+        <p id="trap-status-message"></p>
+        <div class="row">
+            <div class="col-xs-8">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <tbody id="trap-status"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <hr>
+
         <h4>Stop</h4>
         <p>
            
@@ -59,6 +76,32 @@
             </div>
         </div>
 
+        <div id="cage-section" style="display: none">
+        <hr>
+
+        <h4>Cage</h4>
+        <p>
+            Shown when the trap config below has a cage. Once an animal is shut in the cage, choose what to do with it. If nothing is chosen it is released after cage_hold_hours. These don't put the trap into manual mode, but the buttons above do, and that ends the cage sequence. Kill and Killed are hidden for a cage with 1 door.
+        </p>
+        <div class="row">
+            <div class="col-xs-12 w-100">
+                <button id="cage-hold-button" onclick="cageCommand('hold')" class="btn btn-primary">Hold</button>
+                <button id="cage-release-button" onclick="cageCommand('release')" class="btn btn-primary">Release</button>
+                <button id="cage-kill-button" onclick="cageCommand('kill')" class="btn btn-danger">Kill</button>
+            </div>
+        </div>
+        <p class="mt-3">
+            Once the animal has been released or let through to the kill mechanism, the trap waits up to cage_exit_wait_hours for it to leave the cage.
+        </p>
+        <div class="row">
+            <div class="col-xs-12 w-100">
+                <button id="cage-wait-button" onclick="cageCommand('wait')" class="btn btn-primary">Wait Longer</button>
+                <button id="cage-escaped-button" onclick="cageCommand('escaped')" class="btn btn-primary">Escaped</button>
+                <button id="cage-killed-button" onclick="cageCommand('killed')" class="btn btn-primary">Killed</button>
+            </div>
+        </div>
+        </div>
+
         <hr>
 
         <h4>Restart</h4>
@@ -74,11 +117,216 @@
         <div class="row">
             <p id="trap-message" class="col-12 mt-3"></p>
         </div>
+
+        <hr>
+
+        <h4>History</h4>
+        <p>
+            Messages sent to and received from the trap, newest first. A response has the same ID as the message it answers. "Lost" is a line that was garbled on the way from the trap, or an entry in the saved history that couldn't be read. File uploads only show the chunks that failed, and while the trap isn't answering only the first unanswered ping is shown. The camera keeps the last 2000 to 3000.
+        </p>
+        <div class="row">
+            <div class="col-xs-12 w-100">
+                <button id="trap-history-button" onclick=loadTrapHistory() class="btn btn-primary">Refresh</button>
+            </div>
+        </div>
+        <p id="trap-history-message" class="mt-3"></p>
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th></th>
+                        <th>ID</th>
+                        <th>Message</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="trap-history"></tbody>
+            </table>
+        </div>
+
+        <hr>
+
+        <h4>Trap Settings</h4>
+        <p>
+            Settings that don't apply to the chosen program or cage are hidden, and keep their saved values. Empty number fields use the trap's default, shown in grey. Saving restarts trap comms, and the trap too if its config changed.
+        </p>
+        <p id="comms-warning" class="text-danger"></p>
+        <div class="row">
+            <div class="col-lg-8">
+                <table class="table">
+                    <colgroup><col style="width: 40%"><col></colgroup>
+                    <tbody>
+                        <tr id="row-trap-program">
+                            <td>Program</td>
+                            <td>
+                                <select class="form-control" id="input-trap-program" onchange="updateTrapSettingRows()"></select>
+                                <div><small>Used when the trap's program switch is at 0. AI Mode needs the camera in high power mode.</small></div>
+                                <div id="program-warning" class="text-danger"></div>
+                            </td>
+                        </tr>
+                        <tr id="row-trap-cage-doors">
+                            <td>Cage</td>
+                            <td>
+                                <select class="form-control" id="input-trap-cage-doors" onchange="updateTrapSettingRows()">
+                                    <option value="0">No cage</option>
+                                    <option value="1">1 door: release only</option>
+                                    <option value="2">2 doors: release and kill</option>
+                                </select>
+                                <div><small>A cage with 1 door only has the door to the spool, so a held animal can only be released.</small></div>
+                            </td>
+                        </tr>
+                        <tr id="row-comms-trap-default">
+                            <td>Enable the trap when no animals have been seen</td>
+                            <td><input type="checkbox" id="input-comms-trap-default"></td>
+                        </tr>
+                        <tr id="row-comms-trap-species">
+                            <td>Species to trap</td>
+                            <td>
+                                <div id="trap-species-list"></div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addSpeciesRow('trap')">Add species</button>
+                                <div><small>The camera enables the trap when it sees one of these with at least the given confidence (0 to 100%).</small></div>
+                            </td>
+                        </tr>
+                        <tr id="row-comms-trap-duration">
+                            <td>Keep the trap enabled for (minutes)</td>
+                            <td>
+                                <input type="number" step="any" min="0" class="form-control" id="input-comms-trap-duration">
+                                <div><small>After the last sighting of a species to trap.</small></div>
+                            </td>
+                        </tr>
+                        <tr id="row-comms-protect-species">
+                            <td>Species to protect</td>
+                            <td>
+                                <div id="protect-species-list"></div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addSpeciesRow('protect')">Add species</button>
+                                <div><small>The camera disables the trap when it sees one of these with at least the given confidence (0 to 100%), even if it has seen a species to trap.</small></div>
+                            </td>
+                        </tr>
+                        <tr id="row-comms-protect-duration">
+                            <td>Keep the trap disabled for (minutes)</td>
+                            <td>
+                                <input type="number" step="any" min="0" class="form-control" id="input-comms-protect-duration">
+                                <div><small>After the last sighting of a species to protect.</small></div>
+                            </td>
+                        </tr>
+                        <tr id="row-trap-spool-reset-delay">
+                            <td>Spool Reset Delay (minutes)</td>
+                            <td><input type="number" class="form-control" id="input-trap-spool-reset-delay" placeholder="10"></td>
+                        </tr>
+                        <tr id="row-trap-cage-entry-timeout">
+                            <td>Cage Entry Timeout (minutes)</td>
+                            <td><input type="number" step="any" class="form-control" id="input-trap-cage-entry-timeout" placeholder="60"></td>
+                        </tr>
+                        <tr id="row-trap-cage-hold-hours">
+                            <td>Cage Hold (hours)</td>
+                            <td><input type="number" step="any" class="form-control" id="input-trap-cage-hold-hours" placeholder="24"></td>
+                        </tr>
+                        <tr id="row-trap-cage-exit-wait-hours">
+                            <td>Cage Exit Wait (hours)</td>
+                            <td><input type="number" step="any" class="form-control" id="input-trap-cage-exit-wait-hours" placeholder="24"></td>
+                        </tr>
+                        <tr id="row-trap-latitude">
+                            <td>Latitude</td>
+                            <td>
+                                <input type="number" step="any" class="form-control" id="input-trap-latitude" placeholder="-43.532055">
+                                <div><small>With the longitude, used to work out when it is night for the trap's night only switch.</small></div>
+                            </td>
+                        </tr>
+                        <tr id="row-trap-longitude">
+                            <td>Longitude</td>
+                            <td><input type="number" step="any" class="form-control" id="input-trap-longitude" placeholder="172.636230"></td>
+                        </tr>
+                        <tr id="row-trap-observation-mode">
+                            <td>Observation Mode</td>
+                            <td>
+                                <input type="checkbox" id="input-trap-observation-mode">
+                                <div><small>The trap resets the spool when it starts but motion never triggers it, and it reports a dry trigger instead.</small></div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <details id="trap-advanced" class="mb-3">
+                    <summary>Advanced settings</summary>
+                    <table class="table mt-2">
+                        <colgroup><col style="width: 40%"><col></colgroup>
+                        <tbody>
+                            <tr id="row-trap-apir-d-threshold">
+                                <td>APIR Displacement Threshold</td>
+                                <td><input type="number" step="any" class="form-control" id="input-trap-apir-d-threshold" placeholder="0.3"></td>
+                            </tr>
+                            <tr id="row-trap-apir-dt-threshold">
+                                <td>APIR Gradient Threshold</td>
+                                <td><input type="number" step="any" class="form-control" id="input-trap-apir-dt-threshold" placeholder="450"></td>
+                            </tr>
+                            <tr id="row-trap-max-current">
+                                <td>Max Current (mA)</td>
+                                <td><input type="number" class="form-control" id="input-trap-max-current" placeholder="1000"></td>
+                            </tr>
+                            <tr id="row-trap-switch-1-disable">
+                                <td>Switch 1 Disable</td>
+                                <td>
+                                    <select class="form-control" id="input-trap-switch-1-disable">
+                                        <option value="IGNORE">IGNORE</option>
+                                        <option value="OPEN">OPEN</option>
+                                        <option value="CLOSED">CLOSED</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr id="row-trap-switch-2-disable">
+                                <td>Switch 2 Disable</td>
+                                <td>
+                                    <select class="form-control" id="input-trap-switch-2-disable">
+                                        <option value="IGNORE">IGNORE</option>
+                                        <option value="OPEN">OPEN</option>
+                                        <option value="CLOSED">CLOSED</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr id="row-trap-switch-logic">
+                                <td>Switch Logic</td>
+                                <td>
+                                    <select class="form-control" id="input-trap-switch-logic">
+                                        <option value="OR">OR</option>
+                                        <option value="AND">AND</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr id="row-trap-motion-message-gap">
+                                <td>Motion Message Gap (seconds)</td>
+                                <td><input type="number" class="form-control" id="input-trap-motion-message-gap" placeholder="10"></td>
+                            </tr>
+                            <tr id="row-trap-post-reset-cooldown">
+                                <td>Post Reset Cooldown (seconds)</td>
+                                <td><input type="number" class="form-control" id="input-trap-post-reset-cooldown" placeholder="20"></td>
+                            </tr>
+                            <tr id="row-trap-spool-reed-check">
+                                <td>Spool Reed Check</td>
+                                <td><input type="checkbox" id="input-trap-spool-reed-check"></td>
+                            </tr>
+                            <tr id="row-trap-manual-mode-timeout">
+                                <td>Manual Mode Timeout (minutes)</td>
+                                <td><input type="number" class="form-control" id="input-trap-manual-mode-timeout" placeholder="30"></td>
+                            </tr>
+                            <tr id="row-trap-test-loop-interval">
+                                <td>Test Loop Interval (minutes)</td>
+                                <td><input type="number" class="form-control" id="input-trap-test-loop-interval" placeholder="180"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </details>
+            </div>
+        </div>
+        <div class="pt-1 pb-5">
+            <button type="button" onclick="saveTrapSettings()" class="btn btn-primary">Save Trap Settings</button>
+        </div>
     </div>
 
     <script src="/static/js/jquery-3.3.1.slim.min.js"></script>
     <script src="/static/js/bootstrap.min.js"></script>
     <script src="/static/js/api-utils.js"></script>
+    <script src="/static/js/config-utils.js"></script>
     <script src="/static/js/trap.js"></script>
 </body>
 

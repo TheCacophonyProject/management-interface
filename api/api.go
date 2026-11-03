@@ -68,6 +68,10 @@ type ManagementAPI struct {
 	hotspotTimer *time.Ticker
 	recordingDir string
 	appVersion   string
+
+	// KeepAwake keeps the camera and its hotspot on. Every API request does this, and a
+	// stream that stays open, such as the trap status, calls it every so often.
+	KeepAwake func()
 }
 
 func NewAPI(router *mux.Router, config *goconfig.Config, appVersion string, l *logging.Logger) (*ManagementAPI, error) {
@@ -424,6 +428,11 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if err := api.checkTrapProgram(newConfig); err != nil {
+		badRequest(&w, err)
+		return
+	}
+
 	log.Debugf("set config: %+v", newConfig)
 	if err := api.config.SetMultipleSections(newConfig); err != nil {
 		log.Printf("Error with SetFromMap: %s", err)
@@ -431,6 +440,33 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// aiModeTrapProgram is the spool-py program where the camera enables the trap when it sees a
+// target species. The camera can only do that in high power mode, where the Raspberry Pi is
+// on and doing the recording.
+const aiModeTrapProgram = 3
+
+// checkTrapProgram refuses new config that sets the trap to AI Mode while the camera is in
+// low power mode.
+func (api *ManagementAPI) checkTrapProgram(newConfig map[string]any) error {
+	trap, _ := newConfig[goconfig.TrapKey].(map[string]any)
+	trapConfig, _ := trap["config"].(map[string]any)
+	if program, _ := trapConfig["program"].(float64); program != aiModeTrapProgram {
+		return nil
+	}
+
+	if err := api.config.Reload(); err != nil {
+		return err
+	}
+	recorder := goconfig.DefaultThermalRecorder()
+	if err := api.config.Unmarshal(goconfig.ThermalRecorderKey, &recorder); err != nil {
+		return err
+	}
+	if recorder.UseLowPowerMode {
+		return errors.New("the trap can't be set to AI Mode while the camera is in low power mode")
+	}
+	return nil
 }
 
 // GetConfig will return the config settings and the defaults
@@ -686,24 +722,52 @@ func getTrapDbus() (dbus.BusObject, error) {
 // callTrap makes a call to the trap DBus service, writing the reason for any failure to
 // the response so it can be shown to the user.
 func callTrap(w *http.ResponseWriter, method string, args ...interface{}) {
+	if storeTrapCall(w, method, nil, args...) {
+		(*w).WriteHeader(http.StatusOK)
+	}
+}
+
+// storeTrapCall makes a call to the trap DBus service, storing what it returns in out.
+// It returns false after writing the reason for a failure to the response.
+func storeTrapCall(w *http.ResponseWriter, method string, out []any, args ...any) bool {
 	trapDbus, err := getTrapDbus()
 	if err != nil {
 		log.Printf("failed to connect to DBus: %v", err)
 		serverError(w, err)
-		return
+		return false
 	}
 
-	if err := trapDbus.Call(trapDbusName+"."+method, 0, args...).Store(); err != nil {
+	if err := trapDbus.Call(trapDbusName+"."+method, 0, args...).Store(out...); err != nil {
 		log.Printf("trap %s failed: %v", method, err)
-		var dbusErr dbus.Error
-		if errors.As(err, &dbusErr) && dbusErr.Name == "org.freedesktop.DBus.Error.ServiceUnknown" {
-			badRequest(w, errors.New("trap service is not running, check that comms is set to trap-control"))
-			return
-		}
-		badRequest(w, err)
+		badRequest(w, trapCallError(err))
+		return false
+	}
+	return true
+}
+
+// errTrapServiceNotRunning is why a trap call fails when tc2-hat-comms hasn't started the
+// trap service, such as while it is starting or when comms isn't set to trap-control.
+var errTrapServiceNotRunning = errors.New("trap service is not running, check that comms is set to trap-control")
+
+// trapCallError gives the reason a call to the trap DBus service failed, for the user.
+func trapCallError(err error) error {
+	var dbusErr dbus.Error
+	if errors.As(err, &dbusErr) && dbusErr.Name == "org.freedesktop.DBus.Error.ServiceUnknown" {
+		return errTrapServiceNotRunning
+	}
+	return err
+}
+
+// GetTrapStatus returns what the trap is doing, as the JSON the trap reports: State, and
+// depending on the state Enabled, DisabledReason, Request, CagePhase and CameraEnabled
+// (see status_reply in spool-py).
+func (api *ManagementAPI) GetTrapStatus(w http.ResponseWriter, r *http.Request) {
+	var status string
+	if !storeTrapCall(&w, "Status", []any{&status}) {
 		return
 	}
-	(*w).WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	io.WriteString(w, status)
 }
 
 // RestartTrap restarts the trap that is connected to the device.
@@ -766,6 +830,33 @@ func (api *ManagementAPI) CloseTrapDoor(w http.ResponseWriter, r *http.Request) 
 	}
 	log.Printf("closing trap door %d", door)
 	callTrap(&w, "CloseDoor", door)
+}
+
+// cageCommandMethods maps the command in a /trap/cage/{command} route to the trap DBus
+// method that sends it.
+var cageCommandMethods = map[string]string{
+	"hold":    "CageHold",
+	"release": "CageRelease",
+	"kill":    "CageKill",
+	"wait":    "CageWait",
+	"escaped": "CageEscaped",
+	"killed":  "CageKilled",
+}
+
+// CageCommand sends a command for the animal held in the cage on a trap that has one.
+// hold, release and kill are for while the animal is shut in the cage, and wait, escaped
+// and killed are for once it has been released or let through to the kill mechanism.
+// Unlike the other trap requests these don't put the trap into manual mode. The trap
+// refuses a command that doesn't apply at the time, and the reason is returned.
+func (api *ManagementAPI) CageCommand(w http.ResponseWriter, r *http.Request) {
+	command := mux.Vars(r)["command"]
+	method, ok := cageCommandMethods[command]
+	if !ok {
+		badRequest(&w, fmt.Errorf("unknown cage command %q", command))
+		return
+	}
+	log.Printf("sending cage command %s", command)
+	callTrap(&w, method)
 }
 
 // CheckSaltConnection will try to ping the salt server and return the response
