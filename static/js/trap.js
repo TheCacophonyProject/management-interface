@@ -164,6 +164,7 @@ const trapStates = {
   RESET_FAILED: "Spool reset failed, waiting to be reset or restarted",
   ARMED: "Armed",
   TRIGGERED: "Triggered",
+  DRY_TRIGGERED: "Would have triggered (Observation Mode)",
   CAGE: "Running the cage sequence",
   MANUAL: "Manual mode",
 };
@@ -199,6 +200,9 @@ function trapStatusRows(status) {
   }
   const rows = [];
   rows.push(["State", trapStates[status.State] || status.State || "Unknown (this program doesn't run the trap sequence)"]);
+  if (status.ObservationMode) {
+    rows.push(["Observation Mode", "On, motion won't trigger the trap"]);
+  }
   if (status.Enabled !== undefined) {
     rows.push(["Enabled", status.Enabled ? "Yes" : "No: " + (status.DisabledReason || "")]);
   }
@@ -351,6 +355,7 @@ const trapMessageNames = {
   MOTION: "Motion",
   MAX_MOTION: "Too much motion",
   TRIGGERED: "Triggered",
+  DRY_TRIGGERED: "Dry trigger",
   SPOOL_RESET: "Spool reset",
   SPOOL_RESET_FAILED: "Spool reset failed",
   RTC_BATTERY_FLAT: "RTC battery flat",
