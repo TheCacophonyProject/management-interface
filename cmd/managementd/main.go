@@ -268,6 +268,7 @@ func main() {
 	apiRouter.HandleFunc("/recordings", apiObj.GetRecordings).Methods("GET")
 	apiRouter.HandleFunc("/recording/{id}", apiObj.GetRecording).Methods("GET")
 	apiRouter.HandleFunc("/recording/{id}", apiObj.DeleteRecording).Methods("DELETE")
+	// TODO if sidekick isn't using this remove it
 	apiRouter.HandleFunc("/camera/snapshot", apiObj.TakeSnapshot).Methods("PUT")
 	apiRouter.HandleFunc("/camera/snapshot-recording", apiObj.TakeSnapshotRecording).Methods("PUT")
 	apiRouter.HandleFunc("/signal-strength", apiObj.GetSignalStrength).Methods("GET")
@@ -350,7 +351,7 @@ func main() {
 	apiRouter.HandleFunc("/offload-status", apiObj.RecordingOffloadStatus).Methods("GET")
 	apiRouter.HandleFunc("/cancel-offload", apiObj.CancelOffload).Methods("PUT")
 	apiRouter.HandleFunc("/thermal/long-test-recording", apiObj.TakeLongTestThermalRecording).Methods("PUT")
-	apiRouter.HandleFunc("/thermal/short-test-recording", apiObj.TakeShortTestThermalRecording).Methods("PUT")
+	apiRouter.HandleFunc("/thermal/short-test-recording", apiObj.TakeLowPowerTestThermalRecording).Methods("PUT")
 	apiRouter.HandleFunc("/thermal/thermal-status", apiObj.TestThermalRecordingStatus).Methods("GET")
 	apiRouter.HandleFunc("/offload-now", apiObj.ForceRp2040Offload).Methods("PUT")
 	apiRouter.HandleFunc("/serve-frames-now", apiObj.PrioritiseFrameServe).Methods("PUT")

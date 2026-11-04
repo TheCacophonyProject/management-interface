@@ -300,15 +300,29 @@ func (api *ManagementAPI) TakeSnapshot(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// TakeSnapshotRecording will request a new snapshot recording to be taken by thermal-recorder
-func (api *ManagementAPI) TakeSnapshotRecording(w http.ResponseWriter, r *http.Request) {
+func (api *ManagementAPI) TakeHighPowerTestRecording() error {
 	conn, err := dbus.SystemBus()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return err
 	}
 	recorder := conn.Object("org.cacophony.thermalrecorder", "/org/cacophony/thermalrecorder")
 	err = recorder.Call("org.cacophony.thermalrecorder.TakeTestRecording", 0).Err
+	return err
+}
+
+// TakeSnapshotRecording will request a new snapshot recording to be taken by thermal-recorder
+func (api *ManagementAPI) TakeSnapshotRecording(w http.ResponseWriter, r *http.Request) {
+	thermalRecorder := goconfig.DefaultThermalRecorder()
+	if err := api.config.Unmarshal(goconfig.ThermalRecorderKey, &thermalRecorder); err != nil {
+		serverError(&w, err)
+		return
+	}
+	// Low and medium power modes both use low power mode.
+	if thermalRecorder.UseLowPowerMode {
+		api.TakeLowPowerTestThermalRecording(w, r)
+		return
+	}
+	err := api.TakeHighPowerTestRecording()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

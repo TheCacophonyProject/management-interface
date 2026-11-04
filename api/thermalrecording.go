@@ -72,7 +72,7 @@ func (api *ManagementAPI) TakeLongTestThermalRecording(w http.ResponseWriter, r 
 	json.NewEncoder(w).Encode(result)
 }
 
-func (api *ManagementAPI) TakeShortTestThermalRecording(w http.ResponseWriter, r *http.Request) {
+func (api *ManagementAPI) TakeLowPowerTestThermalRecording(w http.ResponseWriter, r *http.Request) {
 	tc2AgentDbus, err := GetTC2AgentDbus()
 	if err != nil {
 		log.Println(err)
