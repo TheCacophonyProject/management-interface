@@ -522,9 +522,149 @@ func (api *ManagementAPI) ensurePowerModeForComms(newConfig map[string]any) {
 	log.Info("comms is enabled, switching thermal-recorder from low power to medium power mode")
 }
 
+// ensureSidekickPowerMode adjusts a power mode set by sidekick to suit comms:
+//   - low power mode off without comms becomes medium power (low power mode with
+//     instant classify).
+//   - low power mode on without comms turns off instant classify (low power).
+//   - without comms run-classifier and postprocess are turned off, with comms
+//     run-classifier is turned on.
+//   - low power mode on with comms that isn't in lowPowerComms also turns on
+//     instant classify, as that comms needs medium or high power.
+//   - comms in postProcessingComms turns on run-classifier and postprocess in
+//     thermal-motion, with low power mode off becoming medium power and low
+//     power mode on turning off instant classify (low power).
+func (api *ManagementAPI) ensureSidekickPowerMode(newConfig map[string]any) {
+	requestComms, commsInRequest := newConfig[goconfig.CommsKey].(map[string]any)
+
+	// Use low power mode from the request, falling back to the existing config
+	// when only comms is being changed.
+	thermalRecorder, ok := newConfig[goconfig.ThermalRecorderKey].(map[string]any)
+	if !ok {
+		thermalRecorder = map[string]any{}
+	}
+	lowPower, ok := thermalRecorder["use-low-power-mode"].(bool)
+	if !ok {
+		if !commsInRequest {
+			return
+		}
+		var existing goconfig.ThermalRecorder
+		if err := api.config.Unmarshal(goconfig.ThermalRecorderKey, &existing); err != nil {
+			log.Errorf("Error reading thermal-recorder config: %v", err)
+			return
+		}
+		lowPower = existing.UseLowPowerMode
+	}
+	// Only add thermal-recorder to the request if a rule below changes it.
+	defer func() {
+		if len(thermalRecorder) > 0 {
+			newConfig[goconfig.ThermalRecorderKey] = thermalRecorder
+		}
+	}()
+
+	// Use comms from the request, falling back to the existing config.
+	var comms goconfig.Comms
+	if err := api.config.Unmarshal(goconfig.CommsKey, &comms); err != nil {
+		log.Errorf("Error reading comms config: %v", err)
+		return
+	}
+	if commsInRequest {
+		comms.Enable, _ = requestComms["enable"].(bool)
+		if commsOut, ok := requestComms["comms-out"].(string); ok {
+			comms.CommsOut = commsOut
+		}
+	}
+
+	if !lowPower && !comms.Enable {
+		thermalRecorder["use-low-power-mode"] = true
+		thermalRecorder["instant-classify"] = true
+		thermalMotion, ok := newConfig[goconfig.ThermalMotionKey].(map[string]any)
+		if !ok {
+			thermalMotion = map[string]any{}
+		}
+		thermalMotion["run-classifier"] = false
+		thermalMotion["postprocess"] = false
+		newConfig[goconfig.ThermalMotionKey] = thermalMotion
+		log.Info("comms isn't enabled, switching thermal-recorder to medium power mode")
+	} else if lowPower && !comms.Enable {
+		thermalRecorder["instant-classify"] = false
+		thermalMotion, ok := newConfig[goconfig.ThermalMotionKey].(map[string]any)
+		if !ok {
+			thermalMotion = map[string]any{}
+		}
+		thermalMotion["run-classifier"] = false
+		thermalMotion["postprocess"] = false
+		newConfig[goconfig.ThermalMotionKey] = thermalMotion
+		log.Info("comms isn't enabled, switching thermal-recorder to low power mode")
+	} else if lowPower && comms.Enable && !slices.Contains(lowPowerComms, comms.CommsOut) {
+		thermalRecorder["instant-classify"] = true
+		thermalMotion, ok := newConfig[goconfig.ThermalMotionKey].(map[string]any)
+		if !ok {
+			thermalMotion = map[string]any{}
+		}
+		thermalMotion["run-classifier"] = true
+		thermalMotion["postprocess"] = false
+		newConfig[goconfig.ThermalMotionKey] = thermalMotion
+		log.Infof("comms-out is %s, switching thermal-recorder to medium power mode", comms.CommsOut)
+	} else if !lowPower && comms.Enable && !slices.Contains(lowPowerComms, comms.CommsOut) {
+		thermalMotion, ok := newConfig[goconfig.ThermalMotionKey].(map[string]any)
+		if !ok {
+			thermalMotion = map[string]any{}
+		}
+		thermalMotion["run-classifier"] = true
+		thermalMotion["postprocess"] = false
+		newConfig[goconfig.ThermalMotionKey] = thermalMotion
+		log.Infof("comms-out is %s, enabling run-classifier and disabling postprocess in thermal-motion", comms.CommsOut)
+	} else if comms.Enable && slices.Contains(postProcessingComms, comms.CommsOut) {
+		// Sidekick's high power becomes medium power, and its low power stays low power.
+		thermalRecorder["use-low-power-mode"] = true
+		thermalRecorder["instant-classify"] = !lowPower
+		thermalMotion, ok := newConfig[goconfig.ThermalMotionKey].(map[string]any)
+		if !ok {
+			thermalMotion = map[string]any{}
+		}
+		thermalMotion["run-classifier"] = true
+		thermalMotion["postprocess"] = true
+		newConfig[goconfig.ThermalMotionKey] = thermalMotion
+		log.Infof("comms-out is %s, setting instant-classify to %v and enabling run-classifier and postprocess", comms.CommsOut, !lowPower)
+	}
+}
+
+// reportSidekickPowerMode reverts the power mode reported to sidekick, which
+// only knows about low power mode, the reverse of ensureSidekickPowerMode.
+// Medium power (low power mode with instant classify) is reported as high
+// power, unless comms is enabled with a type not in lowPowerComms, where it is
+// what sidekick's low power mode is changed to. This only changes the response,
+// not the config.
+func reportSidekickPowerMode(values map[string]any) {
+	thermalRecorder, ok := values[goconfig.ThermalRecorderKey].(*goconfig.ThermalRecorder)
+	if !ok {
+		return
+	}
+	comms, ok := values[goconfig.CommsKey].(*goconfig.Comms)
+	if !ok {
+		return
+	}
+	if comms.Enable && !slices.Contains(lowPowerComms, comms.CommsOut) {
+		return
+	}
+	if thermalRecorder.UseLowPowerMode && thermalRecorder.InstantClassify {
+		thermalRecorder.UseLowPowerMode = false
+	}
+}
+
+// clientHeader is set by the management interface config page so its requests
+// can be told apart from other clients such as sidekick. It can be faked, so
+// don't rely on it for security.
+const (
+	clientHeader              = "X-Client"
+	managementInterfaceClient = "management-interface"
+)
+
 // SetConfig is a way of writing new config to the device.
 func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
-	log.Info("API request: SetConfig")
+	fromManagementInterface := r.Header.Get(clientHeader) == managementInterfaceClient
+
+	log.Infof("API request: SetConfig (from management interface: %v)", fromManagementInterface)
 	newConfig := map[string]any{}
 
 	section := r.FormValue("section")
@@ -544,12 +684,15 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	api.ensureThermalMotionForComms(newConfig)
-	ensureClassifierForPostProcess(newConfig)
-	ensureLowPowerForInstantClassify(newConfig)
-	api.ensurePowerModeForComms(newConfig)
-
+	if !fromManagementInterface {
+		// Once sidekick is updated we can remove this
+		api.ensureSidekickPowerMode(newConfig)
+	} else {
+		api.ensureThermalMotionForComms(newConfig)
+		ensureClassifierForPostProcess(newConfig)
+		ensureLowPowerForInstantClassify(newConfig)
+		api.ensurePowerModeForComms(newConfig)
+	}
 	log.Debugf("set config: %+v", newConfig)
 	if err := api.config.SetMultipleSections(newConfig); err != nil {
 		log.Printf("Error with SetFromMap: %s", err)
@@ -561,7 +704,8 @@ func (api *ManagementAPI) SetConfig(w http.ResponseWriter, r *http.Request) {
 
 // GetConfig will return the config settings and the defaults
 func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
-	log.Info("API request: GetConfig")
+	fromManagementInterface := r.Header.Get(clientHeader) == managementInterfaceClient
+	log.Infof("API request: GetConfig (from management interface: %v)", fromManagementInterface)
 	if err := api.config.Reload(); err != nil {
 		serverError(&w, err)
 		return
@@ -576,6 +720,10 @@ func (api *ManagementAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		serverError(&w, err)
 		return
+	}
+	if !fromManagementInterface {
+		// Once sidekick is updated we can remove this
+		reportSidekickPowerMode(values)
 	}
 
 	configValuesCC := map[string]interface{}{}

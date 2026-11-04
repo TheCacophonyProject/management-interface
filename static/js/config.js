@@ -9,6 +9,8 @@ async function loadConfig() {
     const response = await fetch("/api/config", {
       headers: {
         Authorization: "Basic " + btoa("admin:feathers"),
+        // Lets GetConfig tell requests from this page apart from sidekick.
+        "X-Client": "management-interface",
       },
     });
 
@@ -233,6 +235,8 @@ async function saveConfig(section, data) {
       method: "POST",
       headers: {
         Authorization: "Basic " + btoa("admin:feathers"),
+        // Lets SetConfig tell requests from this page apart from sidekick.
+        "X-Client": "management-interface",
       },
       body: formData,
     });
