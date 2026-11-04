@@ -236,14 +236,17 @@ async function takeTestRecording() {
   document
     .getElementById("take-snapshot-recording")!
     .setAttribute("disabled", "true");
-  console.log("making a test recording");
   fetch("/api/camera/snapshot-recording", {
     method: "PUT",
     headers: {
       Authorization: "Basic YWRtaW46ZmVhdGhlcnM=",
     },
   })
-    .then((response) => console.log(response))
+    .then((response) => {
+      if (response.status === 500) {
+        alert("Test Recording cannot be taken right now. Try again in 10 seconds");
+      }
+    })
     .then((data) => console.log(data))
     .catch((error) => console.error(error));
   //TODO handle errors better and check that recording was made properly instead of just waiting..
